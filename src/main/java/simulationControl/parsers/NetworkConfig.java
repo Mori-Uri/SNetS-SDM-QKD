@@ -218,6 +218,46 @@ public class NetworkConfig {
         private int qTransmittersPerTrustedNode = -1;
         private int qReceiversPerTrustedNode = -1;
 
+        /**
+         * Parte 39: how the trusted nodes are placed. "global" (default) = every link is cut into spans of at most
+         * qtndKm; "perLink" = the links listed in trustedNodesPerLink use their own rule (a number of trusted nodes,
+         * evenly spaced, or their own QTND in km) and the other links keep qtndKm.
+         */
+        private String trustedNodeMode = "global";
+        private List<LinkTrustedNodes> trustedNodesPerLink;
+
+        public String getTrustedNodeMode() {
+            return trustedNodeMode == null || trustedNodeMode.trim().isEmpty() ? "global" : trustedNodeMode.trim();
+        }
+        public void setTrustedNodeMode(String v) { this.trustedNodeMode = v; }
+        public boolean isTrustedNodesPerLink() { return "perlink".equalsIgnoreCase(getTrustedNodeMode()); }
+        public List<LinkTrustedNodes> getTrustedNodesPerLink() { return trustedNodesPerLink; }
+        public void setTrustedNodesPerLink(List<LinkTrustedNodes> v) { this.trustedNodesPerLink = v; }
+
+        /**
+         * Parte 39: QTND of one link. Without per-link mode, or when the link is not listed, it is qtndKm. A listed
+         * link ("A-B" matches both directions; an entry "B-A" written for the reverse direction wins for it) uses
+         * trustedNodes (n nodes = n + 1 equal spans) or its own qtndKm.
+         */
+        public double qtndForLink(String source, String destination, double lengthKm) {
+            if (!isTrustedNodesPerLink() || trustedNodesPerLink == null) return qtndKm;
+            LinkTrustedNodes exact = null, reverse = null;
+            for (LinkTrustedNodes e : trustedNodesPerLink) {
+                if (e == null || e.link == null) continue;
+                String[] ab = e.link.trim().split("\\s*-\\s*");
+                if (ab.length != 2) continue;
+                if (ab[0].equals(source) && ab[1].equals(destination)) exact = e;
+                else if (ab[0].equals(destination) && ab[1].equals(source)) reverse = e;
+            }
+            LinkTrustedNodes e = exact != null ? exact : reverse;
+            if (e == null) return qtndKm;
+            if (e.trustedNodes != null && e.trustedNodes.intValue() >= 0 && lengthKm > 0) {
+                return lengthKm / (e.trustedNodes.intValue() + 1);
+            }
+            if (e.qtndKm != null && e.qtndKm.doubleValue() > 0) return e.qtndKm.doubleValue();
+            return qtndKm;
+        }
+
         public String getPichMode() {
             return pichMode == null || pichMode.trim().isEmpty() ? "segment" : pichMode.trim().toLowerCase();
         }
@@ -325,6 +365,23 @@ public class NetworkConfig {
                     ", wavelengthPolicy=" + getWavelengthPolicy() +
                     '}';
         }
+    }
+
+    /** Parte 39: trusted-node rule of one link (network.qkd.trustedNodesPerLink). */
+    public static class LinkTrustedNodes {
+        /** "A-B": the link between nodes A and B (both directions unless "B-A" is also listed). */
+        private String link;
+        /** Number of trusted nodes inside the link (evenly spaced); has priority over qtndKm. */
+        private Integer trustedNodes;
+        /** QTND of this link in km (used when trustedNodes is absent). */
+        private Double qtndKm;
+
+        public String getLink() { return link; }
+        public void setLink(String v) { this.link = v; }
+        public Integer getTrustedNodes() { return trustedNodes; }
+        public void setTrustedNodes(Integer v) { this.trustedNodes = v; }
+        public Double getQtndKm() { return qtndKm; }
+        public void setQtndKm(Double v) { this.qtndKm = v; }
     }
 
     public static class ModulationConfig {

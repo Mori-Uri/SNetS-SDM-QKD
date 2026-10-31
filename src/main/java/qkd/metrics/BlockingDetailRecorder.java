@@ -110,6 +110,34 @@ public final class BlockingDetailRecorder implements java.io.Serializable {
     private long[][] rowAttempts;
     private final Map<String, long[][]> rowBlocked = new LinkedHashMap<String, long[][]>();
 
+    /*
+     * Parte 39: channel that failed in each blocked QKD-protected request. A protected request needs three
+     * channels: its classical data circuit (CCh), the quantum channels of the QKD session (QCh) and, when modelled,
+     * the public channel of the protocol (PICh). The channel is decided by the final cause of the block:
+     * classical causes and the protection of active sessions = CCh; SKR, QCh spectrum, QTx/QRx and other QKD
+     * causes = QCh; PICh = PICh. Observation only, written to QKDChannelBlocking.csv and
+     * QKDChannelSlotBlocking.csv.
+     */
+    public static final String CH_CCH = "CCh";
+    public static final String CH_QCH = "QCh";
+    public static final String CH_PICH = "PICh";
+    public static final String[] CHANNELS = {CH_CCH, CH_QCH, CH_PICH};
+    /** channel -> cause -> blocked protected requests */
+    private final Map<String, Map<String, Long>> chanCause = new LinkedHashMap<String, Map<String, Long>>();
+    /** link -> blocked protected requests attributed to that link, per channel (CHANNELS order) */
+    private long[][] chanLink;
+    /** protected requests whose QCh / PICh failed without any band tried (no place in the spectrum to show) */
+    private long chQchNoBand, chPichNoBand;
+    /** where the protected requests used / tried each channel (slots and link-core rows) */
+    private int[][][] chSlotAttempts;
+    private final Map<String, int[][][]> chSlotBlocked = new LinkedHashMap<String, int[][][]>();
+    private long[][] chRowAttempts;
+    private final Map<String, long[][]> chRowBlocked = new LinkedHashMap<String, long[][]>();
+    /** channel decided by the last observe() for a protected request (null = accepted or not protected) */
+    private String lastChannel;
+    /** links of the route of the candidate of the last protected request (fallback attribution) */
+    private List<Link> lastRouteLinks;
+
     public BlockingDetailRecorder(double warmupArrivals, ControlPlane cp) {
         this.warmupArrivals = Math.max(0, warmupArrivals);
         this.warmupDone = this.warmupArrivals <= 0;
@@ -133,6 +161,11 @@ public final class BlockingDetailRecorder implements java.io.Serializable {
                 slotAttempts = new int[linkNames.size()][slotCores][slotSlots];
                 rowAttempts = new long[linkNames.size()][slotCores];
             }
+            chanLink = new long[linkNames.size()][CHANNELS.length];
+            if (slotCores > 0 && slotSlots > 0) {
+                chSlotAttempts = new int[linkNames.size()][slotCores][slotSlots];
+                chRowAttempts = new long[linkNames.size()][slotCores];
+            }
         }
     }
 
@@ -154,6 +187,81 @@ public final class BlockingDetailRecorder implements java.io.Serializable {
         rowBlocked.clear();
         qkdBlockedNoQchBand = 0;
         modPerLink.clear();
+        chanCause.clear();
+        if (chanLink != null) for (long[] a : chanLink) java.util.Arrays.fill(a, 0);
+        chQchNoBand = chPichNoBand = 0;
+        if (chSlotAttempts != null) for (int[][] a : chSlotAttempts) for (int[] b : a) java.util.Arrays.fill(b, 0);
+        chSlotBlocked.clear();
+        if (chRowAttempts != null) for (long[] a : chRowAttempts) java.util.Arrays.fill(a, 0);
+        chRowBlocked.clear();
+    }
+
+    /** Parte 39: channel of a block cause (see CH_*). */
+    public static String channelOf(String cause) {
+        if (cause == null) return null;
+        if (C_QKD_PICH.equals(cause)) return CH_PICH;
+        if (cause.startsWith("QKD ") && !C_QKD_PROTECT.equals(cause)) return CH_QCH;
+        return CH_CCH;
+    }
+
+    private static int channelIndex(String ch) {
+        for (int i = 0; i < CHANNELS.length; i++) if (CHANNELS[i].equals(ch)) return i;
+        return -1;
+    }
+
+    /** Parte 39: one attempt (and one block of the channel, when not null) of a protected request on a band. */
+    private boolean chMarkBand(String link, int core, int[] band, String blockedChannel) {
+        if (chSlotAttempts == null) return false;
+        Integer li = linkIndex.get(link);
+        if (li == null || core < 0 || core >= slotCores || band == null || band.length < 2 || band[0] < 1 || band[1] < band[0]) return false;
+        int[] bl = null;
+        long[][] rblk = null;
+        if (blockedChannel != null) {
+            int[][][] blk = chSlotBlocked.get(blockedChannel);
+            if (blk == null) { blk = new int[linkNames.size()][][]; chSlotBlocked.put(blockedChannel, blk); }
+            if (blk[li] == null) blk[li] = new int[slotCores][];
+            if (blk[li][core] == null) blk[li][core] = new int[slotSlots];
+            bl = blk[li][core];
+            rblk = chRowBlocked.get(blockedChannel);
+            if (rblk == null) { rblk = new long[linkNames.size()][slotCores]; chRowBlocked.put(blockedChannel, rblk); }
+        }
+        int[] at = chSlotAttempts[li][core];
+        for (int s = band[0] - 1; s < band[1] && s < slotSlots; s++) {
+            at[s]++;
+            if (bl != null) bl[s]++;
+        }
+        chRowAttempts[li][core]++;
+        if (rblk != null) rblk[li][core]++;
+        return true;
+    }
+
+    private void chBlockLink(String link, String ch) {
+        Integer li = linkIndex.get(link);
+        int ci = channelIndex(ch);
+        if (li != null && ci >= 0 && chanLink != null) chanLink[li][ci]++;
+    }
+
+    /** Parte 39: the blocked channel falls back to every link of the candidate route (no band or no link known). */
+    private void chBlockRoute(String ch) {
+        if (lastRouteLinks == null) return;
+        for (Link l : lastRouteLinks) chBlockLink(linkName(l), ch);
+    }
+
+    /**
+     * Parte 39: PICh bands of a protected request. Accepted: its PIChs count as attempts. Blocked by the PICh: the
+     * link where no PICh fitted gets the block (all links of the route when unknown); a PICh failure has no band.
+     * Entries: {Link, Integer core, int[] band}.
+     */
+    public void markPich(RequestForConnection request, boolean success, List<Object[]> entries, Link failedLink) {
+        if (request == null || !request.isQkdProtected()) return;
+        if (success) {
+            if (entries != null) for (Object[] e : entries) chMarkBand(linkName((Link) e[0]), ((Integer) e[1]).intValue(), (int[]) e[2], null);
+            return;
+        }
+        if (!CH_PICH.equals(lastChannel)) return;
+        chPichNoBand++;
+        if (failedLink != null) chBlockLink(linkName(failedLink), CH_PICH);
+        else chBlockRoute(CH_PICH);
     }
 
     /**
@@ -163,6 +271,7 @@ public final class BlockingDetailRecorder implements java.io.Serializable {
      */
     public void markQch(RequestForConnection request, boolean success, List<Object[]> entries, boolean qkdTried) {
         if (request == null || !request.isQkdProtected() || slotAttempts == null) return;
+        markQchChannel(success, entries);
         String cause = success ? null : lastObservedCause;
         boolean qkdCause = cause != null && cause.startsWith("QKD ") && !C_QKD_PROTECT.equals(cause);
         if (!success && !qkdCause) return; // blocked by the classical side: the QKD side did not decide
@@ -179,6 +288,27 @@ public final class BlockingDetailRecorder implements java.io.Serializable {
             }
         }
         if (!success && !any && qkdTried) qkdBlockedNoQchBand++;
+    }
+
+    /** Parte 39: QCh bands in the channel maps; the links of the bands tried get the block when the QCh failed. */
+    private void markQchChannel(boolean success, List<Object[]> entries) {
+        boolean qchFailed = !success && CH_QCH.equals(lastChannel);
+        if (!success && !qchFailed && !CH_PICH.equals(lastChannel)) return; // the classical side decided
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        java.util.Set<String> links = new java.util.LinkedHashSet<String>();
+        boolean any = false;
+        if (entries != null) {
+            for (Object[] e : entries) {
+                Link l = (Link) e[0];
+                int core = ((Integer) e[1]).intValue();
+                int[] band = (int[]) e[2];
+                if (!seen.add(linkName(l) + "|" + core + "|" + band[0] + "-" + band[1])) continue;
+                if (chMarkBand(linkName(l), core, band, qchFailed ? CH_QCH : null)) { any = true; links.add(linkName(l)); }
+            }
+        }
+        if (!qchFailed) return;
+        if (any) for (String l : links) chBlockLink(l, CH_QCH);
+        else { chQchNoBand++; chBlockRoute(CH_QCH); }
     }
 
     /** Adds one attempt (and one block of the cause, when not null) on a band of one link and core. */
@@ -204,6 +334,16 @@ public final class BlockingDetailRecorder implements java.io.Serializable {
         rowAttempts[li][core]++;
         if (rblk != null) rblk[li][core]++;
         return true;
+    }
+
+    /** Parte 39: the classical band (CCh) of a protected request on every link of its route. */
+    private void chMarkCircuit(Circuit c, String blockedChannel) {
+        if (chSlotAttempts == null || c == null || c.getRoute() == null) return;
+        int core = rawCore(c);
+        int[] band;
+        try { band = c.getSpectrumAssigned(); } catch (RuntimeException e) { band = null; }
+        if (core < 0 || band == null) return;
+        for (Link l : c.getRoute().getLinkList()) chMarkBand(linkName(l), core, band, blockedChannel);
     }
 
     /** Part 29: adds one attempt (and one block of the cause, when not null) on the band of the candidate. */
@@ -312,6 +452,25 @@ public final class BlockingDetailRecorder implements java.io.Serializable {
                 Map<String, Long> m = blockedPerCore.get(core);
                 if (m == null) { m = new LinkedHashMap<String, Long>(); blockedPerCore.put(core, m); }
                 m.put(cause, m.containsKey(cause) ? m.get(cause) + 1 : 1L);
+            }
+        }
+
+        // Parte 39: channel of the protected requests
+        lastChannel = null;
+        lastRouteLinks = null;
+        if (cls == QKD) {
+            lastRouteLinks = ref != null && ref.getRoute() != null ? ref.getRoute().getLinkList() : null;
+            if (!success) {
+                lastChannel = channelOf(cause);
+                Map<String, Long> m = chanCause.get(lastChannel);
+                if (m == null) { m = new LinkedHashMap<String, Long>(); chanCause.put(lastChannel, m); }
+                m.put(cause, m.containsKey(cause) ? m.get(cause) + 1 : 1L);
+                if (CH_CCH.equals(lastChannel)) chBlockRoute(CH_CCH);
+            }
+            if (success) {
+                if (request.getCircuits() != null) for (Circuit c : request.getCircuits()) chMarkCircuit(c, null);
+            } else {
+                chMarkCircuit(blockedCircuit != null ? blockedCircuit : any, CH_CCH.equals(lastChannel) ? CH_CCH : null);
             }
         }
 
@@ -471,6 +630,19 @@ public final class BlockingDetailRecorder implements java.io.Serializable {
             for (int i = 0; i < v.length; i++) v[i] = e.getValue()[i].clone();
             s.rowBlocked.put(e.getKey(), v);
         }
+        // Parte 39
+        for (Map.Entry<String, Map<String, Long>> e : chanCause.entrySet()) s.chanCause.put(e.getKey(), new LinkedHashMap<String, Long>(e.getValue()));
+        if (chanLink != null) { s.chanLink = new long[chanLink.length][]; for (int i = 0; i < chanLink.length; i++) s.chanLink[i] = chanLink[i].clone(); }
+        s.chQchNoBand = chQchNoBand;
+        s.chPichNoBand = chPichNoBand;
+        s.chSlotAttempts = deepCopy(chSlotAttempts);
+        for (Map.Entry<String, int[][][]> e : chSlotBlocked.entrySet()) s.chSlotBlocked.put(e.getKey(), deepCopy(e.getValue()));
+        if (chRowAttempts != null) { s.chRowAttempts = new long[chRowAttempts.length][]; for (int i = 0; i < chRowAttempts.length; i++) s.chRowAttempts[i] = chRowAttempts[i].clone(); }
+        for (Map.Entry<String, long[][]> e : chRowBlocked.entrySet()) {
+            long[][] v = new long[e.getValue().length][];
+            for (int i = 0; i < v.length; i++) v[i] = e.getValue()[i].clone();
+            s.chRowBlocked.put(e.getKey(), v);
+        }
         return s;
     }
 
@@ -503,6 +675,146 @@ public final class BlockingDetailRecorder implements java.io.Serializable {
         public final Map<String, Map<String, long[]>> modPerLink = new TreeMap<String, Map<String, long[]>>();
         public long[][] rowAttempts;
         public final Map<String, long[][]> rowBlocked = new LinkedHashMap<String, long[][]>();
+        // Parte 39: channel of the blocked protected requests
+        public final Map<String, Map<String, Long>> chanCause = new LinkedHashMap<String, Map<String, Long>>();
+        public long[][] chanLink;
+        public long chQchNoBand, chPichNoBand;
+        public int[][][] chSlotAttempts;
+        public final Map<String, int[][][]> chSlotBlocked = new LinkedHashMap<String, int[][][]>();
+        public long[][] chRowAttempts;
+        public final Map<String, long[][]> chRowBlocked = new LinkedHashMap<String, long[][]>();
+    }
+
+    /**
+     * Parte 39: QKDChannelBlocking.csv, SNetS layout {@code Metrics,LoadPoint,Channel,Cause,Link, ,rep0..}.
+     * Only QKD-protected requests. Channel: CCh (classical circuit of the request), QCh (quantum channels),
+     * PICh (public channel), all. Returns null when no protected request was seen.
+     */
+    public static String toChannelCsv(List<List<Snapshot>> snaps) {
+        int reps = 0;
+        boolean anyQkd = false;
+        java.util.LinkedHashSet<String> causes = new java.util.LinkedHashSet<String>();
+        List<String> links = null;
+        for (List<Snapshot> row : snaps) {
+            reps = Math.max(reps, row.size());
+            for (Snapshot s : row) {
+                if (s == null) continue;
+                if (s.attempts[QKD] > 0) anyQkd = true;
+                if (links == null && s.linkNames != null) links = s.linkNames;
+            }
+        }
+        if (reps == 0 || !anyQkd) return null;
+        for (String c : CAUSES) causes.add(c);
+        StringBuilder sb = new StringBuilder("Metrics,LoadPoint,Channel,Cause,Link, ");
+        for (int r = 0; r < reps; r++) sb.append(",rep").append(r);
+        sb.append('\n');
+        chRow(sb, snaps, "QKD-protected requests", "all", "all", "all", s -> s.attempts[QKD]);
+        chRow(sb, snaps, "Blocking probability by channel", "all", "all", "all", s -> ratio(s.blocked[QKD], s.attempts[QKD]));
+        for (String ch : CHANNELS) {
+            chRow(sb, snaps, "Blocking probability by channel", ch, "all", "all", s -> ratio(chTotal(s, ch), s.attempts[QKD]));
+            chRow(sb, snaps, "Share of the blocked protected requests by channel", ch, "all", "all", s -> ratio(chTotal(s, ch), s.blocked[QKD]));
+            chRow(sb, snaps, "Blocked protected requests by channel", ch, "all", "all", s -> chTotal(s, ch));
+        }
+        for (String ch : CHANNELS) {
+            for (String c : causes) {
+                if (!ch.equals(channelOf(c))) continue;
+                chRow(sb, snaps, "Blocking probability by channel and cause", ch, c, "all", s -> {
+                    Map<String, Long> m = s.chanCause.get(ch);
+                    return ratio(m == null ? 0 : nz(m.get(c)), s.attempts[QKD]);
+                });
+            }
+        }
+        chRow(sb, snaps, "Blocked protected requests without band", CH_QCH, "all", "all", s -> s.chQchNoBand);
+        chRow(sb, snaps, "Blocked protected requests without band", CH_PICH, "all", "all", s -> s.chPichNoBand);
+        if (links != null) {
+            for (int li = 0; li < links.size(); li++) {
+                final int i = li;
+                String ln = "<" + links.get(li) + ">";
+                final String link = links.get(li);
+                for (String ch : CHANNELS) {
+                    final int ci = channelIndex(ch);
+                    chRow(sb, snaps, "Link blocking probability by channel", ch, "all", ln, s -> {
+                        long[] v = s.perLink.get(link);
+                        if (v == null || s.chanLink == null || i >= s.chanLink.length) return Double.NaN;
+                        return ratio(s.chanLink[i][ci], v[QKD]);
+                    });
+                    chRow(sb, snaps, "Link blocked protected requests by channel", ch, "all", ln, s ->
+                            s.chanLink == null || i >= s.chanLink.length ? Double.NaN : s.chanLink[i][ci]);
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    private static double chTotal(Snapshot s, String ch) {
+        Map<String, Long> m = s.chanCause.get(ch);
+        if (m == null) return 0;
+        double t = 0;
+        for (Long v : m.values()) t += v;
+        return t;
+    }
+
+    private static void chRow(StringBuilder sb, List<List<Snapshot>> snaps, String metric, String ch, String cause, String link, V v) {
+        for (int lp = 0; lp < snaps.size(); lp++) {
+            sb.append(metric).append(',').append(lp).append(',').append(ch).append(',').append(cause.replace(',', ' '))
+              .append(',').append(link).append(", ");
+            for (Snapshot s : snaps.get(lp)) sb.append(',').append(s == null ? Double.NaN : v.of(s));
+            sb.append('\n');
+        }
+    }
+
+    /**
+     * Parte 39: QKDChannelSlotBlocking.csv, same layout as SlotBlocking.csv, only the QKD-protected requests and
+     * with the channel in the Cause column: where each channel (CCh, QCh, PICh) of the protected requests was used
+     * or tried, and where the one that failed was. A QCh or PICh that failed without any band is counted in the
+     * "without band" rows (no position in the spectrum).
+     */
+    public static String toChannelSlotCsv(List<List<Snapshot>> snaps) {
+        int slots = 0;
+        for (List<Snapshot> row : snaps) for (Snapshot s : row) if (s != null && s.chSlotAttempts != null && s.attempts[QKD] > 0) slots = Math.max(slots, s.slotSlots);
+        if (slots == 0) return null;
+        StringBuilder sb = new StringBuilder("Metrics,LoadPoint,Link,Core,Replication,Cause");
+        for (int k = 1; k <= slots; k++) sb.append(',').append(k);
+        sb.append('\n');
+        for (int lp = 0; lp < snaps.size(); lp++) {
+            List<Snapshot> row = snaps.get(lp);
+            for (int rep = 0; rep < row.size(); rep++) {
+                Snapshot s = row.get(rep);
+                if (s == null || s.chSlotAttempts == null) continue;
+                sb.append("Blocked requests without spectrum band,").append(lp).append(",all,all,").append(rep).append(",all,")
+                  .append(s.chQchNoBand + s.chPichNoBand).append('\n');
+                if (s.chQchNoBand > 0) sb.append("Blocked QKD requests without QCh band,").append(lp).append(",all,all,").append(rep).append(",all,").append(s.chQchNoBand).append('\n');
+                if (s.chPichNoBand > 0) sb.append("Blocked QKD requests without PICh band,").append(lp).append(",all,all,").append(rep).append(",all,").append(s.chPichNoBand).append('\n');
+                for (int li = 0; li < s.chSlotAttempts.length; li++) {
+                    String ln = "<" + s.linkNames.get(li) + ">";
+                    for (int c = 0; c < s.chSlotAttempts[li].length; c++) {
+                        if (s.chRowAttempts != null && s.chRowAttempts[li][c] > 0) {
+                            countRow(sb, "Requests on link and core", lp, ln, c, rep, "all", s.chRowAttempts[li][c]);
+                            long tot = 0;
+                            for (long[][] b : s.chRowBlocked.values()) tot += b[li][c];
+                            if (tot > 0) countRow(sb, "Blocked requests on link and core", lp, ln, c, rep, "all", tot);
+                            for (Map.Entry<String, long[][]> e : s.chRowBlocked.entrySet())
+                                if (e.getValue()[li][c] > 0) countRow(sb, "Blocked requests on link and core by cause", lp, ln, c, rep, e.getKey(), e.getValue()[li][c]);
+                        }
+                        slotRow(sb, "Slot attempts", lp, ln, c, rep, "all", s.chSlotAttempts[li][c], slots);
+                        int[] sum = new int[slots];
+                        boolean anyBlock = false;
+                        for (int[][][] b : s.chSlotBlocked.values()) {
+                            if (b[li] == null || b[li][c] == null) continue;
+                            for (int k = 0; k < slots && k < b[li][c].length; k++) sum[k] += b[li][c][k];
+                            anyBlock = true;
+                        }
+                        if (anyBlock) slotRow(sb, "Slot blocked", lp, ln, c, rep, "all", sum, slots);
+                        for (Map.Entry<String, int[][][]> e : s.chSlotBlocked.entrySet()) {
+                            int[][][] b = e.getValue();
+                            if (b[li] == null || b[li][c] == null) continue;
+                            slotRow(sb, "Slot blocked by cause", lp, ln, c, rep, e.getKey(), b[li][c], slots);
+                        }
+                    }
+                }
+            }
+        }
+        return sb.toString();
     }
 
     /**

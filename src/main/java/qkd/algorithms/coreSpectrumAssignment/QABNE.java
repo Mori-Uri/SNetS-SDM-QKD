@@ -25,7 +25,8 @@ import util.IntersectionFreeSpectrum;
  * fit for the central core, last fit for even outer-core identifiers and
  * first fit for odd outer-core identifiers. The QKD adaptation changes the
  * core rotation only: cores marked {@link Core#isQkdReserved()} are removed
- * from the classical candidate set before the round-robin rotation.</p>
+ * from the classical candidate set before the round-robin rotation. Since Part 39 the cores disabled in the
+ * network file ({@link Core#isDisabled()}) are removed as well.</p>
  *
  * <p>Refer\u00eancias: [ABNE20] J. Lacerda Jr. et al., "ABNE - Algoritmo de Balanceamento Inter-N\u00facleos para Redes \u00d3pticas El\u00e1sticas com SDM", 2020 (rota\u00e7\u00e3o de n\u00facleos e pol\u00edticas medium/first/last fit); [FUJII14] S. Fujii et al., "On-Demand Spectrum and Core Allocation for Reducing Crosstalk in Multicore Fibers in EONs", JOCN 6(12), 2014.</p>
  */
@@ -189,7 +190,9 @@ public class QABNE implements CoreAndSpectrumAssignmentAlgorithmInterface {
         Link firstLink = circuit.getRoute().getLink(0);
         List<Integer> available = new ArrayList<Integer>();
         for (Core core : firstLink.getCores()) {
-            if (!core.isQkdReserved()) {
+            // Parte 39: a core disabled in the network file (network.disabledCores) is also left out of the
+            // rotation, so a 6-core classical run with qabne does not waste attempts on it (C_1Block bias).
+            if (!core.isQkdReserved() && !core.isDisabled()) {
                 available.add(Integer.valueOf(core.getId()));
             }
         }

@@ -206,6 +206,7 @@ public class SimulationManagement {
         finalResult.qkdStatistics = buildQkdStatisticsCsv();
         finalResult.qkdMetrics = buildQkdMetricsCsv();
         finalResult.blockingDetails = buildBlockingDetailsCsv();
+        finalResult.qkdChannelBlocking = buildChannelCsv(false);
         if (simulationRequest.getSimulationConfig().getActiveMetrics().SpectrumUtilization
                 && simulationRequest.getSimulationConfig().getActiveMetrics().SlotUtilization) {
             finalResult.slotUtilization = buildSlotUtilizationCsv();
@@ -213,6 +214,7 @@ public class SimulationManagement {
         if (simulationRequest.getSimulationConfig().getActiveMetrics().BlockingProbability
                 && simulationRequest.getSimulationConfig().getActiveMetrics().SlotBlocking) {
             finalResult.slotBlocking = buildSlotBlockingCsv();
+            finalResult.qkdChannelSlotBlocking = buildChannelCsv(true);
         }
         blockingSnapshotsCache = null;
         simulationRequest.setResult(finalResult);
@@ -253,6 +255,19 @@ public class SimulationManagement {
         if (snaps == null) return null;
         try {
             return qkd.metrics.BlockingDetailRecorder.toCsv(snaps);
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /** Parte 39: QKDChannelBlocking.csv / QKDChannelSlotBlocking.csv (channel that failed in the protected requests). */
+    private String buildChannelCsv(boolean slots) {
+        List<List<qkd.metrics.BlockingDetailRecorder.Snapshot>> snaps = blockingSnapshots();
+        if (snaps == null) return null;
+        try {
+            return slots ? qkd.metrics.BlockingDetailRecorder.toChannelSlotCsv(snaps)
+                    : qkd.metrics.BlockingDetailRecorder.toChannelCsv(snaps);
         } catch (RuntimeException e) {
             e.printStackTrace();
             return null;

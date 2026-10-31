@@ -355,7 +355,9 @@ svg.chart .axis line, svg.chart .axis path { stroke: var(--border-strong); }
 .fig-head p { margin: 0; max-width: 80ch; }
 .fig-toolbar { margin: 0; }
 .fig-toolbar .sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 2px; }
-.fig-layout { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 16px; align-items: start; }
+/* 1.17.0: fixed width, so the panel does not change size with the name of the chosen model */
+.fig-layout { display: grid; grid-template-columns: 370px minmax(0, 1fr); gap: 16px; align-items: start; }
+.fig-controls { min-width: 0; }
 .fig-controls { position: sticky; top: 10px; max-height: calc(100vh - 140px); overflow: auto; display: grid; gap: 10px; padding-right: 4px; }
 .fig-right { display: grid; gap: 12px; min-width: 0; position: sticky; top: 10px; }
 .fig-preview { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; overflow: auto; }
@@ -459,14 +461,16 @@ body.sidebar-collapsed .sidebar { display: none; }
 /* 1.11.0: marcar/desmarcar todos e lista suspensa que guarda a posição */
 .stack-xs { display: grid; gap: 4px; }
 .allnone { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0; }
-.picker { position: relative; }
+.picker { position: relative; flex: 1 1 auto; min-width: 0; width: 100%; }
 .picker-btn { width: 100%; display: flex; align-items: center; gap: 6px; text-align: left; cursor: pointer; }
 .picker-btn .ell { flex: 1 1 auto; min-width: 0; }
 .picker-caret { color: var(--fg-3); font-size: 11px; }
 .picker-panel { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .18); padding: 6px; display: grid; gap: 6px; }
-.picker-list { max-height: 360px; overflow: auto; }
+.picker-list { max-height: 360px; overflow: auto; position: relative; }
 .picker-group { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--fg-3); padding: 8px 6px 3px; }
-.picker-item { padding: 5px 8px; border-radius: 5px; cursor: pointer; font-size: 13px; }
+.picker-item { padding: 5px 8px; border-radius: 5px; cursor: pointer; font-size: 13px; display: flex; min-width: 0; }
+.picker-item .ell { flex: 1 1 auto; }
+.picker-btn { overflow: hidden; }
 .picker-item:hover { background: var(--surface-2); }
 .picker-item.selected { background: var(--surface-3); font-weight: 600; }
 .picker-empty { padding: 8px; color: var(--fg-3); font-size: 12.5px; }
@@ -486,3 +490,13 @@ p.warn, .small.warn { color: var(--warn); font-weight: 600; }
 .read-block { display: grid; gap: 4px; font-size: 13px; }
 .read-list { margin: 0; padding-left: 18px; display: grid; gap: 3px; line-height: 1.45; }
 .read-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: baseline; }
+
+/* 1.17.0: per-series pattern/value options, per-link QTND rows */
+.fig-series-extra { margin-top: 6px; padding: 8px; border-left: 3px solid var(--line, #d0d4dc); background: var(--bg-soft, rgba(127,127,127,.06)); border-radius: 4px; }
+.fig-series-extra .fig-series-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.fig-series-extra .toolbar select { min-width: 0; flex: 1 1 auto; }
+tr.row-custom td { background: rgba(112, 48, 160, .07); }
+.fig-series-grid > div { display: grid; gap: 2px; font-size: 11.5px; color: var(--fg-3); }
+/* 1.17.0: long model names must not widen the left column (grid tracks default to min-content) */
+.fig-controls .field, .fig-controls .stack-s { grid-template-columns: minmax(0, 1fr); }
+.fig-controls .field > .toolbar { min-width: 0; max-width: 100%; }

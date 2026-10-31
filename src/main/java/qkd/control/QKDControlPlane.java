@@ -289,9 +289,27 @@ public class QKDControlPlane extends ControlPlane {
                 java.util.List<Object[]> bands = tried;
                 if (ok) bands = sessionBands(sessionRegistry.get(request));
                 blockingDetails.markQch(request, ok, bands, !tried.isEmpty() || lastQkdRejectCause != null);
+                // Parte 39: PICh of the protected request (channel that failed, observation only)
+                blockingDetails.markPich(request, ok, ok ? sessionPichBands(sessionRegistry.get(request)) : null,
+                        ok ? null : provisioningService.getLastPichFailureLink());
             }
         }
         return ok;
+    }
+
+    /** Parte 39: {link, core, band} of each PICh of an admitted session (segment or route mode). */
+    private static java.util.List<Object[]> sessionPichBands(QKDActiveConnection c) {
+        java.util.List<Object[]> out = new java.util.ArrayList<Object[]>();
+        if (c == null) return out;
+        if (c.getPichShares() != null) {
+            for (qkd.capacity.QKDPichPool.Channel ch : c.getPichShares()) {
+                if (ch == null || ch.link == null || ch.band == null) continue;
+                out.add(new Object[] {ch.link, Integer.valueOf(ch.coreId), ch.band.clone()});
+            }
+        } else if (c.getPich() != null && c.getPich().links != null && c.getPich().band != null) {
+            for (network.Link l : c.getPich().links) out.add(new Object[] {l, Integer.valueOf(c.getPich().coreId), c.getPich().band.clone()});
+        }
+        return out;
     }
 
     /** Part 33: {link, core, band} of each QCh of an admitted session. */

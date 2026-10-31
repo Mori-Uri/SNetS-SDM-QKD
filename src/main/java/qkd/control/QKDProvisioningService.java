@@ -44,6 +44,10 @@ public final class QKDProvisioningService {
     private final qkd.capacity.QKDPichPool pichPool;
     /** Part 23 counters (reset with the QKD statistics after the warm-up). */
     private long alternativeRouteAdmissions;
+    /** Parte 39: link where the last PICh failed (null = unknown or no PICh failure). */
+    private transient network.Link lastPichFailureLink;
+
+    public network.Link getLastPichFailureLink() { return lastPichFailureLink; }
     private long pichFailures;
     private long routesTried;
 
@@ -104,6 +108,7 @@ public final class QKDProvisioningService {
                     "classical circuit has no selected route");
         }
 
+        lastPichFailureLink = null;
         final Route classicalRoute = request.getCircuits().get(0).getRoute();
         final java.util.List<Route> candidates = new java.util.ArrayList<Route>();
         candidates.add(classicalRoute);
@@ -197,6 +202,7 @@ public final class QKDProvisioningService {
                     pichPool.acquire(route.getLinkList(), mesh.getGuardBand(), additionalClassicalCircuit);
             if (shares == null) {
                 pichFailures++;
+                lastPichFailureLink = pichPool.getLastFailedLink();
                 releaseQuietly(session);
                 return QKDProvisioningResult.failure("[PICH] no " + pichSlots
                         + "-slot PICh available on some link of the QKD route");

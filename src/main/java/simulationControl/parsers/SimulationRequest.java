@@ -43,6 +43,9 @@ public class SimulationRequest {
         public final static String FILE_BLOCKING_DETAILS = "BlockingDetails.csv";
         public final static String FILE_SLOT_UTILIZATION = "SlotUtilization.csv";
         public final static String FILE_SLOT_BLOCKING = "SlotBlocking.csv";
+        /** Parte 39: channel (CCh, QCh, PICh) that failed in the blocked QKD-protected requests. */
+        public final static String FILE_QKD_CHANNEL_BLOCKING = "QKDChannelBlocking.csv";
+        public final static String FILE_QKD_CHANNEL_SLOT_BLOCKING = "QKDChannelSlotBlocking.csv";
 
         public String blockingProbability;
         public String bitRateBlockingProbability;
@@ -61,6 +64,8 @@ public class SimulationRequest {
         public String blockingDetails;
         public String slotUtilization;
         public String slotBlocking;
+        public String qkdChannelBlocking;
+        public String qkdChannelSlotBlocking;
     }
 
     /**

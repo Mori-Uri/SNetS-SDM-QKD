@@ -343,3 +343,19 @@ Estúdio de gráficos:
 - **Relatório**: opção "Mapas do espectro: só um sentido de cada enlace (a < b)" e escolha dos sentidos nos mapas da
   topologia (os dois, maior dos dois ou média). No estúdio, os mapas do espectro ganharam a caixa "Só um sentido de
   cada enlace", que vale mesmo quando a lista de enlaces muda de caso.
+
+## Versão 1.17.0 (Parte 39)
+
+- **Caixa de modelos**: um nome por linha (o nome completo aparece ao passar o mouse); ao abrir, a lista fica centrada
+  no modelo escolhido. A coluna da esquerda não muda mais de largura ao trocar de modelo.
+- **Padrões nas barras** (seção 3, botão "Padrão e valores" de cada série): diagonais, cruzadas, listras, grade,
+  pontos, tijolos ou zigue-zague, com cor (automática = preto/branco conforme a barra), tamanho e espessura.
+- **5. Rótulos dos valores**: cor, negrito, caixa, posição na barra ou no ponto, empilhadas ao lado com linha guia,
+  rotação, ocultar valores pequenos. Cada série pode ter os seus ajustes ou ficar sem valores.
+- **Topologia**: rótulos em caixa ou em caixa afastada com linha até o enlace, cores, tamanho, distância,
+  afastamento automático e arrastar o rótulo no gráfico.
+- **Mapa de bloqueio do espectro**: cor de cada causa (seção 3).
+- **Canais QKD bloqueados**: modelos com o canal que impediu a requisição protegida (CCh, QCh ou PICh), por causa,
+  por enlace e no espectro (simulador da Parte 39).
+- **Métrica × QTND (ou outro parâmetro)**: uma curva por família de casos (ex.: R25 e R100 separados).
+- **Aba QKD**: nós confiáveis com QTND global ou por enlace (nº de nós ou QTND próprio em cada enlace).

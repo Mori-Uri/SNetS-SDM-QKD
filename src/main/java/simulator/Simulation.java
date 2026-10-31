@@ -92,6 +92,12 @@ public class Simulation implements Serializable {
             coreAndSpectrum = QKDAlgorithmFactory
                     .instantiateCoreAndSpectrumAssignment(
                             sc.getCoreAndSpectrumAssignment());
+        } else if (QKDAlgorithmFactory.isQkdCoreAndSpectrumAlgorithm(sc.getCoreAndSpectrumAssignment())) {
+            /* Parte 39: a classical run may name qabne/qfirstfit too (for example 6 cores with one core disabled
+             * and the same rotation as the QKD cases); the legacy factory does not know these names. */
+            coreAndSpectrum = QKDAlgorithmFactory
+                    .instantiateCoreAndSpectrumAssignment(
+                            sc.getCoreAndSpectrumAssignment());
         } else {
             coreAndSpectrum = legacyFactory
                     .instantiateCoreAndSpectrumAssignment();

@@ -80,6 +80,22 @@
         }
         if (net.qkd.qchGranularity !== undefined && !['route', 'link', 'span'].includes(String(net.qkd.qchGranularity).toLowerCase())) add('err', 'network', 'qkd.qchGranularity deve ser route, link ou span.');
         if (net.qkd.qchSlotPolicy !== undefined && !['firstfit', 'lowestloss'].includes(String(net.qkd.qchSlotPolicy).toLowerCase())) add('err', 'network', 'qkd.qchSlotPolicy deve ser firstfit ou lowestloss.');
+        // Parte 39: per-link trusted nodes
+        const tnm = String(net.qkd.trustedNodeMode || 'global').toLowerCase();
+        if (!['global', 'perlink'].includes(tnm)) add('err', 'network', 'qkd.trustedNodeMode deve ser global ou perLink.');
+        if (tnm === 'perlink') {
+          const rules = Array.isArray(net.qkd.trustedNodesPerLink) ? net.qkd.trustedNodesPerLink : [];
+          const linkSet = new Set((Array.isArray(net.links) ? net.links : []).map((l) => String(l.source) + '-' + String(l.destination)));
+          for (const r of rules) {
+            const nm = r && typeof r.link === 'string' ? r.link.replace(/\s+/g, '') : '';
+            const [a, b] = nm.split('-');
+            if (!a || !b || (!linkSet.has(a + '-' + b) && !linkSet.has(b + '-' + a))) { add('err', 'network', `qkd.trustedNodesPerLink: o enlace "${r && r.link}" não existe.`); continue; }
+            const hasN = r.trustedNodes !== undefined && r.trustedNodes !== null;
+            if (hasN && !(Number.isInteger(Number(r.trustedNodes)) && Number(r.trustedNodes) >= 0)) add('err', 'network', `qkd.trustedNodesPerLink ${r.link}: trustedNodes deve ser um inteiro ≥ 0.`);
+            if (!hasN && !(Number(r.qtndKm) > 0)) add('err', 'network', `qkd.trustedNodesPerLink ${r.link}: informe trustedNodes (≥ 0) ou qtndKm (> 0).`);
+          }
+          if (!rules.length) add('info', 'network', 'qkd.trustedNodeMode = perLink sem regras: todos os enlaces usam o QTND global.');
+        }
         if (Number(net.qkd.pichSlots) > 0 && String(net.qkd.qchGranularity || 'link').toLowerCase() !== 'route') add('info', 'network', 'O PICh é reservado em qualquer modo de QCh, mas o cenário da qualificação usa qchGranularity = route.');
       }
     }

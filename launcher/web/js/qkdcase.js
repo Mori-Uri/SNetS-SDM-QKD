@@ -52,6 +52,7 @@
 
   function planning(net, qtnd) {
     const links = isPlainObject(net) && Array.isArray(net.links) ? net.links : [];
+    const qkd = isPlainObject(net) && isPlainObject(net.qkd) ? net.qkd : null;
     const seen = new Map();
     for (const l of links) {
       const a = String(l.source), b = String(l.destination);
@@ -59,11 +60,22 @@
       if (!seen.has(key)) seen.set(key, { a: a < b ? a : b, b: a < b ? b : a, km: Number(l.size) || 0, dirs: 0 });
       seen.get(key).dirs++;
     }
-    const rows = [...seen.values()].map((r) => Object.assign(r, { spans: spansOf(r.km, qtnd) }));
+    // Parte 39: per-link trusted nodes (same rule as the simulator); the table shows the a→b direction
+    const rows = [...seen.values()].map((r) => {
+      const q = qkd ? App.presets.qtndForLink(qkd, r.a, r.b, r.km) : qtnd;
+      const own = Number.isFinite(q) && q > 0 ? q : qtnd;
+      return Object.assign(r, { qtnd: own, custom: Math.abs(own - qtnd) > 1e-9 || !!linkRule(qkd, r.a, r.b), spans: spansOf(r.km, own) });
+    });
     const trusted = rows.reduce((s, r) => s + Math.max(0, r.spans.length - 1), 0);
     const spans = rows.reduce((s, r) => s + r.spans.length, 0);
     const maxSpans = Math.max(0, ...rows.map((r) => r.spans.length));
     return { rows, trusted, spans, maxSpans };
+  }
+
+  /** Parte 39: entry of network.qkd.trustedNodesPerLink for the undirected link a-b (either spelling), or null. */
+  function linkRule(qkd, a, b) {
+    if (!qkd || String(qkd.trustedNodeMode || 'global').toLowerCase() !== 'perlink' || !Array.isArray(qkd.trustedNodesPerLink)) return null;
+    return qkd.trustedNodesPerLink.find((e) => e && typeof e.link === 'string' && [a + '-' + b, b + '-' + a].includes(e.link.replace(/\s+/g, ''))) || null;
   }
 
   // ------------------------------------------------------------------ mode bar
@@ -78,7 +90,7 @@
       el('div.seg.mode-seg',
         el('button', { type: 'button', 'aria-pressed': String(!q), on: { click: () => { if (q) toClassical(); } } }, 'Clássica'),
         el('button', { type: 'button', 'aria-pressed': String(q), on: { click: () => { if (!q) enableDialog(); } } }, 'QKD')),
-      q ? el('span.small.muted', 'QTND ' + fmtNum(Number(st().model.network.qkd.qtndKm)) + ' km · núcleo QKD ' + st().model.network.qkd.quantumCoreId) : null);
+      q ? el('span.small.muted', 'QTND ' + fmtNum(Number(st().model.network.qkd.qtndKm)) + ' km' + (String(st().model.network.qkd.trustedNodeMode || '').toLowerCase() === 'perlink' ? ' (com regras por enlace)' : '') + ' · núcleo QKD ' + st().model.network.qkd.quantumCoreId) : null);
   }
 
   function refreshAll(tab) {
@@ -254,22 +266,71 @@
       });
       return g;
     };
+    // Parte 39: QTND global or per link (submenu)
+    const perLink = String(q.trustedNodeMode || 'global').toLowerCase() === 'perlink';
+    const setRules = (list) => { App.setValue('network', ['qkd', 'trustedNodesPerLink'], list); App.renderTab(); };
+    const ruleCell = (r) => {
+      const rule = linkRule(q, r.a, r.b);
+      const kind = !rule ? 'global' : rule.trustedNodes !== undefined && rule.trustedNodes !== null && rule.trustedNodes !== '' ? 'nodes' : 'km';
+      const ks = el('select.input', { style: { width: 'auto' } },
+        el('option', { value: 'global' }, 'QTND global'), el('option', { value: 'nodes' }, 'Nº de nós confiáveis'), el('option', { value: 'km' }, 'QTND próprio (km)'));
+      ks.value = kind;
+      const curVal = !rule ? '' : kind === 'nodes' ? String(rule.trustedNodes) : String(rule.qtndKm === undefined ? '' : rule.qtndKm).replace('.', ',');
+      const vi = el('input.input.num', { type: 'text', value: curVal, style: { width: '80px' }, placeholder: kind === 'nodes' ? 'nós' : 'km' });
+      vi.hidden = kind === 'global';
+      const save = () => {
+        const list = (Array.isArray(q.trustedNodesPerLink) ? q.trustedNodesPerLink : []).filter((e) => e !== rule);
+        if (ks.value === 'global') { setRules(list); return; }
+        const v = parseNumber(vi.value);
+        const ok = ks.value === 'nodes' ? Number.isInteger(v) && v >= 0 : Number.isFinite(v) && v > 0;
+        vi.classList.toggle('invalid', !ok && vi.value !== '');
+        if (!ok) { vi.hidden = false; vi.focus(); return; }
+        list.push(ks.value === 'nodes' ? { link: r.a + '-' + r.b, trustedNodes: v } : { link: r.a + '-' + r.b, qtndKm: v });
+        setRules(list);
+      };
+      ks.addEventListener('change', () => {
+        vi.hidden = ks.value === 'global';
+        vi.placeholder = ks.value === 'nodes' ? 'nós' : 'km';
+        if (ks.value === 'global' || vi.value !== '') save(); else vi.focus();
+      });
+      vi.addEventListener('change', save);
+      return el('td', el('div.toolbar', { style: { margin: 0, flexWrap: 'nowrap' } }, ks, vi));
+    };
+    const modeBox = el('div.stack-s', { style: { marginBottom: '10px' } },
+      el('div.fields',
+        field('Nós confiáveis', (() => {
+          const s2 = el('select.input',
+            el('option', { value: 'global' }, 'QTND global: mesmo espaçamento em todos os enlaces (padrão)'),
+            el('option', { value: 'perLink' }, 'Por enlace: escolher a regra de cada enlace na tabela abaixo'));
+          s2.value = perLink ? 'perLink' : 'global';
+          s2.addEventListener('change', () => {
+            App.setValue('network', ['qkd', 'trustedNodeMode'], s2.value);
+            if (s2.value === 'perLink' && !Array.isArray(q.trustedNodesPerLink)) App.setValue('network', ['qkd', 'trustedNodesPerLink'], []);
+            drawModeBar(); App.renderTab();
+          });
+          return s2;
+        })(), perLink ? 'network.qkd.trustedNodeMode = "perLink"; regras em network.qkd.trustedNodesPerLink. Enlaces sem regra usam o QTND global.' : 'network.qkd.trustedNodeMode = "global" (ou ausente).')),
+      perLink ? el('div.toolbar', { style: { margin: 0 } },
+        el('span.small.muted', (Array.isArray(q.trustedNodesPerLink) ? q.trustedNodesPerLink.length : 0) + ' enlace(s) com regra própria.'),
+        el('button.btn.small.ghost', { type: 'button', on: { click: () => setRules([]) } }, 'Todos no QTND global')) : null);
     root.append(el('section.panel',
-      el('h2', 'Planejamento dos nós confiáveis (QTND = ' + fmtNum(Number(q.qtndKm)) + ' km)'),
+      el('h2', 'Planejamento dos nós confiáveis (QTND ' + (perLink ? 'global ' : '') + '= ' + fmtNum(Number(q.qtndKm)) + ' km' + (perLink ? ', com regras por enlace' : '') + ')'),
+      modeBox,
       el('div.kv',
         kvBox('Enlaces (pares de fibras)', fmtNum(plan.rows.length)),
         kvBox('Trechos QKD', fmtNum(plan.spans)),
         kvBox('Nós confiáveis', fmtNum(plan.trusted)),
         kvBox('Máx. trechos num enlace', fmtNum(plan.maxSpans))),
       el('div.table-wrap', { style: { marginTop: '12px' } }, el('table.grid.data',
-        el('thead', el('tr', el('th', 'Enlace'), el('th.num', 'Comprimento'), el('th', 'Trechos (km)'), el('th.num', 'Nós confiáveis'), el('th', ''))),
-        el('tbody', plan.rows.map((r) => el('tr',
+        el('thead', el('tr', el('th', 'Enlace'), el('th.num', 'Comprimento'), perLink ? el('th', 'Regra do enlace') : null, el('th', 'Trechos (km)'), el('th.num', 'Nós confiáveis'), el('th', ''))),
+        el('tbody', plan.rows.map((r) => el('tr' + (r.custom ? '.row-custom' : ''),
           el('td', r.a + ' — ' + r.b + (r.dirs < 2 ? ' (1 sentido)' : '')),
           el('td.num', fmtNum(r.km) + ' km'),
+          perLink ? ruleCell(r) : null,
           el('td.mono', r.spans.map((s) => fmtNum(s, 2)).join(' + ')),
           el('td.num', String(Math.max(0, r.spans.length - 1))),
           el('td', bar(r))))))),
-      el('p.small.muted', { style: { marginTop: '8px' } }, 'Regra do simulador (QKDTopologyPlanner): trechos de QTND km a partir da origem do enlace e o restante no último trecho. Q-TRx de uma sessão = número de trechos da rota QKD.')));
+      el('p.small.muted', { style: { marginTop: '8px' } }, 'Regra do simulador (QKDTopologyPlanner): trechos de QTND km a partir da origem do enlace e o restante no último trecho. Q-TRx de uma sessão = número de trechos da rota QKD.' + (perLink ? ' Por enlace: "nº de nós" n divide o enlace em n + 1 trechos iguais; "QTND próprio" usa a mesma regra com o km do enlace. A regra vale para os dois sentidos.' : ''))));
 
     // ------------------------------- demand
     if (isPlainObject(sim)) {

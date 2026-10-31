@@ -331,6 +331,14 @@ public class SimulationFileManager {
                 && sr.getSimulationConfig().getActiveMetrics().SlotBlocking){
             saveResult(path, SimulationRequest.Result.FILE_SLOT_BLOCKING,sr.getResult().slotBlocking);
         }
+        // Parte 39: channel that failed in the blocked QKD-protected requests
+        if(sr.getResult().qkdChannelBlocking != null && sr.getSimulationConfig().getActiveMetrics().BlockingProbability){
+            saveResult(path, SimulationRequest.Result.FILE_QKD_CHANNEL_BLOCKING,sr.getResult().qkdChannelBlocking);
+        }
+        if(sr.getResult().qkdChannelSlotBlocking != null && sr.getSimulationConfig().getActiveMetrics().BlockingProbability
+                && sr.getSimulationConfig().getActiveMetrics().SlotBlocking){
+            saveResult(path, SimulationRequest.Result.FILE_QKD_CHANNEL_SLOT_BLOCKING,sr.getResult().qkdChannelSlotBlocking);
+        }
     }
 
     /**

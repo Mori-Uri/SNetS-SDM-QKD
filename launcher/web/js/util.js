@@ -236,7 +236,7 @@ window.App = window.App || {};
         if (!items.length) continue;
         if (g.label) list.append(el('div.picker-group', g.label));
         for (const o of items) {
-          const row = el('div.picker-item' + (o.value === value ? '.selected' : ''), { title: o.title || o.label, role: 'option', tabindex: '-1' }, o.label);
+          const row = el('div.picker-item' + (o.value === value ? '.selected' : ''), { title: o.title || o.label, role: 'option', tabindex: '-1' }, el('span.ell', o.label));
           row.addEventListener('click', () => { close(); if (o.value !== value) onChange(o.value); });
           list.append(row);
         }
@@ -248,9 +248,10 @@ window.App = window.App || {};
     function open() {
       fill();
       panel.hidden = false;
-      const saved = pickerScroll.get(key);
-      if (saved !== undefined) list.scrollTop = saved;
-      else { const s = list.querySelector('.selected'); if (s) list.scrollTop = Math.max(0, s.offsetTop - list.clientHeight / 2); }
+      // 1.17.0: the list always opens with the chosen option in the middle (at the top when it is one of the first)
+      const s = list.querySelector('.selected');
+      if (s) list.scrollTop = Math.max(0, s.offsetTop - (list.clientHeight - s.offsetHeight) / 2);
+      else { const saved = pickerScroll.get(key); if (saved !== undefined) list.scrollTop = saved; }
       document.addEventListener('mousedown', onDoc, true);
       document.addEventListener('keydown', onKey, true);
       setTimeout(() => filter.focus(), 0);

@@ -168,3 +168,13 @@ por núcleo e causa e o bloqueio por enlace. Ele só observa as decisões e não
 - **Plano de verificação.** Ganhou as fases M (Moghaddam et al., 2021) e Q (QKD-Analytical, 2026).
 
 Detalhes em `CHANGELOG_QKD_PARTE26.md`.
+
+## Parte 39: canal QKD bloqueado e nós confiáveis por enlace
+
+- `QKDChannelBlocking.csv` e `QKDChannelSlotBlocking.csv`: para cada requisição protegida bloqueada, o canal que não
+  pôde ser estabelecido (CCh = circuito clássico, QCh, PICh), por causa, por enlace e no espectro. Só observação.
+- `network.qkd.trustedNodeMode = "perLink"` com `trustedNodesPerLink` (nº de nós ou QTND próprio por enlace). O padrão
+  continua sendo o QTND global.
+- `qabne` ignora núcleos desativados e pode rodar em modo clássico.
+
+Detalhes em `CHANGELOG_QKD_PARTE39.md`.

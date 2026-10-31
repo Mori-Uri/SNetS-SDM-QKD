@@ -56,7 +56,9 @@ public final class QKDTopologyPlanner {
                     link.getSource(),
                     link.getDestination(),
                     link.getSize(),
-                    parameters.getQtndKm()));
+                    // Parte 39: per-link trusted-node rule (network.qkd.trustedNodeMode = "perLink")
+                    networkConfig.getQkd() == null ? parameters.getQtndKm()
+                            : networkConfig.getQkd().qtndForLink(link.getSource(), link.getDestination(), link.getSize())));
         }
 
         return new QKDTopologyPlan(parameters, linkPlans);

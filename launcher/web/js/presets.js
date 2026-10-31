@@ -239,14 +239,40 @@
     return { pos, source: 'auto' };
   }
 
+  /**
+   * Parte 39: QTND of one direction of a link, same rule as NetworkConfig.QKDConfig.qtndForLink: with
+   * trustedNodeMode "perLink", an entry {link:"A-B"} (exact direction first, then the reverse) gives trustedNodes n
+   * (n + 1 equal spans) or its own qtndKm; otherwise the global qtndKm.
+   */
+  function qtndForLink(qkd, source, destination, km) {
+    const g = qkd ? Number(qkd.qtndKm) : NaN;
+    if (!qkd || String(qkd.trustedNodeMode || 'global').toLowerCase() !== 'perlink' || !Array.isArray(qkd.trustedNodesPerLink)) return g;
+    let exact = null, reverse = null;
+    for (const e of qkd.trustedNodesPerLink) {
+      if (!e || typeof e.link !== 'string') continue;
+      const ab = e.link.trim().split(/\s*-\s*/);
+      if (ab.length !== 2) continue;
+      if (ab[0] === String(source) && ab[1] === String(destination)) exact = e;
+      else if (ab[0] === String(destination) && ab[1] === String(source)) reverse = e;
+    }
+    const e = exact || reverse;
+    if (!e) return g;
+    const n = Number(e.trustedNodes);
+    if (e.trustedNodes !== undefined && e.trustedNodes !== null && e.trustedNodes !== '' && Number.isInteger(n) && n >= 0 && km > 0) return km / (n + 1);
+    const q = Number(e.qtndKm);
+    return q > 0 ? q : g;
+  }
+
   /** Model for figRender ('topo') drawing a network (no values): used by the Rede preview. */
   function topoPanel(network, title, extra) {
     const { pos } = coordsFor(network);
-    const q = network && network.qkd && network.qkd.enabled ? Number(network.qkd.qtndKm) : 0;
+    const qkd = network && network.qkd && network.qkd.enabled ? network.qkd : null;
+    const q = qkd ? Number(qkd.qtndKm) : 0;
+    const qOf = (a, b, km) => { const v = qkd ? qtndForLink(qkd, a, b, km) : 0; return Number.isFinite(v) && v > 0 ? v : 0; };
     return Object.assign({
       title: title || '',
       nodes: [...pos.entries()].map(([id, p]) => ({ id, x: p.x, y: p.y })),
-      links: undirectedLinks(network).map((l) => ({ a: l.a, b: l.b, km: l.km, both: l.dirs.size > 1 })),
+      links: undirectedLinks(network).map((l) => ({ a: l.a, b: l.b, km: l.km, both: l.dirs.size > 1, qtndAB: qOf(l.a, l.b, l.km), qtndBA: qOf(l.b, l.a, l.km) })),
       qtnd: Number.isFinite(q) && q > 0 ? q : 0, // Parte 27: trusted nodes every qtnd km
     }, extra || {});
   }
@@ -282,6 +308,6 @@
 
   App.presets = {
     TOPOLOGIES, CORES, HEAT_STOPS, coresConfig, corePresetOf, coreLayout, undirectedLinks, matchTopology,
-    coordsFor, topoPanel, buildTopology, heatColor, pairKey,
+    coordsFor, topoPanel, buildTopology, heatColor, pairKey, qtndForLink,
   };
 })(window.App);

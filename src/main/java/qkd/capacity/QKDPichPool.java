@@ -48,6 +48,10 @@ public final class QKDPichPool implements Serializable {
 
     private final int pichSlots;
     private final int sessionsPerChannel;
+    /** Parte 39: link of the last failed acquire (null when it succeeded). */
+    private transient Link lastFailedLink;
+
+    public Link getLastFailedLink() { return lastFailedLink; }
     private final Map<Link, List<Channel>> byLink = new IdentityHashMap<Link, List<Channel>>();
     private int openChannels;
     private long peakOpenChannels;
@@ -67,9 +71,11 @@ public final class QKDPichPool implements Serializable {
      */
     public List<Channel> acquire(List<Link> links, int guardBand, Circuit candidate) {
         List<Channel> got = new ArrayList<Channel>();
+        lastFailedLink = null;
         for (Link l : links) {
             Channel c = joinOrOpen(l, guardBand, candidate);
             if (c == null) {
+                lastFailedLink = l; // Parte 39: link where no PICh fitted (observation only)
                 release(got);
                 return null;
             }

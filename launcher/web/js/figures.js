@@ -91,6 +91,7 @@
     if (/Fragmentation$/.test(f)) return ' Ligue a métrica ' + f + ' na aba Métricas do caso e rode a simulação de novo.';
     if (f === 'SlotBlocking') return ' Ele é gravado pelo simulador da Parte 29 (métrica SlotBlocking, ligada por padrão, junto com BlockingProbability).';
     if (f === 'SlotUtilization') return ' Ele é gravado pelo simulador da Parte 27 (métrica SlotUtilization, ligada por padrão, junto com SpectrumUtilization).';
+    if (f === 'QKDChannelBlocking' || f === 'QKDChannelSlotBlocking') return ' Ele é gravado pelo simulador da Parte 39 em casos com QKD (o mapa do espectro também precisa do SlotBlocking ligado).';
     if (f === 'BlockingDetails') return ' Ele é gravado pelo simulador da Parte 25 em diante (o diagnóstico do espectro, pelo da Parte 27).';
     return '';
   }
@@ -343,6 +344,8 @@
     'Spectrum: not enough free slots': ['Faltavam slots livres', '#404040'],
     'Spectrum: no route': ['Sem rota', '#A5A5A5'],
     'Spectrum: QKD side': ['Recusada pelo lado QKD', '#5B9BD5'],
+    // Parte 39: channel of the QKD request that could not be set up
+    'CCh': ['CCh: circuito clássico da requisição', '#4472C4'], 'QCh': ['QCh: canal quântico', '#ED7D31'], 'PICh': ['PICh: canal público', '#70AD47'],
     'classical': ['Clássicas (não protegidas)', null], 'qkd': ['Protegidas por QKD', null], 'all': ['Todas as requisições', null],
   };
 
@@ -374,7 +377,7 @@
   function parseSlotBlockCsv(lines, header) {
     const nSlots = header.length - 6;
     const att = new Map(), blkAll = new Map(), blk = new Map();
-    const reqAtt = new Map(), reqBlkAll = new Map(), reqBlk = new Map(), noBand = new Map(), noQch = new Map();
+    const reqAtt = new Map(), reqBlkAll = new Map(), reqBlk = new Map(), noBand = new Map(), noQch = new Map(), noPich = new Map();
     const links = [], linkSet = new Set(), cores = new Set(), lps = new Set(), reps = new Set(), causes = [];
     const addArr = (m, key, c) => { let a = m.get(key); if (!a) { a = new Float64Array(nSlots); m.set(key, a); } for (let k = 0; k < nSlots; k++) { const v = Number(c[6 + k]); if (v) a[k] += v; } };
     const addNum = (m, key, v) => m.set(key, (m.get(key) || 0) + (Number(v) || 0));
@@ -390,6 +393,7 @@
       lps.add(lp); reps.add(c[4].trim());
       if (metric === 'Blocked requests without spectrum band') { addNum(noBand, lp, c[6]); continue; }
       if (metric === 'Blocked QKD requests without QCh band') { addNum(noQch, lp, c[6]); continue; }
+      if (metric === 'Blocked QKD requests without PICh band') { addNum(noPich, lp, c[6]); continue; }
       const key = lp + '|' + link + '|' + core;
       if (!linkSet.has(link)) { linkSet.add(link); links.push(link); }
       cores.add(core);
@@ -401,7 +405,7 @@
       else if (metric === 'Blocked requests on link and core by cause') addNum(sub(reqBlk, cause), key, c[6]);
     }
     const p = { ok: true, slotblock: true, dims: [], rows: [], nSlots, links, cores: [...cores].sort((a, b) => Number(a) - Number(b)),
-      att, blkAll, blk, reqAtt, reqBlkAll, reqBlk, noBand, noQch, causes, nReps: reps.size };
+      att, blkAll, blk, reqAtt, reqBlkAll, reqBlk, noBand, noQch, noPich, causes, nReps: reps.size };
     finishParsed(p);
     p.lps = [...lps].sort((a, b) => a - b);
     return p;
@@ -410,7 +414,7 @@
   // ================================================================ templates
 
   // Parte 27: models grouped by subject (optgroups of the "Modelo de gráfico" box); ids are kept, so saved figures still open
-  const TEMPLATE_GROUPS = ['Bloqueio', 'Causas de bloqueio', 'Núcleos', 'Espectro e utilização', 'Fragmentação', 'Mapas de calor', 'Correlações', 'QKD', 'Custo QKD', 'Outros'];
+  const TEMPLATE_GROUPS = ['Bloqueio', 'Causas de bloqueio', 'Canais QKD bloqueados', 'Núcleos', 'Espectro e utilização', 'Fragmentação', 'Mapas de calor', 'Correlações', 'QKD', 'Custo QKD', 'Outros'];
   const TEMPLATES = [
     // ---- Bloqueio
     { id: 'bp', group: 'Bloqueio', name: 'Bloqueio de circuitos × carga', type: 'line', file: 'BlockingProbability', metric: 'Blocking probability', y: 'Probabilidade de Bloqueio de Circuito', x: 'Carga (Erlangs)', xMode: 'erl' },
@@ -504,6 +508,21 @@
     { id: 'costVsBlock', group: 'Custo QKD', name: 'Custo × bloqueio QKD (um ponto por carga, uma curva por caso)', type: 'scatter', by: 'LoadPoint', xFile: 'QKDCost', xMetric: 'QKD equipment cost (relative units)', yFile: 'QKDMetrics', yMetric: 'QKD blocking probability', x: 'Custo de equipamento QKD (unidades)', y: 'Probabilidade de bloqueio QKD',
       desc: 'Cada curva é um caso; cada ponto, uma carga. Casos mais à esquerda e mais abaixo são melhores (menos custo e menos bloqueio): use para escolher QTND, PICh e limite de QTx/QRx.' },
     { id: 'costVsBlockAll', group: 'Custo QKD', name: 'Custo × bloqueio total (um ponto por carga, uma curva por caso)', type: 'scatter', by: 'LoadPoint', xFile: 'QKDCost', xMetric: 'QKD equipment cost (relative units)', yFile: 'BlockingProbability', yMetric: 'Blocking probability', x: 'Custo de equipamento QKD (unidades)', y: 'Probabilidade de bloqueio' },
+    // ---- Parte 39: canal QKD que não pôde ser estabelecido
+    { id: 'chanBars', group: 'Canais QKD bloqueados', name: 'Bloqueio das protegidas por canal (CCh, QCh, PICh): empilhadas', type: 'bars', file: 'QKDChannelBlocking', metric: 'Blocking probability by channel', itemsFrom: 'dim', dim: 'Channel', xAxis: 'cases', stacked: true, y: 'Probabilidade de bloqueio das protegidas',
+      desc: 'Usa o QKDChannelBlocking.csv (simulador da Parte 39). Para cada requisição protegida bloqueada, o canal que não pôde ser estabelecido: CCh = o circuito clássico da requisição (XT, XTO, QoT, fragmentação, falta de espectro, núcleo não tentado e recusa da proteção de sessões ativas); QCh = canal quântico (SKR insuficiente, espectro do QCh, falta de QTx/QRx, outros QKD); PICh = canal público. A pilha soma o bloqueio das requisições protegidas.' },
+    { id: 'chanShare', group: 'Canais QKD bloqueados', name: 'Parcela de cada canal nas protegidas bloqueadas (100 %)', type: 'bars', file: 'QKDChannelBlocking', metric: 'Blocking probability by channel', itemsFrom: 'dim', dim: 'Channel', xAxis: 'cases', stacked: true, normalize: true, y: '',
+      desc: 'Usa o QKDChannelBlocking.csv (simulador da Parte 39). Para cada requisição protegida bloqueada, o canal que não pôde ser estabelecido: CCh = o circuito clássico da requisição (XT, XTO, QoT, fragmentação, falta de espectro, núcleo não tentado e recusa da proteção de sessões ativas); QCh = canal quântico (SKR insuficiente, espectro do QCh, falta de QTx/QRx, outros QKD); PICh = canal público. Cada barra soma 100 %: mostra qual canal mais impede o estabelecimento das sessões.' },
+    { id: 'chanLoad', group: 'Canais QKD bloqueados', name: 'Bloqueio por canal × carga (uma linha por canal)', type: 'line', file: 'QKDChannelBlocking', metric: 'Blocking probability by channel', seriesBy: 'dim:Channel', y: 'Probabilidade de bloqueio das protegidas', x: 'Carga (Erlangs)', xMode: 'erl', labels: { all: 'Todos os canais' },
+      desc: 'Usa o QKDChannelBlocking.csv (simulador da Parte 39). Para cada requisição protegida bloqueada, o canal que não pôde ser estabelecido: CCh = o circuito clássico da requisição (XT, XTO, QoT, fragmentação, falta de espectro, núcleo não tentado e recusa da proteção de sessões ativas); QCh = canal quântico (SKR insuficiente, espectro do QCh, falta de QTx/QRx, outros QKD); PICh = canal público.' },
+    { id: 'chanCauses', group: 'Canais QKD bloqueados', name: 'Canal × causa: cada canal com as suas causas (empilhadas)', type: 'bars', file: 'QKDChannelBlocking', metric: 'Blocking probability by channel and cause', itemsFrom: 'dim', dim: 'Channel', seriesDim: 'Cause', xAxis: 'items', stacked: true, y: 'Probabilidade de bloqueio das protegidas', x: 'Canal',
+      desc: 'Usa o QKDChannelBlocking.csv (simulador da Parte 39). Para cada requisição protegida bloqueada, o canal que não pôde ser estabelecido: CCh = o circuito clássico da requisição (XT, XTO, QoT, fragmentação, falta de espectro, núcleo não tentado e recusa da proteção de sessões ativas); QCh = canal quântico (SKR insuficiente, espectro do QCh, falta de QTx/QRx, outros QKD); PICh = canal público. Uma barra por canal, com as causas empilhadas. Escolha um caso por vez, ou use painéis.' },
+    { id: 'chanLinks', group: 'Canais QKD bloqueados', name: 'Bloqueio por canal em cada enlace (empilhadas)', type: 'bars', file: 'QKDChannelBlocking', metric: 'Link blocking probability by channel', itemsFrom: 'dim', dim: 'Link', seriesDim: 'Channel', xAxis: 'items', stacked: true, y: 'Protegidas bloqueadas ÷ protegidas que usam o enlace', x: 'Enlace', rotate: -60,
+      desc: 'Usa o QKDChannelBlocking.csv (simulador da Parte 39). Para cada requisição protegida bloqueada, o canal que não pôde ser estabelecido: CCh = o circuito clássico da requisição (XT, XTO, QoT, fragmentação, falta de espectro, núcleo não tentado e recusa da proteção de sessões ativas); QCh = canal quântico (SKR insuficiente, espectro do QCh, falta de QTx/QRx, outros QKD); PICh = canal público. Enlace de cada bloqueio: QCh/PICh, o enlace em que o canal falhou (todos os da rota quando a falha não tem enlace); CCh, todos os enlaces da rota do circuito.' },
+    { id: 'chanSlot', group: 'Canais QKD bloqueados', name: 'Espectro: onde cada canal foi bloqueado (uma cor por canal)', type: 'slotblock', file: 'QKDChannelSlotBlocking', blockMode: 'causes',
+      desc: 'Mapa de calor do espectro só com as requisições protegidas: cada slot recebe a cor do canal (CCh, QCh ou PICh) com mais bloqueios ali. Tentativas: a faixa do circuito clássico, dos QChs e do PICh de cada sessão. Usa o QKDChannelSlotBlocking.csv (Parte 39). Bloqueios sem faixa tentada (ex.: SKR insuficiente sem espectro para o QCh) aparecem no título.' },
+    { id: 'chanSlotRatio', group: 'Canais QKD bloqueados', name: 'Espectro: bloqueio das protegidas em cada slot (bloqueadas ÷ tentativas)', type: 'slotblock', file: 'QKDChannelSlotBlocking', blockMode: 'ratio',
+      desc: 'Como o mapa de bloqueio do espectro, mas só com os canais das requisições protegidas (QKDChannelSlotBlocking.csv, Parte 39). Escolha um canal em "Causa" para ver só ele.' },
     { id: 'qkdQtnd', group: 'QKD', name: 'Métrica × QTND (casos de uma varredura)', type: 'line', file: 'QKDMetrics', metric: 'QKD blocking probability', y: 'Probabilidade de bloqueio QKD', x: 'QTND (km)', xMode: 'param', paramPath: 'network:qkd.qtndKm' },
     { id: 'qkdEquip', group: 'QKD', name: 'QTx/QRx em uso por nó (pico)', type: 'bars', file: 'QKDMetrics', metric: 'Peak QTx in use per node', itemsFrom: 'dim', dim: 'src', xAxis: 'items', y: 'QTx em uso (pico)', x: 'Nó', rotate: -60 },
     // ---- Outros
@@ -544,7 +563,7 @@
       slots: { lp: -1, links: [], cores: [], oneWay: false, from: 1, to: 0, order: 'name', caseLayout: 'stack', blockMode: t.blockMode || 'ratio', blockCause: t.blockCause || 'all', onlyBlocked: false, summary: true },
       scatter: { xFile: t.xFile || 'SpectrumUtilization', xMetric: t.xMetric || 'Utilization Per Link', yFile: t.yFile || 'BlockingDetails', yMetric: t.yMetric || 'Link blocking probability',
         by: t.by || 'Link', lp: -1, fx: {}, fy: {}, trend: true, pooled: false },
-      labels: {}, seriesStyle: {}, seriesOrder: [], style,
+      labels: Object.assign({}, t.labels || {}), seriesStyle: {}, seriesOrder: [], style,
     };
   }
 
@@ -633,7 +652,7 @@
         line: o.line !== undefined ? o.line !== false : kind !== 'scatter',
       };
     }
-    return {
+    return Object.assign(extraStyle(o), {
       color: o.color || defColor,
       dash: o.dash || (kind === 'line' ? ['solid', 'dashed', 'dotted', 'dashdot'][cycle % 4] : 'solid'),
       width: o.width !== undefined && o.width !== '' ? Number(o.width) : st.lineWidth,
@@ -642,7 +661,15 @@
       hollow: o.hollow !== undefined ? !!o.hollow : false,
       visible: o.visible !== false,
       line: o.line !== false,
-    };
+    });
+  }
+
+  /** 1.17.0: bar pattern and value-label overrides of one series (spec.seriesStyle[key]), passed to the renderer. */
+  const EXTRA_KEYS = ['pattern', 'patternColor', 'patternSize', 'patternWidth', 'valShow', 'valColor', 'valBold', 'valBox', 'valBoxFill', 'valBoxStroke', 'valPos'];
+  function extraStyle(o) {
+    const out = {};
+    for (const k of EXTRA_KEYS) if (o[k] !== undefined && o[k] !== '' && o[k] !== 'inherit') out[k] = o[k];
+    return out;
   }
 
   function flatten(obj, prefix, out) {
@@ -651,6 +678,60 @@
     if (Array.isArray(obj)) return out;
     for (const k of Object.keys(obj)) flatten(obj[k], prefix ? prefix + '.' + k : k, out);
     return out;
+  }
+
+  /**
+   * 1.17.0: families of cases for the "metric × parameter" charts: cases whose configuration is equal apart from the
+   * parameter of the x axis (and from names/paths). Returns {count, of: Map(path → {sig, parts})}.
+   */
+  const FAMILY_SKIP = /(^|\.)(name|label|description|seed|seeds|path|file|folder|outputFolder|resultsFolder)$/i;
+  async function paramFamilies(cases, paramPath) {
+    const files = ['simulation', 'network', 'physicalLayer', 'qkdPhysicalLayer', 'others', 'traffic'];
+    const flats = await Promise.all(cases.map(async (c) => {
+      const cd = await caseData(c.path).catch(() => null);
+      const out = {};
+      for (const f of files) {
+        const fl = flatten(cd && cd.files[f], '', {});
+        for (const k of Object.keys(fl)) { if (f + ':' + k !== paramPath && !FAMILY_SKIP.test(k)) out[f + ':' + k] = fl[k]; }
+      }
+      // per-link trusted nodes (arrays are skipped by flatten): part of the family when the x is the QTND
+      const pl = cd && cd.files.network && cd.files.network.qkd && cd.files.network.qkd.trustedNodesPerLink;
+      if (Array.isArray(pl) && pl.length) out['network:qkd.trustedNodesPerLink'] = JSON.stringify(pl);
+      // traffic generators (an array): summarised by the protected fraction, the key demand and the total load
+      const gens = cd && cd.files.traffic && Array.isArray(cd.files.traffic.requestGenerators) ? cd.files.traffic.requestGenerators : [];
+      if (gens.length) {
+        const mean = (f) => +(gens.reduce((a, g) => a + (Number(f(g)) || 0), 0) / gens.length).toPrecision(4);
+        out['traffic:qkdProtectedProbability'] = mean((g) => g.qkdProtectedProbability);
+        const kr = [...new Set(gens.map((g) => g.keyRateMbps).filter((v) => v !== undefined))].sort();
+        if (kr.length) out['traffic:keyRateMbps'] = kr.join('/');
+        out['traffic:arrivalRate'] = +gens.reduce((a, g) => a + (Number(g.arrivalRate) || 0), 0).toPrecision(6);
+      }
+      return out;
+    }));
+    const keys = [...new Set(flats.flatMap((x) => Object.keys(x)))];
+    const vary = keys.filter((k) => new Set(flats.map((x) => JSON.stringify(x[k] === undefined ? null : x[k]))).size > 1);
+    const of = new Map();
+    const sigs = new Set();
+    cases.forEach((c, i) => {
+      const parts = vary.map((k) => [k, flats[i][k]]);
+      const sig = JSON.stringify(parts);
+      sigs.add(sig);
+      of.set(c.path, { sig, parts, first: caseLabel(c) });
+    });
+    return { count: sigs.size, of, vary };
+  }
+  function labelOfFamily(spec, f) {
+    const k = 'fam:' + f.sig;
+    if (spec.labels[k]) return spec.labels[k];
+    const NAMES = { qkdProtectedProbability: 'protegidas', keyRateMbps: 'chave (Mbit/s)', arrivalRate: 'carga', pichSlots: 'PICh', alternativeRoutes: 'rotas alt.', quantumCoreId: 'núcleo QKD', coreAndSpectrumAssignment: 'alocação', trustedNodesPerLink: 'nós por enlace' };
+    const parts = f.parts.filter(([, v]) => v !== undefined).map(([key, v]) => {
+      const k = key.split(/[.:]/).pop();
+      const val = k === 'qkdProtectedProbability' && typeof v === 'number' ? R().fmtNumber(v * 100, 'auto', 3, spec.style.decimal) + ' %'
+        : k === 'trustedNodesPerLink' ? 'sim' : typeof v === 'number' ? R().fmtNumber(v, 'auto', 4, spec.style.decimal) : String(v);
+      return (NAMES[k] || k) + ' = ' + val;
+    });
+    const t = parts.join(', ');
+    return t && t.length <= 60 ? t : f.first;
   }
 
   async function differingParams(spec) {
@@ -713,6 +794,9 @@
 
     if (L.xMode === 'param') {
       if (!L.paramPath) return { kind: 'line', series: [], empty: 'Escolha o parâmetro do eixo x (os casos precisam diferir em algum parâmetro de configuração).' };
+      // 1.17.0: cases are grouped in families (same configuration apart from the parameter); one curve per family.
+      // L.paramGroup 'pool' keeps the old behaviour (all cases with the same x pooled in one point).
+      const fam = L.paramGroup === 'pool' ? null : await paramFamilies(avail.map((x) => x.c), L.paramPath);
       const groups = new Map();
       for (const { c, p } of avail) {
         const cd = await caseData(c.path);
@@ -722,20 +806,27 @@
         if (!Number.isFinite(x)) continue;
         const lp = lpResolve(L.paramLp, p.lps);
         const subkeys = dimName ? dimValues(p, metric)[p.dims.indexOf(dimName)] || [] : metrics;
+        const f = fam ? fam.of.get(c.path) : null;
         for (const sk of subkeys) {
           const reps = dimName ? repsAt(p, metric, lp, spec.filters, dimName, sk) : repsAt(p, sk, lp, spec.filters);
-          const gk = dimName ? 'd:' + sk : 'm:' + sk;
-          if (!groups.has(gk)) groups.set(gk, { item: dimName ? sk : sk, pts: new Map() });
+          const gk = (f && fam.count > 1 ? 'f:' + f.sig + '|' : '') + (dimName ? 'd:' + sk : 'm:' + sk);
+          if (!groups.has(gk)) groups.set(gk, { item: sk, fam: f && fam.count > 1 ? f : null, pts: new Map() });
           const g = groups.get(gk);
           if (!g.pts.has(x)) g.pts.set(x, { reps: [], labels: [] });
           g.pts.get(x).reps.push(...reps); g.pts.get(x).labels.push(caseLabel(c));
         }
       }
+      const multiItem = new Set([...groups.values()].map((g) => g.item)).size > 1 || dimName || L.seriesBy === 'metric';
+      let hidden = 0;
       for (const [gk, g] of groups) {
         const points = [...g.pts.entries()].sort((a, b) => a[0] - b[0]).map(([x, v]) => Object.assign({ x, label: v.labels.join(', ') }, stats(v.reps)));
-        add('param|' + gk, itemLabel(spec, g.item), points, g.item);
+        if (g.fam && L.paramHideSingle !== false && points.length < 2) { hidden++; continue; }
+        const name = g.fam ? (labelOfFamily(spec, g.fam) + (multiItem ? ' · ' + itemLabel(spec, g.item) : '')) : itemLabel(spec, g.item);
+        add('param|' + gk, name, points, g.item);
+        if (g.fam) Object.assign(series[series.length - 1], { fam: g.fam, famItem: multiItem ? g.item : null });
       }
-      return { kind: 'line', series, xNumericOnly: false };
+      return { kind: 'line', series, xNumericOnly: false, paramFamilies: fam ? fam.count : 0, paramHidden: hidden,
+        empty: !series.length && hidden ? 'Cada família de casos tem um só valor do parâmetro (nenhuma curva). Desmarque "Esconder famílias com um só ponto" ou junte os casos (seção 2).' : undefined };
     }
 
     // 1.16.0: load points chosen in "2. Dados" (empty = all)
@@ -1036,7 +1127,15 @@
 
   /** Colours of the blocking causes in the "causes" mode (Parte 29). */
   const SLOT_NOBLOCK_COLOR = '#D9D9D9';
-  function slotCauseColor(cause, i) {
+  /** Parte 39: the spectrum blocking map reads SlotBlocking.csv or QKDChannelSlotBlocking.csv (same layout). */
+  function slotBlockFile(spec) {
+    return spec && /^(SlotBlocking|QKDChannelSlotBlocking)$/.test(spec.file || '') ? spec.file : 'SlotBlocking';
+  }
+
+  function slotCauseColor(cause, i, st) {
+    // 1.17.0: colour chosen by the user for this cause (section 3 of the heat map)
+    const own = st && st.slotCauseColors && st.slotCauseColors[cause];
+    if (own) return own;
     return causeColor(cause) || ['#C00000', '#7030A0', '#00B050', '#0070C0', '#ED7D31', '#FFC000', '#5B9BD5', '#A5A5A5'][i % 8];
   }
 
@@ -1054,8 +1153,8 @@
     for (const c of spec.cases) {
       const cd = await caseData(c.path);
       let p = null;
-      try { p = await getCsv(c.path, 'SlotBlocking'); } catch (e) { p = null; }
-      if (!(p && p.ok && p.slotblock)) { missing.push(caseLabel(c) + ' (sem SlotBlocking.csv: rode de novo com o simulador da Parte 29)'); continue; }
+      try { p = await getCsv(c.path, slotBlockFile(spec)); } catch (e) { p = null; }
+      if (!(p && p.ok && p.slotblock)) { missing.push(caseLabel(c) + ' (sem ' + slotBlockFile(spec) + '.csv: rode de novo com o simulador da ' + (slotBlockFile(spec) === 'SlotBlocking' ? 'Parte 29' : 'Parte 39') + ')'); continue; }
       for (const k of p.causes) if (!allCauses.includes(k)) allCauses.push(k);
       const lp = lpResolve(T.lp, p.lps);
       let links = p.links.slice();
@@ -1095,7 +1194,7 @@
             if (!(att[s] > 0)) { row.colors[i] = null; continue; }
             let best = -1, bv = 0;
             byCause.forEach((arr, j) => { if (arr && arr[s] > bv) { bv = arr[s]; best = j; } });
-            row.colors[i] = best < 0 ? SLOT_NOBLOCK_COLOR : slotCauseColor(causes[best], allCauses.indexOf(causes[best]));
+            row.colors[i] = best < 0 ? (st.slotNoBlockColor || SLOT_NOBLOCK_COLOR) : slotCauseColor(causes[best], allCauses.indexOf(causes[best]), st);
           }
         }
         row.tip = (k, e) => {
@@ -1120,11 +1219,12 @@
       const nb = p.noBand.get(lp) || 0;
       const sub = [lpLabel(cd, lp), p.nReps > 1 ? 'soma de ' + p.nReps + ' replicações' : '', want !== 'all' ? autoLabel(want) : '',
         nb > 0 && want === 'all' ? nb + ' bloqueio' + (nb > 1 ? 's' : '') + ' sem faixa no espectro (fora do mapa)' : '',
-        (p.noQch.get(lp) || 0) > 0 && want === 'all' ? p.noQch.get(lp) + ' bloqueio' + (p.noQch.get(lp) > 1 ? 's' : '') + ' QKD sem QCh tentado (fora do núcleo ' + (qCoreS || 'quântico') + ')' : ''].filter(Boolean);
+        (p.noQch.get(lp) || 0) > 0 && want === 'all' ? p.noQch.get(lp) + ' bloqueio' + (p.noQch.get(lp) > 1 ? 's' : '') + ' QKD sem QCh tentado (fora do núcleo ' + (qCoreS || 'quântico') + ')' : '',
+        (p.noPich.get(lp) || 0) > 0 && want === 'all' ? p.noPich.get(lp) + ' bloqueio' + (p.noPich.get(lp) > 1 ? 's' : '') + ' de PICh sem faixa tentada' : ''].filter(Boolean);
       panels.push({ title: (spec.cases.length > 1 ? caseLabel(c) + ' · ' : '') + sub.join(' · '), rows, from, to, path: c.path, lp, noBand: nb, totReq, totBlk });
     }
     S.slotCauses = allCauses;
-    if (!panels.length) return { empty: 'Nenhum caso selecionado tem o arquivo SlotBlocking.csv.' + fileHint('SlotBlocking'), missing };
+    if (!panels.length) return { empty: 'Nenhum caso selecionado tem o arquivo ' + slotBlockFile(spec) + '.csv.' + fileHint(slotBlockFile(spec)), missing };
     if (!panels.some((x) => x.rows.length)) return { empty: T.onlyBlocked ? 'Nenhum núcleo de enlace selecionado teve bloqueio' + (want !== 'all' ? ' por ' + autoLabel(want) : '') + ' neste ponto de carga.' : 'Nenhum enlace/núcleo selecionado teve tentativas.', missing };
     let min = 0, max = 1;
     if (mode === 'count' || st.slotRange === 'auto') {
@@ -1141,8 +1241,8 @@
     if (mode === 'causes') {
       const used = new Set();
       for (const pn of panels) for (const r of pn.rows) for (const c of r.colors) if (c) used.add(c);
-      model.legendItems = allCauses.filter((k) => want === 'all' || k === want).map((k) => [slotCauseColor(k, allCauses.indexOf(k)), autoLabel(k)]).filter(([c]) => used.has(c));
-      model.legendItems.push([SLOT_NOBLOCK_COLOR, 'Tentado, sem bloqueio' + (want !== 'all' ? ' por esta causa' : '')], [model.noDataColor, 'Nenhuma tentativa']);
+      model.legendItems = allCauses.filter((k) => want === 'all' || k === want).map((k) => [slotCauseColor(k, allCauses.indexOf(k), st), autoLabel(k)]).filter(([c]) => used.has(c));
+      model.legendItems.push([st.slotNoBlockColor || SLOT_NOBLOCK_COLOR, 'Tentado, sem bloqueio' + (want !== 'all' ? ' por esta causa' : '')], [model.noDataColor, 'Nenhuma tentativa']);
     }
     model.legendTitle = slotBlockLegendTitle(spec, mode);
     return model;
@@ -1755,9 +1855,10 @@
       usesCost(spec) ? section('Pesos do custo', true, costPanel()) : null,
       (seriesBox = el('div')),
       section('4. Aparência', false, appearancePanel()),
-      section('5. Eixos e números', false, axesPanel()),
-      section('6. Linhas de referência', false, refLinesPanel()),
-      section('7. Legenda e título', false, legendPanel()));
+      ['line', 'bars'].includes(spec.type) ? section('5. Rótulos dos valores', false, valuesPanel()) : null,
+      section('6. Eixos e números', false, axesPanel()),
+      section('7. Linhas de referência', false, refLinesPanel()),
+      section('8. Legenda e título', false, legendPanel()));
     drawSeriesPanel();
   }
 
@@ -1889,7 +1990,7 @@
       changedData();
       App.toast('Modelo de volta ao padrão.', 'ok');
     } } }, 'Padrão do modelo');
-    box.append(groupField('Modelo de gráfico', el('div.toolbar', { style: { margin: 0, flexWrap: 'nowrap' } }, tmplSel, resetTmpl),
+    box.append(groupField('Modelo de gráfico', el('div.stack-s', tmplSel, el('div', resetTmpl)),
       (tdesc ? tdesc + ' ' : '') + 'Os ajustes feitos em cada modelo ficam guardados: ao trocar de modelo e voltar, eles reaparecem. "Padrão do modelo" esquece os ajustes deste modelo.'));
 
     const typeSel = selectInput(spec, 'type', [['line', 'Linhas (métrica × carga ou parâmetro)'], ['bars', 'Barras (agrupadas / empilhadas)'], ['cores', 'Diagrama da fibra (núcleos)'], ['topo', 'Mapa de calor na topologia (enlaces)'], ['slots', 'Mapa de calor do espectro (slots × núcleos × enlaces)'], ['slotblock', 'Mapa de calor do bloqueio no espectro (slots)'], ['slotline', 'Perfil de ocupação por slot (linhas)'], ['scatter', 'Dispersão: métrica × métrica (correlação)']], () => {
@@ -1958,7 +2059,10 @@
         const pSel = el('select.input', (S.paramOptions || []).length ? S.paramOptions.map((p) => el('option', { value: p }, p)) : el('option', { value: '' }, 'os casos não diferem em parâmetros numéricos'));
         pSel.value = L.paramPath;
         pSel.addEventListener('change', () => { L.paramPath = pSel.value; changedData(); });
-        box.append(field('Parâmetro', pSel), field('Ponto de carga', lpSelect(L, 'paramLp')));
+        box.append(field('Parâmetro', pSel), field('Ponto de carga', lpSelect(L, 'paramLp')),
+          field('Casos com outras diferenças', selectInput(Object.assign(L, { paramGroup: L.paramGroup || 'family' }), 'paramGroup', [['family', 'Uma curva por família (casos iguais fora este parâmetro)'], ['pool', 'Juntar todos no mesmo ponto (como antes)']], () => changedData()),
+            'Ex.: QTND 25, 50 e 100 km com R25 e com R100 viram duas curvas (protectedFraction = 0,25 e = 1), em vez de misturar R25 e R100 no mesmo ponto.'),
+          el('div.checks', checkInput(Object.assign(L, { paramHideSingle: L.paramHideSingle !== false }), 'paramHideSingle', 'Esconder famílias com um só ponto', () => changedData())));
       } else if ((S.lpOptions || []).length > 1) {
         // 1.16.0: which load points appear on the x axis
         const lps = S.lpOptions;
@@ -2067,8 +2171,14 @@
     const o = S.slotOptions || { links: [], cores: [], nSlots: 0 };
     const box = el('div.stack-s');
     const isBlock = S.spec.type === 'slotblock';
+    if (isBlock) {
+      if (!/^(SlotBlocking|QKDChannelSlotBlocking)$/.test(S.spec.file || '')) S.spec.file = 'SlotBlocking';
+      box.append(field('Requisições do mapa', selectInput(S.spec, 'file', [['SlotBlocking', 'Todas, cores por causa (SlotBlocking.csv)'], ['QKDChannelSlotBlocking', 'Só as protegidas por QKD, cores por canal CCh/QCh/PICh (QKDChannelSlotBlocking.csv)']], () => {
+        S.spec.slots.blockCause = 'all'; changedData();
+      })));
+    }
     if (!o.links.length) {
-      box.append(el('p.small.muted', isBlock ? 'Nenhum caso selecionado tem SlotBlocking.csv.' + fileHint('SlotBlocking') : 'Nenhum caso selecionado tem SlotUtilization.csv. O arquivo é gravado pelo simulador da Parte 27 (métrica SlotUtilization, ligada por padrão junto com SpectrumUtilization).'));
+      box.append(el('p.small.muted', isBlock ? 'Nenhum caso selecionado tem ' + slotBlockFile(S.spec) + '.csv.' + fileHint(slotBlockFile(S.spec)) : 'Nenhum caso selecionado tem SlotUtilization.csv. O arquivo é gravado pelo simulador da Parte 27 (métrica SlotUtilization, ligada por padrão junto com SpectrumUtilization).'));
       return box;
     }
     box.append(field('Ponto de carga', lpSelect(T, 'lp')));
@@ -2225,9 +2335,21 @@
         field('Imagens por linha', numInput(st, 'topoCols', changedStyle, { min: 1, max: 8 })),
         field('Raio dos nós (px)', numInput(st, 'topoNodeR', changedStyle, { min: 4, max: 40 })),
         field('Espessura dos enlaces (px)', numInput(st, 'topoLinkWidth', changedStyle, { min: 1, max: 20, step: 0.5 })),
-        field('Cor dos rótulos', colorInput(st, 'topoLabelColor', changedStyle)),
+        field('Cor do texto dos rótulos', colorInput(st, 'topoLabelColor', changedStyle)),
+        field('Estilo dos rótulos', selectInput(st, 'topoLabelStyle', [['plain', 'Só o texto'], ['box', 'Texto numa caixa'], ['callout', 'Caixa afastada, com linha até o enlace']], changedStyle)),
+        field('Fundo da caixa', colorInput(st, 'topoLabelFill', changedStyle)),
+        field('Contorno da caixa e da linha', colorInput(Object.assign(st, { topoLabelStroke: st.topoLabelStroke || st.topoLabelColor || '#c00000' }), 'topoLabelStroke', changedStyle)),
+        field('Tamanho dos rótulos (px)', numInput(st, 'topoLabelSize', changedStyle, { min: 0, max: 40, step: 0.5, placeholder: 'auto' })),
+        field('Distância do enlace (px)', numInput(st, 'topoLabelDist', changedStyle, { min: 0, max: 300, step: 1, placeholder: 'auto' }), 'Com "caixa afastada", o comprimento da linha.'),
         field('Preenchimento dos nós', colorInput(st, 'topoNodeFill', changedStyle)),
         field('Enlace sem dado', colorInput(st, 'topoNoData', changedStyle))),
+        el('div.checks',
+          checkInput(st, 'topoLabelBold', 'Rótulos em negrito', changedStyle),
+          checkInput(st, 'topoLabelAvoid', 'Afastar rótulos que batem em nós ou em outros rótulos', changedStyle),
+          checkInput(st, 'topoKmUnit', 'Mostrar "km" no comprimento', changedStyle)),
+        el('div.toolbar', { style: { margin: 0 } },
+          el('span.small.muted', 'Arraste um rótulo no gráfico para mudar a posição dele.'),
+          st.topoLabelOffsets && Object.keys(st.topoLabelOffsets).length ? el('button.btn.small.ghost', { type: 'button', on: { click: () => { st.topoLabelOffsets = {}; persistDraft(); drawSeriesPanel(); refresh(true); } } }, 'Desfazer posições arrastadas (' + Object.keys(st.topoLabelOffsets).length + ')') : null),
         el('div.checks', checkInput(st, 'topoAutoHeight', 'Altura automática (proporção da topologia)', changedStyle),
           checkInput(st, 'topoPanelBorder', 'Moldura em cada imagem', changedStyle),
           checkInput(st, 'topoTrusted', 'Nós confiáveis (pontos a cada QTND km, casos com QKD)', changedStyle)),
@@ -2255,6 +2377,7 @@
         m.summaryHeads ? field('Título da coluna da porcentagem', labelInput('__sumB', '%')) : null,
         scale && m.block === 'ratio' ? field('Casas decimais da escala', numInput(st, 'slotDigits', changedStyle, { min: 0, max: 6 })) : null,
         field('Cor das divisões', colorInput(st, 'slotGridColor', changedStyle))),
+        m.block === 'causes' ? slotCauseColorsPanel(st) : null,
         el('div.checks',
           checkInput(st, 'slotCellGrid', 'Contorno em cada slot (quando couber)', changedStyle),
           checkInput(st, 'slotLinkSep', 'Linha grossa entre enlaces', changedStyle),
@@ -2356,6 +2479,14 @@
           el('label', el('span', 'Marcador'), mk), el('label', el('span', 'Tamanho'), ms)),
         el('div.checks.small', el('label.check', hol, ' marcador vazado'), el('label.check', ln, ' linha')));
       }
+      // 1.17.0: pattern (bars) and value labels of this series
+      const hasExtra = ['pattern', 'patternColor', 'valShow', 'valColor', 'valBold', 'valBox', 'valPos'].some((k) => o[k] && o[k] !== 'none');
+      const extraOpen = S.extraOpen || (S.extraOpen = new Set());
+      const xb = el('button.btn.small.ghost', { type: 'button', title: e.kind === 'bar' ? 'Padrão (hachura) da barra e valores desta série' : 'Valores desta série' },
+        (extraOpen.has(e.key) ? '▾ ' : '▸ ') + (e.kind === 'bar' ? 'Padrão e valores' : 'Valores') + (hasExtra ? ' •' : ''));
+      xb.addEventListener('click', () => { if (extraOpen.has(e.key)) extraOpen.delete(e.key); else extraOpen.add(e.key); drawSeriesPanel(); });
+      row.append(el('div', { style: { marginTop: '2px' } }, xb));
+      if (extraOpen.has(e.key)) row.append(seriesExtras(o, e.kind === 'bar'));
       body.append(row);
     });
     if (m.kind === 'bars' && spec.bars.xAxis === 'cases' && m.categories.length) body.append(el('p.small.muted', 'Os rótulos dos casos (eixo x) são editados na seção 1.'));
@@ -2369,6 +2500,62 @@
     seriesBox.append(section('3. Séries e cores (' + entries.length + ')', true, body));
   }
 
+  /** 1.17.0: drag a link label of the topology in the preview; the offset is kept in style.topoLabelOffsets. */
+  function enableTopoLabelDrag(svg) {
+    let drag = null;
+    const toSvg = (ev) => {
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return { x: ev.clientX, y: ev.clientY };
+      const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+      const q = pt.matrixTransform(ctm.inverse());
+      return { x: q.x, y: q.y };
+    };
+    svg.addEventListener('pointerdown', (ev) => {
+      const gg = ev.target.closest && ev.target.closest('[data-topo-key]');
+      if (!gg) return;
+      ev.preventDefault();
+      drag = { gg, key: gg.getAttribute('data-topo-key'), start: toSvg(ev), d: { x: 0, y: 0 } };
+      try { svg.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+    });
+    svg.addEventListener('pointermove', (ev) => {
+      if (!drag) return;
+      const q = toSvg(ev);
+      drag.d = { x: q.x - drag.start.x, y: q.y - drag.start.y };
+      drag.gg.setAttribute('transform', `translate(${drag.d.x.toFixed(1)} ${drag.d.y.toFixed(1)})`);
+    });
+    const end = () => {
+      if (!drag) return;
+      const { key, d } = drag;
+      drag = null;
+      if (Math.hypot(d.x, d.y) < 1) return;
+      const st = S.spec.style;
+      if (!st.topoLabelOffsets || typeof st.topoLabelOffsets !== 'object') st.topoLabelOffsets = {};
+      const o = st.topoLabelOffsets[key] || { dx: 0, dy: 0 };
+      st.topoLabelOffsets[key] = { dx: +(Number(o.dx || 0) + d.x).toFixed(1), dy: +(Number(o.dy || 0) + d.y).toFixed(1) };
+      S.dirty = true; persistDraft(); refresh(true); drawSeriesPanel();
+    };
+    svg.addEventListener('pointerup', end);
+    svg.addEventListener('pointercancel', end);
+  }
+
+  /** 1.17.0: one colour per blocking cause of the spectrum heat map (stored in style.slotCauseColors). */
+  function slotCauseColorsPanel(st) {
+    const causes = S.slotCauses || [];
+    if (!st.slotCauseColors || typeof st.slotCauseColors !== 'object') st.slotCauseColors = {};
+    const own = st.slotCauseColors;
+    const rows = causes.map((k, i) => {
+      const c = el('input.input.color', { type: 'color', value: toHex(slotCauseColor(k, i, st)) });
+      c.addEventListener('input', () => { own[k] = c.value; changedStyleData(); });
+      return field(autoLabel(k), c);
+    });
+    const nb = el('input.input.color', { type: 'color', value: toHex(st.slotNoBlockColor || SLOT_NOBLOCK_COLOR) });
+    nb.addEventListener('input', () => { st.slotNoBlockColor = nb.value; changedStyleData(); });
+    rows.push(field('Tentado, sem bloqueio', nb));
+    return el('div.stack-s', el('div.small.muted', { style: { marginTop: '6px' } }, 'Cor de cada tipo de bloqueio'),
+      el('div.fields.two', rows),
+      el('div', el('button.btn.small.ghost', { type: 'button', on: { click: () => { st.slotCauseColors = {}; delete st.slotNoBlockColor; persistDraft(); drawSeriesPanel(); refresh(true); } } }, 'Cores padrão das causas')));
+  }
+
   function labelInputFor(e) {
     const spec = S.spec;
     // line series named by case: edit the case label; item series: edit item label
@@ -2378,6 +2565,10 @@
       const i = el('input.input', { type: 'text', value: c.label, 'data-fk': 'case:' + c.path });
       i.addEventListener('input', () => { c.label = i.value; changedStyle(); });
       return i;
+    }
+    if (e.key.startsWith('param|f:')) {
+      const sr = S.model && S.model.series && S.model.series.find((x) => x.key === e.key);
+      if (sr && sr.fam) return labelInput('fam:' + sr.fam.sig, labelOfFamily({ labels: {}, style: S.spec.style }, sr.fam));
     }
     const m = /\|m:(.*)$/.exec(e.key) || /\|[^|=]+=(.*)$/.exec(e.key) || /^param\|[dm]:(.*)$/.exec(e.key);
     if (m) return labelInput(m[1], autoLabel(m[1]), e.name);
@@ -2414,18 +2605,98 @@
         field('Altura de cada painel (px)', numInput(st, 'panelHeight', changedStyle, { min: 0, max: 2000, step: 10, placeholder: '0 = usa a altura total' })),
         field('Rótulo do painel', textInput(st, 'panelLabel', changedStyle, { placeholder: 'ex.: (a)' }))),
       el('div.checks',
-        checkInput(st, 'barValues', 'Valores sobre as barras', changedStyle),
-        checkInput(st, 'lineValues', 'Valores nos pontos das linhas', changedStyle),
         checkInput(st, 'barOutline', 'Contorno nas barras', changedStyle),
         checkInput(st, 'border', 'Moldura no gráfico', changedStyle)),
-      el('div.fields.two',
-        field('Casas dos valores (barras)', numInput(st, 'barValueDigits', changedStyle, { min: 0, max: 10 })),
-        field('Casas dos valores (linhas)', numInput(st, 'lineValueDigits', changedStyle, { min: 0, max: 10 })),
-        field('Tamanho dos valores (px)', numInput(st, 'valueSize', changedStyle, { min: 0, max: 40, step: 0.5, placeholder: 'auto' }))),
+      el('p.small.muted', 'Valores sobre barras e pontos: seção 5. Padrões (hachuras) de cada barra: seção 3.'),
       el('div.toolbar', { style: { margin: '4px 0 0' } },
         el('span.small.muted', 'Tamanhos rápidos:'),
         ...[['Coluna (≈8,5 cm)', 520, 340], ['Página (≈17 cm)', 1000, 460], ['Lado a lado', 600, 420], ['Slide 16:9', 1280, 720]].map(([l, w, h]) =>
           el('button.btn.small', { type: 'button', on: { click: () => { st.width = w; st.height = h; changedData(); } } }, l))));
+  }
+
+  const VAL_COLORS = [['auto', 'Automática (texto nas barras, cor da série nas linhas)'], ['text', 'Cor do texto do gráfico'], ['series', 'Cor da série'], ['contrast', 'Contraste com o fundo (preto/branco)'], ['custom', 'Cor escolhida']];
+  const VAL_BAR_POS = [['auto', 'Automática (dentro se couber, senão acima)'], ['outsideEnd', 'Acima da barra'], ['insideEnd', 'Dentro, no topo'], ['center', 'Dentro, no centro'], ['insideBase', 'Dentro, na base']];
+  const VAL_STACK = [['center', 'No centro de cada segmento'], ['auto', 'No centro; ao lado se não couber'], ['side', 'Sempre ao lado, com linha guia']];
+  const VAL_LINE_POS = [['above', 'Acima do ponto'], ['below', 'Abaixo do ponto'], ['right', 'À direita'], ['left', 'À esquerda']];
+
+  /** Colour mode select + colour picker; the picker sets a hex colour, the modes are words. */
+  function valColorInput(obj, key, onChange, inherit) {
+    const isHex = (v) => /^#/.test(String(v || ''));
+    const opts = (inherit ? [['inherit', 'Igual à seção 5']] : []).concat(VAL_COLORS);
+    const sel = el('select.input', opts.map(([v, l]) => el('option', { value: v }, l)));
+    const cur = obj[key];
+    sel.value = isHex(cur) ? 'custom' : (cur || (inherit ? 'inherit' : 'auto'));
+    const pick = el('input.input.color', { type: 'color', value: toHex(isHex(cur) ? cur : '#000000'), title: 'Cor do valor' });
+    pick.hidden = sel.value !== 'custom';
+    sel.addEventListener('change', () => {
+      pick.hidden = sel.value !== 'custom';
+      obj[key] = sel.value === 'custom' ? pick.value : sel.value === 'inherit' ? '' : sel.value;
+      onChange();
+    });
+    pick.addEventListener('input', () => { obj[key] = pick.value; onChange(); });
+    return el('div.toolbar', { style: { margin: 0, flexWrap: 'nowrap' } }, sel, pick);
+  }
+
+  /** 1.17.0: value labels of bars and line points (global style; each series can override in section 3). */
+  function valuesPanel() {
+    const st = S.spec.style;
+    const bars = S.spec.type === 'bars';
+    const stacked = bars && S.spec.bars && !!S.spec.bars.stacked;
+    return el('div.stack-s',
+      el('div.checks',
+        bars ? checkInput(st, 'barValues', 'Mostrar valores nas barras', changedStyle) : checkInput(st, 'lineValues', 'Mostrar valores nos pontos das linhas', changedStyle)),
+      el('div.fields.two',
+        groupField('Cor do texto', valColorInput(st, 'valColor', changedStyle, false), '"Contraste" escolhe preto ou branco conforme o fundo (a barra, ou a caixa).'),
+        field('Tamanho (px)', numInput(st, 'valueSize', changedStyle, { min: 0, max: 40, step: 0.5, placeholder: 'auto' })),
+        bars ? field('Casas decimais', numInput(st, 'barValueDigits', changedStyle, { min: 0, max: 10 }))
+          : field('Casas decimais', numInput(st, 'lineValueDigits', changedStyle, { min: 0, max: 10 })),
+        field('Ocultar valores menores que', textInput(st, 'valMin', changedStyle, { placeholder: 'ex.: 0,001' }), 'Em módulo; vazio = mostra todos.'),
+        bars && !stacked ? field('Posição na barra', selectInput(st, 'valPos', VAL_BAR_POS, changedStyle), 'Se não couber dentro, o valor vai para cima da barra.') : null,
+        stacked ? field('Barras empilhadas', selectInput(st, 'valStacked', VAL_STACK, changedStyle), 'Ao lado: o valor fica à direita da pilha, ligado ao segmento por uma linha (bom para segmentos finos).') : null,
+        bars ? field('Rotação', selectInput(st, 'valRotate', [['auto', 'Automática (gira se não couber)'], ['0', 'Horizontal'], ['-90', 'Vertical']], changedStyle)) : null,
+        !bars ? field('Posição no ponto', selectInput(st, 'valLinePos', VAL_LINE_POS, changedStyle)) : null,
+        field('Caixa', selectInput(st, 'valBox', [['none', 'Sem caixa'], ['box', 'Caixa com fundo']], changedStyle)),
+        field('Fundo da caixa', colorInput(st, 'valBoxFill', changedStyle)),
+        field('Contorno da caixa', colorInput(st, 'valBoxStroke', changedStyle)),
+        field('Opacidade da caixa', numInput(st, 'valBoxOpacity', changedStyle, { min: 0, max: 1, step: 0.05 }))),
+      el('div.checks', checkInput(st, 'valBold', 'Negrito', changedStyle)),
+      el('p.small.muted', 'Cada série pode ter cor, negrito, caixa, posição própria ou ficar sem valores: botão "Valores" na série (seção 3).'));
+  }
+
+  /** Per-series overrides: pattern (bars) and value labels. Shown under the series row when opened. */
+  function seriesExtras(o, isBar) {
+    const ch = () => changedStyle();
+    const inh = (v, l) => [[v, l]];
+    const box = el('div.fig-series-extra.stack-s');
+    if (isBar) {
+      const pats = Object.entries(R().PATTERNS);
+      box.append(el('div.small.muted', 'Padrão da barra'),
+        el('div.fig-series-grid',
+          el('label', el('span', 'Padrão'), selectInput(Object.assign(o, { pattern: o.pattern || 'none' }), 'pattern', pats, ch)),
+          el('label', el('span', 'Cor do padrão'), (() => {
+            const auto = el('input', { type: 'checkbox', title: 'Automática (preto/branco conforme a barra)' }); auto.checked = !o.patternColor;
+            const c = el('input.input.color', { type: 'color', value: toHex(o.patternColor || '#000000') }); c.disabled = auto.checked;
+            auto.addEventListener('change', () => { c.disabled = auto.checked; if (auto.checked) delete o.patternColor; else o.patternColor = c.value; ch(); });
+            c.addEventListener('input', () => { o.patternColor = c.value; ch(); });
+            return el('div.toolbar', { style: { margin: 0, flexWrap: 'nowrap' } }, el('label.check.small', auto, ' auto'), c);
+          })()),
+          el('label', el('span', 'Tamanho (px)'), numInput(o, 'patternSize', ch, { min: 3, max: 40, step: 1, placeholder: '8' })),
+          el('label', el('span', 'Traço (px)'), numInput(o, 'patternWidth', ch, { min: 0, max: 10, step: 0.25, placeholder: 'auto' }))));
+    }
+    const posOpts = isBar ? inh('', 'Igual à seção 5').concat(VAL_BAR_POS, [['side', 'Ao lado (empilhadas)']]) : inh('', 'Igual à seção 5').concat(VAL_LINE_POS);
+    box.append(el('div.small.muted', 'Valores desta série'),
+      el('div.fig-series-grid',
+        el('label', el('span', 'Mostrar'), selectInput(Object.assign(o, { valShow: o.valShow || '' }), 'valShow', [['', 'Sim'], ['hide', 'Não (só esta série)']], ch)),
+        el('div', el('span.small', 'Cor do valor'), valColorInput(o, 'valColor', ch, true)),
+        el('label', el('span', 'Negrito'), selectInput(Object.assign(o, { valBold: o.valBold || '' }), 'valBold', [['', 'Igual à seção 5'], ['yes', 'Sim'], ['no', 'Não']], ch)),
+        el('label', el('span', 'Posição'), selectInput(Object.assign(o, { valPos: o.valPos || '' }), 'valPos', posOpts, ch)),
+        el('label', el('span', 'Caixa'), selectInput(Object.assign(o, { valBox: o.valBox || '' }), 'valBox', [['', 'Igual à seção 5'], ['none', 'Sem caixa'], ['box', 'Com caixa']], ch)),
+        el('label', el('span', 'Fundo da caixa'), (() => {
+          const c = el('input.input.color', { type: 'color', value: toHex(o.valBoxFill || S.spec.style.valBoxFill || '#ffffff') });
+          c.addEventListener('input', () => { o.valBoxFill = c.value; ch(); });
+          return c;
+        })())));
+    return box;
   }
 
   /** 1.16.0: bar width (%) as a slider plus a number; stored as barGap = 1 − width. */
@@ -2569,7 +2840,7 @@
       S.slotOptions = { links: [], cores: [], nSlots: 0, causes: [] };
       for (const c of spec.cases) {
         try {
-          const p = await getCsv(c.path, isBlock ? 'SlotBlocking' : 'SlotUtilization');
+          const p = await getCsv(c.path, isBlock ? slotBlockFile(spec) : 'SlotUtilization');
           if (!(p && p.ok && (isBlock ? p.slotblock : p.slot))) continue;
           if (isBlock) for (const k of p.causes) if (!S.slotOptions.causes.includes(k)) S.slotOptions.causes.push(k);
           for (const l of p.links) if (!S.slotOptions.links.includes(l)) S.slotOptions.links.push(l);
@@ -2668,6 +2939,7 @@
     const frameEl = el('div.fig-canvas', { style: { maxWidth: S.spec.style.width + 'px' } });
     svgNode.setAttribute('style', 'width:100%;height:auto;display:block');
     frameEl.appendChild(svgNode);
+    if (m.kind === 'topo') enableTopoLabelDrag(svgNode);
     previewBox.append(frameEl, el('div.small.muted', { style: { marginTop: '6px' } },
       svgNode.getAttribute('width') + ' × ' + svgNode.getAttribute('height') + ' px' + (S.savedName ? ' · figura "' + S.savedName + '"' : ' · não salva')
       + (m.lpUsed && m.lpUsed.length ? ' · ponto de carga ' + [...new Set(m.lpUsed.map((l) => l + 1))].join('/') : '')));
@@ -2892,6 +3164,7 @@
       // names may depend on labels
       const multiCase = spec.cases.length > 1;
       for (const s of m.series) {
+        if (s.fam) { s.name = labelOfFamily(spec, s.fam) + (s.famItem !== null && s.famItem !== undefined ? ' · ' + itemLabel(spec, s.famItem) : ''); continue; }
         const c = spec.cases.find((x) => x.path === s.key);
         if (c) s.name = caseLabel(c);
         const mm = /^(.*)\|m:(.*)$/.exec(s.key) || /^(.*)\|[^|=]+=(.*)$/.exec(s.key);
