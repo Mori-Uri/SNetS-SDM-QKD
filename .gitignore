@@ -1,5 +1,5 @@
 # ============================================================
-# SNetS-SDM-SBRC26 - .gitignore
+# SNetS-SDM-QKD - .gitignore
 # Java/Maven + Python analyzer + Docker/WSL/Windows artifacts
 # ============================================================
 
@@ -198,3 +198,15 @@ physicalLayer.before_p26
 /simulations/QKD_Test8/**/*.csv
 /simulations/QKD_Test8/**/*.txt
 /simulations/QKD_Test8/**/savestate/
+
+# ------------------------------------------------------------------
+# Parte 41 - a pasta simulations/ é local (casos e resultados de cada estudo).
+# Ficam no git só os JARs, os scripts de execução e os casos de exemplo.
+# ------------------------------------------------------------------
+/simulations/*
+!/simulations/SNetS-SDM-QKD.jar
+!/simulations/SNetS-SDM-SBRC26.jar
+!/simulations/run_SNetS-SDM-QKD_jar.bat
+!/simulations/run_SNetS-SDM-SBRC26_jar.bat
+!/simulations/QKD_qualificacao/
+!/simulations/QKD_experiments/

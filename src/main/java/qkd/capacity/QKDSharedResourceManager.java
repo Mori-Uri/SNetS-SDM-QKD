@@ -476,6 +476,18 @@ public final class QKDSharedResourceManager implements Serializable {
             for (int k = start; k < start + qchSlots; k++) if (!free[k]) { ok = false; break; }
             if (ok) starts.add(Integer.valueOf(start));
         }
+        final int rule = qchRule(links.get(0));
+        if (rule == 2) {
+            Collections.reverse(starts); // Parte 40: last fit (even outer QKD core, qchSlotPolicy = abne)
+        } else if (rule == 0) {
+            final int reference = n / 2; // Parte 40: medium fit (central QKD core), same reference as qABNE/ABNE
+            Collections.sort(starts, new Comparator<Integer>() {
+                @Override public int compare(Integer a, Integer b) {
+                    int c = Integer.compare(Math.abs(reference - a.intValue()), Math.abs(reference - b.intValue()));
+                    return c != 0 ? c : a.compareTo(b);
+                }
+            });
+        }
         if (mesh.getQkdNetworkParameters().isLowestLossSlots()) {
             final Core ref = links.get(0).getCore(coreId);
             final int q = qchSlots;
@@ -586,7 +598,7 @@ public final class QKDSharedResourceManager implements Serializable {
         Core core = link.getCore(coreId);
         if (core == null || !core.isQkdReserved()) return null;
         if (!equipmentAvailable(plan.getSpans())) return null;
-        int[] band = firstFit(core.getFreeSpectrumBandsForQKD(guardBand), qchSlots);
+        int[] band = chooseBand(core.getFreeSpectrumBandsForQKD(guardBand), qchSlots, qchRule(link), core.getNumOfSlots());
         if (band == null || !core.useSpectrumForQKD(band, guardBand)) { lastActivationFailure = "SPECTRUM"; return null; }
         QKDChannelAllocation allocation = new QKDChannelAllocation(
                 link, coreId, band, guardBand, plan.getSpanCount());
@@ -649,7 +661,7 @@ public final class QKDSharedResourceManager implements Serializable {
         if (lane >= maxLanes) { lastActivationFailure = "SPECTRUM"; return null; }
         // SNetS spectrum slots are numbered 1..numOfSlots
         int start = wavelengthLanes ? laneStartAtWavelength(core, lane, maxLanes, qchSlots, guardBand)
-                : 1 + lane * (qchSlots + guardBand);
+                : laneStart(core, lane, maxLanes, qchSlots, guardBand, qchRule(link));
         if (start < 1) { lastActivationFailure = "SPECTRUM"; return null; }
         int[] band = new int[] {start, start + qchSlots - 1};
         List<Link> links = new ArrayList<Link>();
@@ -817,6 +829,64 @@ public final class QKDSharedResourceManager implements Serializable {
     private static int[] firstFit(List<int[]> bands, int slots) {
         for (int[] b : bands) if (b[1]-b[0]+1 >= slots) return new int[]{b[0], b[0]+slots-1};
         return null;
+    }
+
+    /**
+     * Parte 40: spectral rule of the QKD core of a link: 1 = first fit, 2 = last fit, 0 = medium fit. With
+     * qchSlotPolicy = "abne" it is the ABNE/ACINE rule of the core (central = medium, even = last, odd = first);
+     * otherwise first fit ("firstfit", and "lowestloss", which reorders the route candidates itself).
+     */
+    private int qchRule(Link link) {
+        QKDNetworkParameters np = mesh.getQkdNetworkParameters();
+        if (!"abne".equals(np.getQchSlotPolicy())) return 1;
+        return QKDNetworkParameters.abneRule(np.getQuantumCoreId(), link.getNumberOfCores());
+    }
+
+    /** Parte 40: band of {@code slots} slots chosen by the rule among the free bands (sorted by slot). */
+    static int[] chooseBand(List<int[]> bands, int slots, int rule, int numSlots) {
+        if (rule == 1) return firstFit(bands, slots);
+        if (rule == 2) {
+            for (int i = bands.size() - 1; i >= 0; i--) {
+                int[] b = bands.get(i);
+                if (b[1] - b[0] + 1 >= slots) return new int[] {b[1] - slots + 1, b[1]};
+            }
+            return null;
+        }
+        // medium fit, as qABNE.policy: the start slot closest to the middle of the core
+        final int reference = numSlots / 2;
+        int[] best = null;
+        for (int[] b : bands) {
+            for (int s = b[0]; s + slots - 1 <= b[1]; s++) {
+                if (best == null || Math.abs(reference - s) < Math.abs(reference - best[0])) best = new int[] {s, s + slots - 1};
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Parte 40: first slot of lane {@code lane} in span/link lanes. First fit: lane k at slot 1 + k*width (as before);
+     * last fit: from the end of the core; medium fit: lane 0 in the middle, then alternating around it. Returns 0 when
+     * the lane does not fit.
+     */
+    private static int laneStart(Core core, int lane, int maxLanes, int qchSlots, int guardBand, int rule) {
+        final int width = qchSlots + guardBand;
+        final int n = core.getNumOfSlots();
+        if (rule == 1) return 1 + lane * width;
+        if (rule == 2) {
+            int s = n - qchSlots + 1 - lane * width;
+            return s >= 1 ? s : 0;
+        }
+        // medium: the lanes of the first-fit grid ordered by the distance of their start to the middle
+        List<Integer> grid = new ArrayList<Integer>();
+        for (int k = 0; k < maxLanes; k++) grid.add(Integer.valueOf(1 + k * width));
+        final int reference = n / 2;
+        Collections.sort(grid, new Comparator<Integer>() {
+            @Override public int compare(Integer a, Integer b) {
+                int c = Integer.compare(Math.abs(reference - a.intValue()), Math.abs(reference - b.intValue()));
+                return c != 0 ? c : a.compareTo(b);
+            }
+        });
+        return lane < grid.size() ? grid.get(lane).intValue() : 0;
     }
 
     private void updatePeaks() {

@@ -11,6 +11,26 @@ deixa de fora os PDFs dos artigos (direitos autorais), os documentos .docx, as s
 - os dois JARs;
 - a documentação.
 
+
+## Atualização (Parte 41): nome do repositório e pasta simulations
+
+**Renomear o repositório no GitHub para SNetS-SDM-QKD.** No site: repositório › **Settings** › **General** ›
+**Repository name** = `SNetS-SDM-QKD` › **Rename**. O GitHub redireciona o endereço antigo. Depois, no GitHub
+Desktop: **Repository › Repository settings… › Remote** e troque a URL para
+`https://github.com/Mori-Uri/SNetS-SDM-QKD.git`.
+
+**Tirar `simulations/` do controle de versão** (os arquivos continuam no seu computador). O `.gitignore` já ignora a
+pasta, mas os arquivos que já estavam no git continuam aparecendo até serem retirados uma vez. No GitHub Desktop:
+**Repository › Open in Command Prompt** (ou Git Bash) e rode:
+
+```bat
+git rm -r -q --cached simulations
+git add -A
+```
+
+Volte ao GitHub Desktop: vão aparecer como "removidos" só no git os casos e resultados de `simulations/`; ficam os
+JARs, os `run_*.bat`, `QKD_qualificacao/` e `QKD_experiments/`. Faça o commit e o push.
+
 ## 1. Conta no GitHub
 
 1. Entre em <https://github.com>. Se não lembrar a senha, use **Forgot password?** com o seu e-mail.
@@ -25,7 +45,7 @@ deixa de fora os PDFs dos artigos (direitos autorais), os documentos .docx, as s
 ## 3. Criar o repositório a partir da pasta do simulador
 
 1. No GitHub Desktop: **File › Add local repository…**.
-2. Em **Local path**, escolha `C:\Users\uriel\Documents\Simulador\SNetS-SDM-qkd-v1`.
+2. Em **Local path**, escolha `C:\Users\uriel\Documents\Simulador\SNetS-SDM-QKD`.
 3. Ele vai avisar que a pasta ainda não é um repositório Git. Clique em **create a repository**.
 4. Na janela **Create a new repository**:
    - **Name**: `SNetS-SDM-QKD`;

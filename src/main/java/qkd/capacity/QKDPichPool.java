@@ -59,9 +59,85 @@ public final class QKDPichPool implements Serializable {
     private double openSampleSum;
     private long samples;
 
+    /** Parte 40: placement rules of a new PICh (core and slot); null = lowest core, first fit. */
+    private final qkd.network.QKDNetworkParameters placement;
+
     public QKDPichPool(int pichSlots, int sessionsPerChannel) {
+        this(pichSlots, sessionsPerChannel, null);
+    }
+
+    public QKDPichPool(int pichSlots, int sessionsPerChannel, qkd.network.QKDNetworkParameters placement) {
         this.pichSlots = pichSlots;
         this.sessionsPerChannel = sessionsPerChannel;
+        this.placement = placement;
+    }
+
+    /**
+     * Parte 40: classical cores that may receive a new PICh on the given links, in the order they are tried.
+     * The QKD core and the disabled cores are never used. "lowest" (default): by id; "fixed": pichCoreId first,
+     * then the others by id; "leastused": fewest used slots on the links first.
+     */
+    public static List<Core> pichCoreOrder(List<Link> links, qkd.network.QKDNetworkParameters np) {
+        final Link first = links.get(0);
+        List<Core> out = new ArrayList<Core>();
+        for (Core core : first.getCores()) {
+            boolean ok = true;
+            for (Link l : links) {
+                Core c = l.getCore(core.getId());
+                if (c == null || c.isQkdReserved() || c.isDisabled()) { ok = false; break; }
+            }
+            if (ok) out.add(core);
+        }
+        final String policy = np == null ? "lowest" : np.getPichCorePolicy();
+        final java.util.Map<Integer, Long> used = new java.util.HashMap<Integer, Long>();
+        for (Core c : out) {
+            long u = 0;
+            for (Link l : links) u += l.getCore(c.getId()).getUsedSlots();
+            used.put(Integer.valueOf(c.getId()), Long.valueOf(u));
+        }
+        final int fixed = np == null ? -1 : np.getPichCoreId();
+        java.util.Collections.sort(out, new java.util.Comparator<Core>() {
+            @Override public int compare(Core a, Core b) {
+                if ("fixed".equals(policy)) {
+                    if (a.getId() == fixed && b.getId() != fixed) return -1;
+                    if (b.getId() == fixed && a.getId() != fixed) return 1;
+                } else if ("leastused".equals(policy)) {
+                    int c = Long.compare(used.get(Integer.valueOf(a.getId())).longValue(), used.get(Integer.valueOf(b.getId())).longValue());
+                    if (c != 0) return c;
+                }
+                return Integer.compare(a.getId(), b.getId());
+            }
+        });
+        return out;
+    }
+
+    /**
+     * Parte 40: first slots of a PICh of {@code slots} slots in a core of {@code n} slots, in the order they are
+     * tried: "firstfit" (default) ascending, "lastfit" descending, "abne" the rule of the core (medium fit in the
+     * central core, last fit in even outer cores, first fit in odd outer cores).
+     */
+    public static int[] pichSlotOrder(int n, int slots, int coreId, int numberOfCores, qkd.network.QKDNetworkParameters np) {
+        final int m = Math.max(0, n - slots + 1);
+        int rule = 1;
+        if (np != null) {
+            if ("lastfit".equals(np.getPichSlotPolicy())) rule = 2;
+            else if ("abne".equals(np.getPichSlotPolicy())) rule = qkd.network.QKDNetworkParameters.abneRule(coreId, numberOfCores);
+        }
+        Integer[] order = new Integer[m];
+        for (int i = 0; i < m; i++) order[i] = Integer.valueOf(1 + i);
+        if (rule == 2) java.util.Collections.reverse(java.util.Arrays.asList(order));
+        else if (rule == 0) {
+            final int reference = n / 2;
+            java.util.Arrays.sort(order, new java.util.Comparator<Integer>() {
+                @Override public int compare(Integer a, Integer b) {
+                    int c = Integer.compare(Math.abs(reference - a.intValue()), Math.abs(reference - b.intValue()));
+                    return c != 0 ? c : a.compareTo(b);
+                }
+            });
+        }
+        int[] out = new int[m];
+        for (int i = 0; i < m; i++) out[i] = order[i].intValue();
+        return out;
     }
 
     /**
@@ -94,8 +170,7 @@ public final class QKDPichPool implements Serializable {
                 }
             }
         }
-        for (Core core : link.getCores()) {
-            if (core.isQkdReserved()) continue;
+        for (Core core : pichCoreOrder(java.util.Collections.singletonList(link), placement)) {
             int n = core.getNumOfSlots();
             boolean[] free = new boolean[n + 2];
             for (int[] b : core.getFreeSpectrumBands(guardBand))
@@ -105,7 +180,7 @@ public final class QKDPichPool implements Serializable {
                 int[] cb = candidate.getSpectrumAssigned();
                 for (int k = Math.max(1, cb[0] - guardBand); k <= Math.min(n, cb[1] + guardBand); k++) free[k] = false;
             }
-            for (int s = 1; s + pichSlots - 1 <= n; s++) {
+            for (int s : pichSlotOrder(n, pichSlots, core.getId(), link.getNumberOfCores(), placement)) {
                 boolean ok = true;
                 for (int k = s; k < s + pichSlots; k++) if (!free[k]) { ok = false; break; }
                 if (!ok) continue;

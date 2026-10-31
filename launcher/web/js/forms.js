@@ -135,11 +135,40 @@
 
   // ---------------------------------------------------------------- tables (arrays of objects)
 
+  // 1.18.1: links table of the network: a change in one direction is copied to the reverse link (when it exists)
+  const tableUi = { bidir: true };
+
   function tableEditor(fileKey, path, rows, fieldNode) {
     const box = el('div');
+    const isLinks = fileKey === 'network' && path.length === 1 && path[0] === 'links';
     const draw = () => {
       clear(box);
       const arr = getPath(App.state.model[fileKey], path) || [];
+      const cells = arr.map(() => ({}));
+      const mirror = (i, c, v) => {
+        if (!isLinks || !tableUi.bidir || c === 'source' || c === 'destination') return;
+        const a = getPath(App.state.model[fileKey], path) || [];
+        const r = a[i];
+        if (!r) return;
+        a.forEach((o, j) => {
+          if (j === i || !o || String(o.source) !== String(r.destination) || String(o.destination) !== String(r.source)) return;
+          App.setValue(fileKey, path.concat([j, c]), Array.isArray(v) ? v.slice() : v);
+          const inp = cells[j] && cells[j][c];
+          if (inp) {
+            if (inp.type === 'checkbox') inp.checked = !!v;
+            else inp.value = typeof v === 'number' ? formatForInput(v) : Array.isArray(v) ? v.join(', ') : String(v);
+            inp.classList.remove('invalid');
+            inp.classList.add('mirrored');
+            setTimeout(() => inp.classList.remove('mirrored'), 700);
+          }
+        });
+      };
+      if (isLinks) {
+        const cb = el('input', { type: 'checkbox', checked: tableUi.bidir });
+        cb.addEventListener('change', () => { tableUi.bidir = cb.checked; });
+        box.appendChild(el('label.check.small', { style: { margin: '0 0 6px' }, title: 'Ao mudar size, slots, spectrum ou outro campo de um enlace a→b, o enlace b→a recebe o mesmo valor' }, cb,
+          ' Bidirecional: alterar também o sentido inverso (ex.: mudar 1→2 muda 2→1)'));
+      }
       const cols = [];
       for (const r of arr) if (isPlainObject(r)) for (const k of Object.keys(r)) if (!cols.includes(k)) cols.push(k);
       const kinds = {};
@@ -152,7 +181,11 @@
       const tbody = el('tbody');
       arr.slice(0, limit).forEach((row, i) => {
         const tr = el('tr', el('td.idx', String(i)));
-        for (const c of cols) tr.appendChild(el('td', cellInput(fileKey, path.concat([i, c]), row[c], kinds[c], fieldNode)));
+        for (const c of cols) {
+          const inp = cellInput(fileKey, path.concat([i, c]), row[c], kinds[c], fieldNode, (v) => mirror(i, c, v));
+          cells[i][c] = inp;
+          tr.appendChild(el('td', inp));
+        }
         tr.appendChild(el('td.rowctl', el('button.btn.small.ghost', {
           type: 'button', title: 'Remover linha',
           on: { click: () => { const a = getPath(App.state.model[fileKey], path); a.splice(i, 1); App.setValue(fileKey, path, a); markChanged(fileKey, path, fieldNode); draw(); } },
@@ -177,10 +210,10 @@
     return box;
   }
 
-  function cellInput(fileKey, path, value, kind, fieldNode) {
+  function cellInput(fileKey, path, value, kind, fieldNode, after) {
     if (kind === 'boolean') {
       const cb = el('input', { type: 'checkbox', checked: !!value, style: { margin: '6px 8px' } });
-      cb.addEventListener('change', () => set(fileKey, path, cb.checked, fieldNode));
+      cb.addEventListener('change', () => { set(fileKey, path, cb.checked, fieldNode); if (after) after(cb.checked); });
       return cb;
     }
     const text = value === undefined || value === null ? '' : kind === 'list' ? value.join(', ')
@@ -196,7 +229,7 @@
       } else if (kind === 'json') { try { v = JSON.parse(inp.value); } catch (e) { bad = true; } }
       else v = inp.value;
       inp.classList.toggle('invalid', bad);
-      if (!bad) set(fileKey, path, v, fieldNode);
+      if (!bad) { set(fileKey, path, v, fieldNode); if (after) after(v); }
     });
     return inp;
   }

@@ -64,7 +64,8 @@ public final class QKDProvisioningService {
                 mesh.getQkdNetworkParameters().getAlternativeRoutes());
         this.pichSlots = mesh.getQkdNetworkParameters().getPichSlots();
         this.pichPool = pichSlots > 0 && mesh.getQkdNetworkParameters().isPichSegmented()
-                ? new qkd.capacity.QKDPichPool(pichSlots, mesh.getQkdNetworkParameters().getPichSessionsPerChannel())
+                ? new qkd.capacity.QKDPichPool(pichSlots, mesh.getQkdNetworkParameters().getPichSessionsPerChannel(),
+                        mesh.getQkdNetworkParameters())
                 : null;
     }
 
@@ -157,7 +158,7 @@ public final class QKDProvisioningService {
                 routePlan,
                 keyDemand.getRequiredKeyRateBps(),
                 requiredSlots,
-                QKD_GUARD_BAND_SLOTS,
+                getQkdGuardBandSlots(),
                 physicalParameters.getAttenuationCenterNm(),
                 additionalClassicalCircuit);
 
@@ -199,7 +200,8 @@ public final class QKDProvisioningService {
 
         if (pichPool != null) {
             java.util.List<qkd.capacity.QKDPichPool.Channel> shares =
-                    pichPool.acquire(route.getLinkList(), mesh.getGuardBand(), additionalClassicalCircuit);
+                    pichPool.acquire(route.getLinkList(), mesh.getQkdNetworkParameters().pichGuardBandOr(mesh.getGuardBand()),
+                            additionalClassicalCircuit);
             if (shares == null) {
                 pichFailures++;
                 lastPichFailureLink = pichPool.getLastFailedLink();
@@ -230,10 +232,10 @@ public final class QKDProvisioningService {
      */
     private QKDActiveConnection.PichReservation reservePich(Route route, Circuit candidate) {
         final java.util.List<Link> links = route.getLinkList();
-        final int guard = mesh.getGuardBand();
+        final int guard = mesh.getQkdNetworkParameters().pichGuardBandOr(mesh.getGuardBand());
         final Link first = links.get(0);
-        for (Core core : first.getCores()) {
-            if (core.isQkdReserved()) continue;
+        // Parte 40: core order and slot order from network.qkd.pichCorePolicy / pichSlotPolicy (disabled cores skipped)
+        for (Core core : qkd.capacity.QKDPichPool.pichCoreOrder(links, mesh.getQkdNetworkParameters())) {
             final int coreId = core.getId();
             int n = Integer.MAX_VALUE;
             boolean usable = true;
@@ -256,7 +258,7 @@ public final class QKDProvisioningService {
                 }
                 for (int k = 1; k <= n; k++) free[k] = free[k] && f[k];
             }
-            for (int s = 1; s + pichSlots - 1 <= n; s++) {
+            for (int s : qkd.capacity.QKDPichPool.pichSlotOrder(n, pichSlots, coreId, first.getNumberOfCores(), mesh.getQkdNetworkParameters())) {
                 boolean ok = true;
                 for (int k = s; k < s + pichSlots; k++) if (!free[k]) { ok = false; break; }
                 if (!ok) continue;
@@ -368,8 +370,10 @@ public final class QKDProvisioningService {
         return physicalParameters.getAttenuationCenterNm();
     }
 
+    /** Guard band between QChs in the QKD core: network.qkd.qchGuardBand (Parte 40; 0 = none, as before). */
     public int getQkdGuardBandSlots() {
-        return QKD_GUARD_BAND_SLOTS;
+        int g = mesh.getQkdNetworkParameters().getQchGuardBand();
+        return g > 0 ? g : QKD_GUARD_BAND_SLOTS;
     }
 
     private void releaseQuietly(QKDSession session) {

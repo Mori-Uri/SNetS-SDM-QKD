@@ -500,3 +500,4 @@ tr.row-custom td { background: rgba(112, 48, 160, .07); }
 /* 1.17.0: long model names must not widen the left column (grid tracks default to min-content) */
 .fig-controls .field, .fig-controls .stack-s { grid-template-columns: minmax(0, 1fr); }
 .fig-controls .field > .toolbar { min-width: 0; max-width: 100%; }
+input.mirrored { background: rgba(46, 160, 67, .18); transition: background .3s; }

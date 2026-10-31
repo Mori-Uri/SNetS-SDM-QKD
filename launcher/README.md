@@ -359,3 +359,16 @@ Estúdio de gráficos:
   por enlace e no espectro (simulador da Parte 39).
 - **Métrica × QTND (ou outro parâmetro)**: uma curva por família de casos (ex.: R25 e R100 separados).
 - **Aba QKD**: nós confiáveis com QTND global ou por enlace (nº de nós ou QTND próprio em cada enlace).
+
+## Versão 1.18.0 (Parte 40)
+
+- **Topologias de pequena escala**: Losango, Metropolitana 2, DT (com os relays como nós confiáveis por enlace) e
+  Linha. A rede de 28 nós agora é a EON e a de 12, a JPN.
+- **Fibras**: 5 núcleos, 3 em triângulo e 3 em linha.
+- **Aba QKD**: QChs pela regra do núcleo (abne: centro medium fit, par last fit, ímpar first fit), banda de guarda
+  entre QChs e painel do PICh (núcleo, slot e banda de guarda).
+
+## Versão 1.18.1 (Parte 41)
+
+- Aba Rede, tabela de enlaces: caixa **Bidirecional** (marcada por padrão). Mudar um campo de um enlace a→b (ex.:
+  size de 50 para 100) muda o mesmo campo do enlace b→a.

@@ -53,7 +53,7 @@ Consulte `simulations/QKD_experiments/README_QKD_EXPERIMENTS.md`.
 
 O JAR classico original foi mantido. O JAR `SNetS-SDM-QKD.jar` foi criado como executavel separado para nao transformar o addon QKD em requisito obrigatorio do uso classico.
 
-## Partes 21 e 22 (ver CHANGELOG_QKD_PARTE21_22.md)
+## Partes 21 e 22 (ver [CHANGELOG.md, Parte 21–22](CHANGELOG.md#parte-21-22))
 
 ### Opcoes novas em `network.qkd`
 
@@ -94,7 +94,7 @@ verificacao\QKD_reference\Dibaj_MF\run_native_reference.bat
 `launcher\SNetS-Launcher.bat` -> botao "Verificacao QKD" (verificadores e artigo-base),
 abas "Varredura" e "Resultados" (inclui o QKDStatistics.csv).
 
-## Parte 23 — cenário da qualificação (ver CHANGELOG_QKD_PARTE23.md)
+## Parte 23 — cenário da qualificação (ver [CHANGELOG.md, Parte 23](CHANGELOG.md#parte-23))
 
 Opções novas em `network.qkd`: `qchGranularity: "route"` (QCh dedicado com o mesmo slot em todos os
 trechos da rota QKD, escolhido pela SKR de cada trecho), `qchSlotPolicy` (`firstfit`/`lowestloss`),
@@ -133,7 +133,7 @@ Estúdio de gráficos.
   - X8: simetria.
 - Pode ser executado pelo launcher ("Verificação QKD" › "Plano de verificação") ou pela linha de
   comando.
-- Detalhes em `CHANGELOG_QKD_PARTE24.md` e `verificacao/QKD_ladder/README.md`.
+- Detalhes em [CHANGELOG.md, Parte 24](CHANGELOG.md#parte-24) e `verificacao/QKD_ladder/README.md`.
 
 Também nesta parte:
 
@@ -150,7 +150,7 @@ Toda simulação com BlockingProbability ativa grava `<caso>_BlockingDetails.csv
 todas as requisições, das clássicas e das protegidas por QKD, com as causas clássicas e QKD juntas. O "other" do
 SNetS aparece separado em falta de espectro livre, outros e recusas do addon QKD. O arquivo traz também o bloqueio
 por núcleo e causa e o bloqueio por enlace. Ele só observa as decisões e não muda nenhuma delas. Detalhes em
-`CHANGELOG_QKD_PARTE25.md`.
+[CHANGELOG.md, Parte 25](CHANGELOG.md#parte-25).
 
 ## Parte 26: camada física QKD separada, PICh por enlace, QTx/QRx e novos cenários
 
@@ -167,7 +167,7 @@ por núcleo e causa e o bloqueio por enlace. Ele só observa as decisões e não
 - **Referências.** As referências de cada cálculo estão no Javadoc e em `docs/REFERENCIAS_QKD.md`.
 - **Plano de verificação.** Ganhou as fases M (Moghaddam et al., 2021) e Q (QKD-Analytical, 2026).
 
-Detalhes em `CHANGELOG_QKD_PARTE26.md`.
+Detalhes em [CHANGELOG.md, Parte 26](CHANGELOG.md#parte-26).
 
 ## Parte 39: canal QKD bloqueado e nós confiáveis por enlace
 
@@ -177,4 +177,13 @@ Detalhes em `CHANGELOG_QKD_PARTE26.md`.
   continua sendo o QTND global.
 - `qabne` ignora núcleos desativados e pode rodar em modo clássico.
 
-Detalhes em `CHANGELOG_QKD_PARTE39.md`.
+Detalhes em [CHANGELOG.md, Parte 39](CHANGELOG.md#parte-39).
+
+## Parte 40: regra do núcleo nos QChs e PICh configurável
+
+- `qkd.qchSlotPolicy = "abne"` (padrão): os QChs seguem a regra do ABNE/ACINE para o núcleo QKD (centro medium fit,
+  externo par last fit, ímpar first fit). `qkd.qchGuardBand` (padrão 0).
+- PICh: `pichCorePolicy` (lowest/fixed/leastUsed), `pichCoreId`, `pichSlotPolicy` (firstfit/lastfit/abne) e
+  `pichGuardBand` (−1 = guardBand da rede). Núcleos desativados não recebem PICh.
+
+Detalhes em [CHANGELOG.md, Parte 40](CHANGELOG.md#parte-40).

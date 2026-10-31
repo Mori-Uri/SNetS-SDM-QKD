@@ -18,7 +18,7 @@
   const st = () => App.state;
 
   const QKD_DEFAULTS = {
-    enabled: true, qtndKm: 30.0, quantumCoreId: 1, qchGranularity: 'route', qchSlotPolicy: 'firstfit',
+    enabled: true, qtndKm: 30.0, quantumCoreId: 1, qchGranularity: 'route', qchSlotPolicy: 'abne',
     wavelengthPolicy: 'grid', alternativeRoutes: 2, pichSlots: 1,
   };
 
@@ -76,6 +76,55 @@
   function linkRule(qkd, a, b) {
     if (!qkd || String(qkd.trustedNodeMode || 'global').toLowerCase() !== 'perlink' || !Array.isArray(qkd.trustedNodesPerLink)) return null;
     return qkd.trustedNodesPerLink.find((e) => e && typeof e.link === 'string' && [a + '-' + b, b + '-' + a].includes(e.link.replace(/\s+/g, ''))) || null;
+  }
+
+  /** 1.18.0: spectral rule that the QChs follow in the QKD core (ABNE/ACINE: centre medium, even last, odd first). */
+  function abneRuleName(coreId, nCores) {
+    const central = nCores === 19 ? 18 : 0;
+    return coreId === central ? 'medium fit (núcleo central)' : coreId % 2 === 0 ? 'last fit (núcleo externo par)' : 'first fit (núcleo externo ímpar)';
+  }
+  function qchRuleNote(q, gran) {
+    const n = cores().length;
+    const core = Number(q.quantumCoreId);
+    const pol = String(q.qchSlotPolicy || 'abne').toLowerCase();
+    const rule = abneRuleName(core, n);
+    const lanes = gran !== 'route' && String(q.spanLanePlacement || 'first') === 'wavelength';
+    if (pol === 'abne') return el('div.notice.info', { style: { marginTop: '10px' } }, 'QChs no núcleo ' + core + ' em ' + rule + ', a mesma regra que o ABNE/ACINE usa nesse núcleo para os circuitos clássicos.'
+      + (lanes ? ' Atenção: spanLanePlacement = "wavelength" define a posição dos QChs e prevalece sobre esta regra.' : ''));
+    if (pol === 'firstfit' && !rule.startsWith('first')) return el('div.notice.warn', { style: { marginTop: '10px' } }, 'O núcleo QKD ' + core + ' teria ' + rule + ' no ABNE/ACINE, mas os QChs estão em first fit (slots do início). ',
+      el('button.btn.small', { type: 'button', on: { click: () => { App.setValue('network', ['qkd', 'qchSlotPolicy'], 'abne'); App.renderTab(); } } }, 'Usar a regra do núcleo (abne)'));
+    return null;
+  }
+
+  /** 1.18.0: where and how the PICh is placed (network.qkd.pich*). */
+  function pichPanel(net, q, num, sel) {
+    const on = Number(q.pichSlots) > 0;
+    const classical = cores().filter((c) => Number(c.id) !== Number(q.quantumCoreId) && !(Array.isArray(net.disabledCores) && net.disabledCores.map(Number).includes(Number(c.id))));
+    const policy = String(q.pichCorePolicy || 'lowest').toLowerCase();
+    const guardNet = Number(net.guardBand) || 0;
+    const pg = q.pichGuardBand === undefined ? -1 : Number(q.pichGuardBand);
+    const fixedOk = classical.some((c) => Number(c.id) === Number(q.pichCoreId));
+    return el('section.panel',
+      el('h2', 'Canal público (PICh)'),
+      el('p.lead', 'Canal clássico da discussão pública do BB84 (peneiramento, correção de erros, amplificação de privacidade). Ocupa slots num núcleo clássico, nunca no núcleo QKD nem num núcleo desativado; a potência dele não entra no crosstalk.'),
+      el('div.fields',
+        num('pichSlots', 'Slots de cada PICh', '0 = não modelar o PICh', { int: true, redraw: true }),
+        on ? sel('pichMode', 'Modelo do PICh', [
+          ['segment', 'segment — um PICh por enlace da rota QKD, compartilhado pelas sessões (padrão)'],
+          ['route', 'route — um PICh dedicado por sessão, contínuo na rota inteira']], true) : null,
+        on && String(q.pichMode || 'segment') === 'segment' ? num('pichSessionsPerChannel', 'Sessões por PICh', '0 = ilimitado', { int: true }) : null,
+        on ? sel('pichCorePolicy', 'Núcleo do PICh', [
+          ['lowest', 'lowest — núcleo clássico de menor número (padrão, como antes)'],
+          ['fixed', 'fixed — sempre o núcleo escolhido abaixo (se estiver cheio, os outros)'],
+          ['leastUsed', 'leastUsed — núcleo clássico com menos slots ocupados no enlace']], true) : null,
+        on && policy === 'fixed' ? sel('pichCoreId', 'Núcleo fixo do PICh', (fixedOk ? [] : [['', 'escolha o núcleo…']]).concat(classical.map((c) => [Number(c.id), 'Núcleo ' + c.id + ' (' + abneRuleName(Number(c.id), cores().length) + ' no ABNE)'])), true) : null,
+        on ? sel('pichSlotPolicy', 'Slot do PICh no núcleo', [
+          ['firstfit', 'firstfit — menor slot livre (padrão, como antes)'],
+          ['lastfit', 'lastfit — maior slot livre'],
+          ['abne', 'abne — regra do ABNE/ACINE do núcleo escolhido']]) : null,
+        on ? sel('pichGuardBand', 'Banda de guarda do PICh', [[-1, 'a mesma dos circuitos clássicos (guardBand da rede = ' + guardNet + ')'], [0, '0 — sem banda de guarda'], [1, '1 slot'], [2, '2 slots']].concat(pg > 2 ? [[pg, pg + ' slots']] : [])) : null),
+      on && policy === 'fixed' && !fixedOk ? el('p.small.warn', 'Escolha o núcleo fixo do PICh (um núcleo clássico ativo); sem ele o simulador recusa o caso.') : null,
+      el('p.small.muted', 'A banda de guarda dos circuitos clássicos fica na aba Rede, grupo Geral (guardBand = ' + guardNet + ' slot' + (guardNet === 1 ? '' : 's') + '). Entre os QChs no núcleo QKD vale a "Banda de guarda entre QChs" acima (padrão 0).'));
   }
 
   // ------------------------------------------------------------------ mode bar
@@ -236,20 +285,25 @@
           ['route', 'route — mesmo slot em todos os trechos da rota QKD (qualificação)'],
           ['link', 'link — um QCh por enlace, compartilhado pela taxa de chave'],
           ['span', 'span — pools por trecho com TDM (artigo-base, Dibaj et al.)']], true),
-        gran === 'route' ? sel('qchSlotPolicy', 'Ordem de escolha do slot do QCh', [
-          ['firstfit', 'firstfit — menor índice de slot primeiro'],
-          ['lowestloss', 'lowestloss — slot mais próximo do mínimo de atenuação']]) : null,
+        sel('qchSlotPolicy', 'Ordem de escolha do slot do QCh', [
+          ['abne', 'abne — regra do ABNE/ACINE para o núcleo QKD (centro: medium fit; par: last fit; ímpar: first fit)'],
+          ['firstfit', 'firstfit — menor índice de slot primeiro']].concat(gran === 'route' ? [
+          ['lowestloss', 'lowestloss — slot mais próximo do mínimo de atenuação']] : []), true),
+        num('qchGuardBand', 'Banda de guarda entre QChs', 'slots no núcleo QKD; 0 = sem guarda (como até a Parte 39)', { int: true }),
         sel('wavelengthPolicy', 'Comprimento de onda do QCh', [
           ['grid', 'grid — λ do slot na grade de 12,5 GHz (a SKR depende do slot)'],
           ['fixed', 'fixed — todos os QChs em λ de mínima atenuação']]),
         num('alternativeRoutes', 'Rotas QKD alternativas', 'k menores, além da rota clássica', { int: true }),
-        num('pichSlots', 'Slots do PICh por sessão', 'em núcleo clássico; 0 = não modelar', { int: true }),
         gran === 'span' ? num('tdmSlots', 'Slots TDM por QCh', '0 = contínuo', { int: true }) : null),
       quick,
+      qchRuleNote(q, gran),
       el('div.notice.info', { style: { marginTop: '10px' } },
         gran === 'route'
           ? 'Admissão de uma requisição protegida: (1) RMSCA clássico; (2) OSNR/XT do candidato e proteção das sessões QKD ativas; (3) rota QKD — a rota clássica e, se falhar, até ' + (q.alternativeRoutes || 0) + ' alternativa(s); (4) espectro QKD — o primeiro slot livre em todos os enlaces da rota cuja SKR em todos os trechos atende à demanda de chave' + (q.pichSlots > 0 ? '; (5) PICh com ' + q.pichSlots + ' slot(s) num núcleo clássico ao longo da rota.' : '.')
           : 'Os modos link/span existem para reproduzir o artigo-base; o cenário da qualificação usa "route".')));
+
+    // ------------------------------- 1.18.0: public interaction channel (PICh)
+    root.append(pichPanel(net, q, num, sel));
 
     // ------------------------------- planning
     const plan = planning(net, Number(q.qtndKm));

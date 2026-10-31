@@ -184,8 +184,25 @@ public class NetworkConfig {
          * Part 23 (route granularity): order in which the free QCh bands are
          * tried: "firstfit" (lowest slot first, as in the qualification) or
          * "lowestloss" (band closest to the attenuation minimum first).
+         * Parte 40: "abne" (default) = the spectral rule ABNE/ACINE uses for the core: medium fit in the central core
+         * (core 0, or 18 with 19 cores), last fit in even outer cores, first fit in odd outer cores. With the QKD core
+         * on core 1 (odd) it is the same as "firstfit". "firstfit" and "abne" apply to the route, link and span modes
+         * ("lowestloss" only to route; spanLanePlacement = "wavelength" wins in span/link lanes).
          */
-        private String qchSlotPolicy = "firstfit";
+        private String qchSlotPolicy = "abne";
+        /** Parte 40: guard band (slots) between two QChs of the QKD core. 0 = none (behaviour up to Part 39). */
+        private int qchGuardBand = 0;
+        /**
+         * Parte 40: classical core that receives a new PICh. "lowest" (default, as before) = lowest-id usable classical
+         * core; "fixed" = pichCoreId (falls back to "lowest" when it is full); "leastUsed" = classical core with the
+         * fewest used slots on the link. Disabled cores and the QKD core are never used.
+         */
+        private String pichCorePolicy = "lowest";
+        private int pichCoreId = -1;
+        /** Parte 40: slot of the PICh in its core: "firstfit" (default, as before), "lastfit" or "abne" (rule of the core). */
+        private String pichSlotPolicy = "firstfit";
+        /** Parte 40: guard band of the PICh; -1 (default) = the guardBand of the network, as the classical circuits. */
+        private int pichGuardBand = -1;
         /**
          * Span/link granularity: where the k-th QCh lane sits in the QKD core.
          * "first" (default, article reproduction): lane k uses slot k+1, while
@@ -284,10 +301,24 @@ public class NetworkConfig {
         public void setSpanLanePlacement(String v) { this.spanLanePlacement = v; }
 
         public String getQchSlotPolicy() {
-            return qchSlotPolicy == null || qchSlotPolicy.trim().isEmpty() ? "firstfit" : qchSlotPolicy.trim().toLowerCase();
+            return qchSlotPolicy == null || qchSlotPolicy.trim().isEmpty() ? "abne" : qchSlotPolicy.trim().toLowerCase();
         }
 
         public void setQchSlotPolicy(String v) { this.qchSlotPolicy = v; }
+        public int getQchGuardBand() { return qchGuardBand; }
+        public void setQchGuardBand(int v) { this.qchGuardBand = v; }
+        public String getPichCorePolicy() {
+            return pichCorePolicy == null || pichCorePolicy.trim().isEmpty() ? "lowest" : pichCorePolicy.trim().toLowerCase();
+        }
+        public void setPichCorePolicy(String v) { this.pichCorePolicy = v; }
+        public int getPichCoreId() { return pichCoreId; }
+        public void setPichCoreId(int v) { this.pichCoreId = v; }
+        public String getPichSlotPolicy() {
+            return pichSlotPolicy == null || pichSlotPolicy.trim().isEmpty() ? "firstfit" : pichSlotPolicy.trim().toLowerCase();
+        }
+        public void setPichSlotPolicy(String v) { this.pichSlotPolicy = v; }
+        public int getPichGuardBand() { return pichGuardBand; }
+        public void setPichGuardBand(int v) { this.pichGuardBand = v; }
 
         public int getAlternativeRoutes() { return alternativeRoutes; }
 

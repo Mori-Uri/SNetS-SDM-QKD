@@ -29,8 +29,11 @@
 
   function topoPreview(net, preset) {
     const R = App.figRender;
+    // 1.18.0: a preset with relay nodes (DT) shows them as trusted nodes of each link
     const panel = preset
-      ? { title: '', nodes: preset.nodes, links: preset.links.map(([a, b, km]) => ({ a, b, km })), qtnd: P().topoPanel(net).qtnd }
+      ? (preset.relays
+        ? { title: '', nodes: preset.nodes, links: preset.links.map(([a, b, km]) => { const r = P().relaysOf(preset, a, b); return { a, b, km, qtndAB: km / (r + 1), qtndBA: km / (r + 1) }; }), qtnd: 0 }
+        : { title: '', nodes: preset.nodes, links: preset.links.map(([a, b, km]) => ({ a, b, km })), qtnd: P().topoPanel(net).qtnd })
       : P().topoPanel(net);
     if (!panel.nodes.length) return el('div.muted.small', 'A rede não tem nós.');
     const st = Object.assign(R.defaultStyle(), {
@@ -64,7 +67,7 @@
     const opts = { slots: commonValue(links, 'slots') || 320, spectrum: commonValue(links, 'spectrum') || 12.5e9 };
     const topoSel = el('select.input',
       el('option', { value: '' }, 'Topologia atual do arquivo' + (info.source === 'preset' && info.topology ? ' (' + info.topology.name + ')' : ' (' + (net.nodes || []).length + ' nós)')),
-      P().TOPOLOGIES.map((t) => el('option', { value: t.id }, t.name)));
+      P().TOPOLOGY_GROUPS.map(([g, label]) => el('optgroup', { label }, P().TOPOLOGIES.filter((t) => t.group === g).map((t) => el('option', { value: t.id }, t.name)))));
     topoSel.value = ui.topo;
     const preset = P().TOPOLOGIES.find((t) => t.id === ui.topo) || null;
     const slots = el('input.input.num', { type: 'number', min: 1, step: 1, value: opts.slots });
@@ -75,7 +78,8 @@
     const draw = () => {
       App.clear(topoBox).append(topoPreview(net, preset));
       const q = P().topoPanel(net).qtnd;
-      if (q > 0) topoBox.append(el('div.small.muted', { style: { marginTop: '4px' } }, 'Pontos roxos: nós confiáveis a cada ' + App.fmtNum(q, 1) + ' km (QTND), contados a partir do nó de origem do enlace. Passe o mouse para ver a posição.'));
+      if (preset && preset.relays) topoBox.append(el('div.small.muted', { style: { marginTop: '4px' } }, 'Pontos roxos: os ' + Object.values(preset.relays).reduce((a, b) => a + b, 0) + ' nós relay da figura, espaçados igualmente em cada enlace. Ao aplicar, eles podem ser gravados como nós confiáveis por enlace.'));
+      else if (q > 0) topoBox.append(el('div.small.muted', { style: { marginTop: '4px' } }, 'Pontos roxos: nós confiáveis a cada ' + App.fmtNum(q, 1) + ' km (QTND), contados a partir do nó de origem do enlace. Passe o mouse para ver a posição.'));
       const u = P().undirectedLinks(net);
       if (preset) { caption.textContent = 'PRÉ-VISUALIZAÇÃO de ' + preset.name + ' (' + preset.desc + '). O caso AINDA usa a topologia do arquivo' + (info.source === 'preset' && info.topology ? ' (' + info.topology.name + ')' : '') + ': clique em "Aplicar topologia" e salve para trocar.'; caption.className = 'small warn'; }
       else {
@@ -100,8 +104,14 @@
       if (!preset) return;
       let o;
       try { o = readOpts(); } catch (e) { App.toast(e.message, 'err'); return; }
+      // 1.18.0: relays of the preset as per-link trusted nodes; rules of the old links are dropped
+      const qkd0 = App.isPlainObject(net.qkd) ? net.qkd : null;
+      const hadRules = !!(qkd0 && Array.isArray(qkd0.trustedNodesPerLink) && qkd0.trustedNodesPerLink.length);
+      const useRelays = el('input', { type: 'checkbox', checked: true });
       const body = el('div.stack-s',
         el('p', 'Substituir os nós e enlaces deste caso por ', el('b', preset.name), '?'),
+        preset.relays ? el('label.check', useRelays, ' Gravar os nós relay da figura como nós confiáveis por enlace (network.qkd.trustedNodeMode = "perLink"; cada enlace com o número de relays da figura, espaçados igualmente; enlaces sem relay ficam sem nó confiável).') : null,
+        !preset.relays && hadRules ? el('p.small.warn', 'As regras de nós confiáveis por enlace atuais serão apagadas (os enlaces mudam); o QTND volta a ser global.') : null,
         el('ul.small',
           el('li', preset.nodes.length + ' nós e ' + preset.links.length * 2 + ' enlaces direcionais (cada enlace nos dois sentidos).'),
           el('li', 'Todos os enlaces com ' + o.slots + ' slots de ' + App.fmtNum(o.spectrum / 1e9, 3) + ' GHz; comprimentos da topologia (km).'),
@@ -112,6 +122,16 @@
         const built = P().buildTopology(preset, Object.assign(o, { nodeTemplate: (net.nodes || [])[0] }));
         App.setValue('network', ['nodes'], built.nodes);
         App.setValue('network', ['links'], built.links);
+        if (preset.relays && useRelays.checked) {
+          const q = Object.assign({ enabled: false, qtndKm: 30.0, quantumCoreId: 1 }, qkd0 || {});
+          q.trustedNodeMode = 'perLink';
+          q.trustedNodesPerLink = preset.links.map(([a, b]) => ({ link: a + '-' + b, trustedNodes: P().relaysOf(preset, a, b) }));
+          App.setValue('network', ['qkd'], q);
+        } else if (hadRules) {
+          const q = Object.assign({}, qkd0);
+          delete q.trustedNodesPerLink; q.trustedNodeMode = 'global';
+          App.setValue('network', ['qkd'], q);
+        }
         ui.topo = '';
         App.renderTab();
         const names = new Set(built.nodes.map((n) => n.name));
@@ -155,18 +175,18 @@
     const curPreset = P().corePresetOf(cores);
     if (ui.cores && !P().CORES[ui.cores]) ui.cores = '';
     const coreSel = el('select.input',
-      el('option', { value: '' }, 'Atual do arquivo (' + cores.length + ' núcleos' + (curPreset ? '' : cores.length ? ', layout próprio' : '') + ')'),
-      [2, 7, 12, 19].map((n) => el('option', { value: String(n) }, P().CORES[n].name)));
+      el('option', { value: '' }, 'Atual do arquivo (' + (curPreset ? P().CORES[curPreset].name : cores.length + ' núcleos' + (cores.length ? ', layout próprio' : '')) + ')'),
+      P().CORE_KEYS.map((k) => el('option', { value: k }, P().CORES[k].name)));
     coreSel.value = ui.cores;
     coreSel.addEventListener('change', () => { ui.cores = coreSel.value; App.renderTab(); });
-    const showN = ui.cores ? Number(ui.cores) : null;
+    const showN = ui.cores || null; // 1.18.0: preset key ('2', '3tri', '3lin', '5', '7', '12', '19')
     const showCfg = showN ? P().coresConfig(showN) : cores;
     const coreBox = el('div.net-preview.cores');
     const disList = Array.isArray(net.disabledCores) ? net.disabledCores.map(Number).filter(Number.isFinite) : [];
     const disSet = new Set(disList);
     if (showCfg.length) coreBox.append(coresPreview(showCfg, qkdCore, disSet));
     else coreBox.append(el('div.muted.small', 'O arquivo não tem núcleos.'));
-    const desc = showN ? P().CORES[showN].desc : curPreset ? P().CORES[curPreset].desc : cores.length ? 'Layout lido de network.cores (não corresponde a 2, 7, 12 ou 19 núcleos padrão).' : '';
+    const desc = showN ? P().CORES[showN].desc : curPreset ? P().CORES[curPreset].desc : cores.length ? 'Layout lido de network.cores (não corresponde a nenhuma fibra pronta).' : '';
     const adj = el('details.small', el('summary', 'Vizinhos de cada núcleo (fonte de crosstalk)'),
       el('div.mono.small', showCfg.map((c) => el('div', c.id + ': ' + (c.adjacentCores || []).join(', ')))));
     const applyCores = () => {
@@ -174,7 +194,7 @@
       App.setValue('network', ['cores'], P().coresConfig(showN));
       ui.cores = '';
       App.renderTab();
-      const warn = qkdCore !== null && qkdCore >= showN;
+      const warn = qkdCore !== null && !P().CORES[showN].ids.includes(qkdCore);
       App.toast(P().CORES[showN].name + ' aplicada' + (warn ? ' — o núcleo QKD (' + qkdCore + ') não existe nesta fibra' : ''), warn ? 'warn' : 'ok', warn ? 7000 : 3000);
     };
     // ---------------- disabled cores (network.disabledCores)

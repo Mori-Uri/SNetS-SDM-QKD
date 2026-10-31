@@ -35,6 +35,14 @@ public final class QKDNetworkParameters implements Serializable {
     private final int pichSlots;
     private boolean lowestLossSlots;
     private boolean wavelengthLanes;
+    /** Parte 40: QCh slot rule ("firstfit", "lowestloss" or "abne") and guard band between QChs. */
+    private String qchSlotPolicy = "firstfit";
+    private int qchGuardBand = 0;
+    /** Parte 40: PICh placement (core rule, fixed core, slot rule, guard band; -1 = network guard band). */
+    private String pichCorePolicy = "lowest";
+    private int pichCoreId = -1;
+    private String pichSlotPolicy = "firstfit";
+    private int pichGuardBand = -1;
     /** Part 26: PICh ends at every node of the QKD route and is shared (true), or is route-continuous and dedicated (false). */
     private boolean pichSegmented = true;
     private int pichSessionsPerChannel = 0;
@@ -107,8 +115,25 @@ public final class QKDNetworkParameters implements Serializable {
             throw new IllegalArgumentException("network.qkd.alternativeRoutes must be >= 0");
         }
         final String slotPolicy = config.getQchSlotPolicy();
-        if (!"firstfit".equals(slotPolicy) && !"lowestloss".equals(slotPolicy)) {
-            throw new IllegalArgumentException("network.qkd.qchSlotPolicy must be \"firstfit\" or \"lowestloss\"");
+        if (!"firstfit".equals(slotPolicy) && !"lowestloss".equals(slotPolicy) && !"abne".equals(slotPolicy)) {
+            throw new IllegalArgumentException("network.qkd.qchSlotPolicy must be \"abne\", \"firstfit\" or \"lowestloss\"");
+        }
+        if (config.getQchGuardBand() < 0) {
+            throw new IllegalArgumentException("network.qkd.qchGuardBand must be >= 0");
+        }
+        final String pcp = config.getPichCorePolicy();
+        if (!"lowest".equals(pcp) && !"fixed".equals(pcp) && !"leastused".equals(pcp)) {
+            throw new IllegalArgumentException("network.qkd.pichCorePolicy must be \"lowest\", \"fixed\" or \"leastUsed\"");
+        }
+        if ("fixed".equals(pcp) && config.getPichSlots() > 0 && (config.getPichCoreId() == quantumCoreId || !containsCore(networkConfig.getCores(), config.getPichCoreId()))) {
+            throw new IllegalArgumentException("network.qkd.pichCoreId must be an existing classical core when pichCorePolicy = \"fixed\"");
+        }
+        final String psp = config.getPichSlotPolicy();
+        if (!"firstfit".equals(psp) && !"lastfit".equals(psp) && !"abne".equals(psp)) {
+            throw new IllegalArgumentException("network.qkd.pichSlotPolicy must be \"firstfit\", \"lastfit\" or \"abne\"");
+        }
+        if (config.getPichGuardBand() < -1) {
+            throw new IllegalArgumentException("network.qkd.pichGuardBand must be >= 0 (or -1 = network guardBand)");
         }
         if (config.getPichSlots() < 0) {
             throw new IllegalArgumentException("network.qkd.pichSlots must be >= 0");
@@ -126,6 +151,12 @@ public final class QKDNetworkParameters implements Serializable {
                 config.getTdmSlots(), "grid".equals(policy), "route".equals(granularity),
                 config.getAlternativeRoutes(), config.getPichSlots());
         out.lowestLossSlots = "lowestloss".equals(slotPolicy);
+        out.qchSlotPolicy = slotPolicy;
+        out.qchGuardBand = config.getQchGuardBand();
+        out.pichCorePolicy = pcp;
+        out.pichCoreId = config.getPichCoreId();
+        out.pichSlotPolicy = psp;
+        out.pichGuardBand = config.getPichGuardBand();
         final String lanes = config.getSpanLanePlacement();
         if (!"first".equals(lanes) && !"wavelength".equals(lanes)) {
             throw new IllegalArgumentException("network.qkd.spanLanePlacement must be \"first\" or \"wavelength\"");
@@ -237,6 +268,28 @@ public final class QKDNetworkParameters implements Serializable {
         return pichSlots;
     }
 
+    /** Parte 40: "firstfit", "lowestloss" or "abne" (spectral rule of the QKD core, as ABNE/ACINE). */
+    public String getQchSlotPolicy() { return qchSlotPolicy; }
+    /** Parte 40: guard band (slots) between QChs in the QKD core. */
+    public int getQchGuardBand() { return qchGuardBand; }
+    /** Parte 40: "lowest", "fixed" or "leastused". */
+    public String getPichCorePolicy() { return pichCorePolicy; }
+    public int getPichCoreId() { return pichCoreId; }
+    /** Parte 40: "firstfit", "lastfit" or "abne". */
+    public String getPichSlotPolicy() { return pichSlotPolicy; }
+    /** Parte 40: PICh guard band; the network guard band when the file says -1. */
+    public int pichGuardBandOr(int networkGuardBand) { return pichGuardBand >= 0 ? pichGuardBand : networkGuardBand; }
+
+    /**
+     * Parte 40: spectral rule of ABNE/ACINE (CSBASDM) for a core: 0 = medium fit (central core: 18 with 19 cores,
+     * otherwise 0), 1 = first fit (odd outer cores), 2 = last fit (even outer cores).
+     */
+    public static int abneRule(int coreId, int numberOfCores) {
+        int central = numberOfCores == 19 ? 18 : 0;
+        if (coreId == central) return 0;
+        return coreId % 2 == 0 ? 2 : 1;
+    }
+
     /** Part 26: PICh per link of the QKD route, shared by sessions (true) or route-continuous and dedicated (false). */
     public boolean isPichSegmented() { return pichSegmented; }
     /** Part 26: sessions per PICh in segment mode (0 = unlimited). */
@@ -280,6 +333,8 @@ public final class QKDNetworkParameters implements Serializable {
                 ", undirectedChannels=" + undirectedChannels +
                 ", tdmSlots=" + tdmSlots +
                 ", wavelengthPolicy=" + (wavelengthGrid ? "grid" : "fixed") +
+                ", qchSlotPolicy=" + qchSlotPolicy + ", qchGuardBand=" + qchGuardBand +
+                ", pich=" + pichCorePolicy + "/" + pichSlotPolicy +
                 '}';
     }
 }

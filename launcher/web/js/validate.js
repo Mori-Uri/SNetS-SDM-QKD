@@ -79,7 +79,17 @@
           if (net.qkd[k] !== undefined && !(Number.isInteger(Number(net.qkd[k])) && Number(net.qkd[k]) >= 0)) add('err', 'network', `qkd.${k} deve ser um inteiro ≥ 0.`);
         }
         if (net.qkd.qchGranularity !== undefined && !['route', 'link', 'span'].includes(String(net.qkd.qchGranularity).toLowerCase())) add('err', 'network', 'qkd.qchGranularity deve ser route, link ou span.');
-        if (net.qkd.qchSlotPolicy !== undefined && !['firstfit', 'lowestloss'].includes(String(net.qkd.qchSlotPolicy).toLowerCase())) add('err', 'network', 'qkd.qchSlotPolicy deve ser firstfit ou lowestloss.');
+        if (net.qkd.qchSlotPolicy !== undefined && !['abne', 'firstfit', 'lowestloss'].includes(String(net.qkd.qchSlotPolicy).toLowerCase())) add('err', 'network', 'qkd.qchSlotPolicy deve ser abne, firstfit ou lowestloss.');
+        // 1.18.0: QCh guard band and PICh placement
+        if (net.qkd.qchGuardBand !== undefined && !(Number.isInteger(Number(net.qkd.qchGuardBand)) && Number(net.qkd.qchGuardBand) >= 0)) add('err', 'network', 'qkd.qchGuardBand deve ser um inteiro ≥ 0.');
+        if (net.qkd.pichGuardBand !== undefined && !(Number.isInteger(Number(net.qkd.pichGuardBand)) && Number(net.qkd.pichGuardBand) >= -1)) add('err', 'network', 'qkd.pichGuardBand deve ser −1 (guardBand da rede) ou um inteiro ≥ 0.');
+        const pcp = String(net.qkd.pichCorePolicy || 'lowest').toLowerCase();
+        if (!['lowest', 'fixed', 'leastused'].includes(pcp)) add('err', 'network', 'qkd.pichCorePolicy deve ser lowest, fixed ou leastUsed.');
+        if (pcp === 'fixed' && Number(net.qkd.pichSlots) > 0) {
+          const pc = Number(net.qkd.pichCoreId);
+          if (!idSet.has(pc) || pc === Number(net.qkd.quantumCoreId)) add('err', 'network', 'qkd.pichCoreId deve ser um núcleo clássico existente (pichCorePolicy = fixed).');
+        }
+        if (net.qkd.pichSlotPolicy !== undefined && !['firstfit', 'lastfit', 'abne'].includes(String(net.qkd.pichSlotPolicy).toLowerCase())) add('err', 'network', 'qkd.pichSlotPolicy deve ser firstfit, lastfit ou abne.');
         // Parte 39: per-link trusted nodes
         const tnm = String(net.qkd.trustedNodeMode || 'global').toLowerCase();
         if (!['global', 'perlink'].includes(tnm)) add('err', 'network', 'qkd.trustedNodeMode deve ser global ou perLink.');

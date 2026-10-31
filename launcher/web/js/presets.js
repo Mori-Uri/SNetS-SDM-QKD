@@ -5,8 +5,8 @@
  *   with their length in km. Applying one writes both directions of every link
  *   (same slots and slot width on all links) and stores the coordinates as
  *   "x"/"y" fields of each node; the simulator ignores these extra fields.
- * - CORES: positions (fibre radius ~ 1) and adjacency of the 2, 7, 12 and 19-core
- *   MCF layouts. The same positions are used in the Rede preview and in the
+ * - CORES: positions (fibre radius ~ 1) and adjacency of the MCF layouts, by key: '2', '3tri', '3lin', '5', '7',
+ *   '12', '19' (1.18.0: the 3- and 5-core layouts reuse the positions of the 7-core fibre). The same positions are used in the Rede preview and in the
  *   per-core diagram of the results.
  * - coordsFor(network): node coordinates of any network (x/y fields, a known
  *   topology with the same links, or an automatic force layout).
@@ -14,14 +14,19 @@
 (function (App) {
   'use strict';
 
-  const T = (id, name, desc, xy, links) => ({
-    id, name, desc,
+  // 1.18.0: group ('backbone' or 'metro') and, optionally, the relay (trusted) nodes drawn inside each link
+  const T = (id, name, desc, xy, links, group, relays) => ({
+    id, name, desc, group: group || 'backbone',
     nodes: Object.entries(xy).map(([n, p]) => ({ id: n, x: p[0], y: p[1] })),
     links: links.trim().split(/\s+/).map((s) => {
       const m = /^(\d+)-(\d+):(\d+(?:\.\d+)?)$/.exec(s);
       return [m[1], m[2], Number(m[3])];
     }),
+    relays: relays ? Object.fromEntries(relays.trim().split(/\s+/).map((s) => { const m = /^(\d+)-(\d+):(\d+)$/.exec(s); return [m[1] + '-' + m[2], Number(m[3])]; })) : null,
   });
+  const TOPOLOGY_GROUPS = [['metro', 'Metropolitanas e de pequena escala'], ['backbone', 'Backbone (longa distância)']];
+  /** 1.18.0: relay nodes of a link of a preset (either spelling of the link), or 0. */
+  function relaysOf(t, a, b) { return t && t.relays ? (t.relays[a + '-' + b] || t.relays[b + '-' + a] || 0) : 0; }
 
   const TOPOLOGIES = [
     T('nsfnet', 'NSFNet (14 nós, 21 enlaces)', 'Rede acadêmica dos EUA', {
@@ -44,7 +49,7 @@
     }, `1-2:1510 1-3:960 1-4:590 1-7:940 2-3:750 2-5:590 2-8:650 3-4:860 3-5:510 3-6:590 4-7:540 4-8:1290
         4-10:860 5-6:520 5-8:500 5-11:1130 6-7:930 6-8:600 6-9:550 7-9:765 7-10:520 8-9:800 8-11:1020 9-10:930
         9-11:520 10-11:1020`),
-    T('net28', 'Rede de 28 nós (44 enlaces)', 'Topologia continental de 28 nós', {
+    T('net28', 'EON (28 nós, 44 enlaces)', 'Rede óptica elástica europeia de 28 nós', {
       1: [158, 115], 2: [57, 212], 3: [182, 302], 4: [287, 272], 5: [420, 40], 6: [512, 85], 7: [437, 184],
       8: [365, 276], 9: [446, 292], 10: [618, 290], 11: [216, 382], 12: [276, 343], 13: [373, 356], 14: [326, 416],
       15: [412, 418], 16: [531, 389], 17: [141, 512], 18: [270, 522], 19: [333, 481], 20: [400, 511], 21: [497, 447],
@@ -54,20 +59,37 @@
         11-18:700 12-13:500 13-14:200 13-15:500 14-15:500 14-19:200 15-20:500 15-21:700 16-21:500 16-22:700
         17-23:1000 18-19:500 18-24:1000 19-20:500 20-25:700 21-26:500 22-27:500 23-24:1000 25-26:1000 25-28:1800
         26-27:700 27-28:1500`),
-    T('net12', 'Rede de 12 nós (17 enlaces)', 'Topologia regional de 12 nós', {
+    T('net12', 'JPN (12 nós, 17 enlaces)', 'Rede japonesa de 12 nós', {
       1: [482, 20], 2: [477, 115], 3: [440, 213], 4: [390, 170], 5: [306, 144], 6: [204, 108], 7: [294, 224],
       8: [173, 176], 9: [113, 173], 10: [138, 232], 11: [51, 218], 12: [35, 342],
     }, `1-2:594 1-4:1257 2-3:352 3-4:48 3-7:366 4-5:251 5-6:251 5-7:251 6-8:253 7-8:187 7-10:491 8-9:342
         9-10:67 9-11:281 10-11:365 10-12:1159 11-12:912`),
     T('core5', 'Núcleo pequeno (5 nós, 6 enlaces)', 'Rede de 5 nós da qualificação', {
       1: [180, 58], 2: [370, 58], 3: [180, 480], 4: [352, 508], 5: [270, 270],
-    }, '1-2:76 1-3:86 2-5:90 5-3:80 2-4:100 3-4:70'),
+    }, '1-2:76 1-3:86 2-5:90 5-3:80 2-4:100 3-4:70', 'metro'),
     T('butterfly', 'Borboleta (6 nós, 8 enlaces)', 'Topologia em borboleta', {
       1: [520, 62], 2: [440, 186], 3: [597, 186], 4: [440, 380], 5: [597, 380], 6: [520, 512],
-    }, '1-2:30 1-3:40 2-3:50 2-4:55 3-5:55 4-5:50 4-6:40 5-6:30'),
+    }, '1-2:30 1-3:40 2-3:50 2-4:55 3-5:55 4-5:50 4-6:40 5-6:30', 'metro'),
     T('metro', 'Metropolitana (8 nós, 11 enlaces)', 'Rede metropolitana', {
       1: [777, 68], 2: [670, 215], 3: [898, 215], 4: [670, 370], 5: [777, 370], 6: [898, 370], 7: [717, 515], 8: [843, 515],
-    }, '1-2:30 1-3:25 2-3:40 2-4:50 3-6:20 4-7:40 5-6:40 5-7:45 5-8:30 6-8:35 7-8:20'),
+    }, '1-2:30 1-3:25 2-3:40 2-4:50 3-6:20 4-7:40 5-6:40 5-7:45 5-8:30 6-8:35 7-8:20', 'metro'),
+    // 1.18.0: small-scale topologies (Fig. 6 of the reference: (a) core, (b) metro, (c) DT with relay nodes)
+    T('losango', 'Losango (5 nós, 6 enlaces)', 'Rede de 5 nós em losango (Fig. 6a); mesmo grafo do "Núcleo pequeno", com outra numeração', {
+      1: [285, 525], 2: [450, 354], 3: [615, 525], 4: [450, 684], 5: [450, 519],
+    }, '1-2:100 2-3:76 2-5:90 5-4:80 1-4:86 3-4:70', 'metro'),
+    T('metro2', 'Metropolitana 2 (8 nós, 11 enlaces)', 'Rede metropolitana deitada (Fig. 6b); mesmo grafo da Metropolitana, com outra numeração', {
+      1: [456, 870], 2: [579, 699], 3: [756, 699], 4: [948, 771], 5: [756, 891], 6: [948, 954], 7: [750, 1035], 8: [579, 1035],
+    }, '1-2:25 2-3:20 3-4:35 3-5:40 5-4:30 4-6:20 5-6:45 6-7:40 7-8:50 2-8:40 1-8:30', 'metro'),
+    T('dt', 'DT (12 nós, 20 enlaces, 20 relays)', 'Rede Deutsche Telekom (Fig. 6c); os nós relay (13–32 na figura) viram nós confiáveis por enlace', {
+      1: [1075, 195], 2: [532, 318], 3: [670, 338], 4: [825, 568], 5: [880, 125], 6: [862, 280], 7: [600, 420], 8: [1118, 370],
+      9: [1162, 755], 10: [1080, 600], 11: [932, 742], 12: [1030, 805],
+    }, `2-5:153 5-1:179 5-6:94 6-1:172 1-8:101 2-3:87 2-7:48 3-7:98 3-6:129 6-8:100 6-4:183 7-4:106 4-8:138 8-10:107
+        4-10:87 4-11:121 11-10:110 10-9:106 11-12:102 12-9:170`, 'metro',
+    `2-5:2 5-1:1 5-6:1 6-1:1 1-8:1 2-3:0 2-7:0 3-7:0 3-6:1 6-8:2 6-4:1 7-4:1 4-8:2 8-10:2 4-10:2 4-11:1 11-10:1 10-9:1
+        11-12:0 12-9:0`),
+    T('linha', 'Linha (2 nós, 1 enlace)', 'Um único enlace de 50 km entre dois nós (edite o comprimento na tabela de enlaces)', {
+      1: [200, 300], 2: [700, 300],
+    }, '1-2:50', 'metro'),
   ];
 
   // ------------------------------------------------------------ multi-core fibres
@@ -87,20 +109,29 @@
   }
 
   const CORES = {};
-  CORES[2] = coreSet('2 núcleos', 'Núcleo 0 à esquerda e 1 à direita, vizinhos entre si.',
+  CORES['2'] = coreSet('2 núcleos', 'Núcleo 0 à esquerda e 1 à direita, vizinhos entre si.',
     { 0: { x: -0.5, y: 0 }, 1: { x: 0.5, y: 0 } }, { 0: [1], 1: [0] });
   (function () {
     const pos = Object.assign({ 0: { x: 0, y: 0 } }, ringPos([1, 2, 3, 4, 5, 6], 1, 90, false));
     const adj = { 0: [1, 2, 3, 4, 5, 6] };
     for (let i = 1; i <= 6; i++) adj[i] = [0, i === 1 ? 6 : i - 1, i === 6 ? 1 : i + 1].sort((a, b) => a - b);
-    CORES[7] = coreSet('7 núcleos', 'Núcleo 0 no centro (vizinho de todos) e 1–6 em anel hexagonal.', pos, adj);
+    CORES['7'] = coreSet('7 núcleos', 'Núcleo 0 no centro (vizinho de todos) e 1–6 em anel hexagonal.', pos, adj);
+    // 1.18.0: 3 and 5 cores on positions of the 7-core fibre (core 0 = centre: medium fit in ABNE/ACINE)
+    const P7 = pos;
+    CORES['5'] = coreSet('5 núcleos', 'Núcleo 0 no centro (vizinho de todos) e 1–4 nos cantos de um quadrado (posições 2, 3, 5 e 6 da fibra de 7 núcleos); cada canto é vizinho dos dois cantos ao lado.',
+      { 0: P7[0], 1: P7[2], 2: P7[3], 3: P7[5], 4: P7[6] },
+      { 0: [1, 2, 3, 4], 1: [0, 2, 4], 2: [0, 1, 3], 3: [0, 2, 4], 4: [0, 1, 3] });
+    CORES['3tri'] = coreSet('3 núcleos em triângulo', 'Núcleo 0 no centro e 1, 2 em cima (posições 2 e 6 da fibra de 7 núcleos); os três são vizinhos entre si.',
+      { 0: P7[0], 1: P7[2], 2: P7[6] }, { 0: [1, 2], 1: [0, 2], 2: [0, 1] });
+    CORES['3lin'] = coreSet('3 núcleos em linha', 'Núcleo 0 no centro, 1 à esquerda e 2 à direita; o 0 é vizinho dos dois e 1 e 2 não são vizinhos entre si.',
+      { 0: { x: 0, y: 0 }, 1: { x: -1, y: 0 }, 2: { x: 1, y: 0 } }, { 0: [1, 2], 1: [0], 2: [0] });
   })();
   (function () {
     const order = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0];
     const pos = ringPos(order, 1, 90, true);
     const adj = {};
     for (let i = 0; i < 12; i++) adj[i] = [(i + 11) % 12, (i + 1) % 12].sort((a, b) => a - b);
-    CORES[12] = coreSet('12 núcleos', 'Anel de 12 núcleos (1 no topo, sentido horário, 0 à esquerda do 1); cada núcleo tem 2 vizinhos.', pos, adj);
+    CORES['12'] = coreSet('12 núcleos', 'Anel de 12 núcleos (1 no topo, sentido horário, 0 à esquerda do 1); cada núcleo tem 2 vizinhos.', pos, adj);
   })();
   (function () {
     const px = {
@@ -116,27 +147,34 @@
       11: [7, 8, 12, 15], 12: [8, 11, 13, 15, 16, 18], 13: [9, 12, 14, 16, 17, 18], 14: [9, 10, 13, 17],
       15: [11, 12, 16], 16: [12, 13, 15, 17], 17: [13, 14, 16], 18: [4, 5, 8, 9, 12, 13],
     };
-    CORES[19] = coreSet('19 núcleos', 'Rede hexagonal: 18 no centro, anel interno 4, 5, 9, 13, 12, 8 e anel externo com 12 núcleos.', pos, adj);
+    CORES['19'] = coreSet('19 núcleos', 'Rede hexagonal: 18 no centro, anel interno 4, 5, 9, 13, 12, 8 e anel externo com 12 núcleos.', pos, adj);
   })();
 
-  /** network.cores array for a preset. */
-  function coresConfig(n) {
-    const c = CORES[n];
+  /** Keys of the core presets in the order of the menu. */
+  const CORE_KEYS = ['2', '3tri', '3lin', '5', '7', '12', '19'];
+
+  /** network.cores array for a preset (key, or a number for the old 2/7/12/19 names). */
+  function coresConfig(key) {
+    const c = CORES[String(key)];
     return c.ids.map((id) => ({ id, adjacentCores: c.adj[id].slice() }));
   }
 
-  /** Which preset (2/7/12/19) a network.cores array is, or null. */
+  /** Which preset key a network.cores array is (same ids and neighbours), or null. */
   function corePresetOf(cores) {
     if (!Array.isArray(cores)) return null;
-    const c = CORES[cores.length];
-    if (!c) return null;
-    for (const core of cores) {
-      const want = c.adj[core.id];
-      if (!want) return null;
-      const got = [...new Set((core.adjacentCores || []).map(Number))].sort((a, b) => a - b);
-      if (got.length !== want.length || got.some((v, i) => v !== want[i])) return null;
+    for (const key of CORE_KEYS) {
+      const c = CORES[key];
+      if (c.n !== cores.length) continue;
+      let ok = true;
+      for (const core of cores) {
+        const want = c.adj[core.id];
+        if (!want) { ok = false; break; }
+        const got = [...new Set((core.adjacentCores || []).map(Number))].sort((a, b) => a - b);
+        if (got.length !== want.length || got.some((v, i) => v !== want[i])) { ok = false; break; }
+      }
+      if (ok) return key;
     }
-    return cores.length;
+    return null;
   }
 
   /** Positions (radius ~1, y down) of the cores of a network.cores array. */
@@ -307,7 +345,7 @@
   }
 
   App.presets = {
-    TOPOLOGIES, CORES, HEAT_STOPS, coresConfig, corePresetOf, coreLayout, undirectedLinks, matchTopology,
+    TOPOLOGIES, TOPOLOGY_GROUPS, relaysOf, CORES, CORE_KEYS, HEAT_STOPS, coresConfig, corePresetOf, coreLayout, undirectedLinks, matchTopology,
     coordsFor, topoPanel, buildTopology, heatColor, pairKey, qtndForLink,
   };
 })(window.App);
