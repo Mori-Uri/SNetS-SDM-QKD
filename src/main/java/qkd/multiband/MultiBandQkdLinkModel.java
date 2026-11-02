@@ -55,6 +55,9 @@ public final class MultiBandQkdLinkModel {
     private final SpontaneousRamanModel raman;
     private final ForwardForm forwardForm;
     private final double detectedFraction;
+    /** Parte 45: optional NLI model (null = no NLI) and its grid step (Hz). */
+    private final NonlinearInterferenceModel nli;
+    private final double nliGridHz;
 
     /**
      * @param parameters BB84 and detector parameters (mu, T_s, f, e_d, eta_d, p_dark, QCh bandwidth, gate)
@@ -65,6 +68,12 @@ public final class MultiBandQkdLinkModel {
      */
     public MultiBandQkdLinkModel(QKDPhysicalParameters parameters, FiberAttenuationModel fiber,
             SpontaneousRamanModel raman, ForwardForm forwardForm, double detectedFraction) {
+        this(parameters, fiber, raman, forwardForm, detectedFraction, null, 0.0);
+    }
+
+    private MultiBandQkdLinkModel(QKDPhysicalParameters parameters, FiberAttenuationModel fiber,
+            SpontaneousRamanModel raman, ForwardForm forwardForm, double detectedFraction,
+            NonlinearInterferenceModel nli, double nliGridHz) {
         if (parameters == null || fiber == null || raman == null || forwardForm == null) {
             throw new IllegalArgumentException("arguments cannot be null");
         }
@@ -77,6 +86,22 @@ public final class MultiBandQkdLinkModel {
         this.raman = raman;
         this.forwardForm = forwardForm;
         this.detectedFraction = detectedFraction;
+        this.nli = nli;
+        this.nliGridHz = nliGridHz;
+    }
+
+    /**
+     * Parte 45: copy of this model that also adds the NLI of the same-core classical channels
+     * ({@link NonlinearInterferenceModel}); the channels must have a bandwidth.
+     *
+     * @param model GN model
+     * @param gridStepHz step of the PSD grid of the double integral (e.g. 2.5e9)
+     */
+    public MultiBandQkdLinkModel withNli(NonlinearInterferenceModel model, double gridStepHz) {
+        if (model == null || !(gridStepHz > 0.0)) {
+            throw new IllegalArgumentException("NLI model and grid step required");
+        }
+        return new MultiBandQkdLinkModel(parameters, fiber, raman, forwardForm, detectedFraction, model, gridStepHz);
     }
 
     /** Convention of [MEHDI24]/[DIBAJ25]: G.652.D loss, fitted SpRS, L e^{-aL}, f_det = 0.5. */
@@ -170,10 +195,26 @@ public final class MultiBandQkdLinkModel {
                 * detectedFraction * lambdaQm / (parameters.getPlanckConstantJs() * parameters.getSpeedOfLightMPerS());
         final double pSame = sameW * photonsPerJoule;
         final double pNeighbour = neighbourW * photonsPerJoule;
+        double nliW = 0.0;
+        if (nli != null && !sameCore.isEmpty()) {
+            final java.util.List<ClassicalChannel> co = new java.util.ArrayList<ClassicalChannel>();
+            for (ClassicalChannel ch : sameCore) {
+                if (ch.getDirection() == ClassicalChannel.Direction.CO_PROPAGATING) co.add(ch);
+            }
+            final double[][] g = NonlinearInterferenceModel.grid(co, nliGridHz);
+            if (g[1].length > 0) {
+                final double centre = NonlinearInterferenceModel.weightedCentreHz(g[1], g[0][0], g[0][1]);
+                final double alphaC = fiber.nepersPerKm(SpontaneousRamanModel.C / centre * 1e9);
+                nliW = nli.psdWPerHz(g[1], g[0][0], g[0][1], SpontaneousRamanModel.C / lambdaQm, lengthKm, alphaC,
+                        alphaQ) * parameters.getQchBandwidthHz();
+            }
+        }
+        final double pNli = nliW * photonsPerJoule;
         final double pDark = parameters.getDarkCountProbability();
-        final double pb = Math.min(1.0, pDark + pSame + pNeighbour);
+        final double pb = Math.min(1.0, pDark + pSame + pNeighbour + pNli);
 
         final QKDPhysicalResult qkd = bb84.evaluateWithAttenuation(alphaQdb, lengthKm, pb);
-        return new MultiBandLinkResult(qchNm, lengthKm, alphaQdb, sameW, neighbourW, pDark, pSame, pNeighbour, qkd);
+        return new MultiBandLinkResult(qchNm, lengthKm, alphaQdb, sameW, neighbourW, pDark, pSame, pNeighbour, nliW,
+                pNli, qkd);
     }
 }

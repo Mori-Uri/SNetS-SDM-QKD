@@ -314,6 +314,9 @@ public class SimulationFileManager {
         if(sr.getSimulationConfig().getActiveMetrics().PhysicalLayerStatistics){
             saveResult(path, SimulationRequest.Result.FILE_PHYSICAL_LAYER_STATISTICS,sr.getResult().physicalLayerStatistics);
         }
+        if(sr.getResult().algorithmCost != null && sr.getSimulationConfig().getActiveMetrics().AlgorithmCost){ // Parte 45
+            saveResult(path, SimulationRequest.Result.FILE_ALGORITHM_COST,sr.getResult().algorithmCost);
+        }
         if(sr.getResult().qkdStatistics != null){
             saveResult(path, SimulationRequest.Result.FILE_QKD_STATISTICS,sr.getResult().qkdStatistics);
         }

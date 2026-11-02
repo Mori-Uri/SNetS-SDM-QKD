@@ -26,6 +26,8 @@
           'regeneratorAssignment'],
       },
       { title: 'QKD', keys: ['qkdProtectedRequestProbability', 'qkdProtectionRandomSeed', 'qkdKeyDemand', 'qkdWarmupFraction', 'qkdExactRequestCount'] },
+      // 1.20.0 (Parte 45)
+      { title: 'Save states (experimental)', desc: 'Grava o estado de cada simulação (carga × replicação) em savestate/ a cada intervalo e ao terminar. Rodando o caso de novo, as simulações concluídas não são refeitas e as interrompidas continuam do ponto salvo, com os mesmos resultados. O estado é ignorado se algum arquivo de entrada mudar (exceto threads). Apague a pasta savestate quando não precisar mais.', keys: ['saveState'] },
     ],
     fields: {
       requests: { label: 'Requisições por replicação', type: 'int', min: 1 },
@@ -52,6 +54,9 @@
       'qkdKeyDemand.updateIntervalsMicroseconds': { label: 'Intervalos de renovação da chave', unit: 'µs', help: 'Lista separada por vírgulas; cada requisição protegida sorteia um deles com igual probabilidade.' },
       'qkdKeyDemand.randomSeed': { label: 'Semente da demanda de chave', type: 'int' },
       qkdWarmupFraction: { label: 'Warm-up das métricas QKD', type: 'prob', default: 0.1, help: 'Fração das chegadas de cada replicação descartada nas estatísticas QKD (padrão 0,1, a mesma regra das métricas clássicas do SNetS). Use 0 em estudos semiestáticos.' },
+      saveState: { label: 'Save states', default: { enabled: true, intervalMinutes: 10 } },
+      'saveState.enabled': { label: 'Gravar e retomar save states', default: true },
+      'saveState.intervalMinutes': { label: 'Intervalo entre gravações', unit: 'min', default: 10, help: 'Cada gravação serializa a simulação inteira (rede, circuitos, eventos pendentes); em redes grandes leva de frações de segundo a poucos segundos.' },
       qkdExactRequestCount: { label: 'Número exato de requisições', default: false, help: 'Processa exatamente "requests" chegadas por replicação. Sem isso o SNetS processa requests + (nº de geradores) chegadas, pois cada gerador já tem uma chegada agendada quando a geração para.' },
     },
   };
@@ -168,7 +173,7 @@
         receiver_referenced: 'receiver_referenced — P_XT = P·ISO·h·L já referida ao receptor (T = 1)',
         distributed: 'distributed — cada ponto do trecho sofre a atenuação restante até o receptor',
         attenuated: 'attenuated — P_XT·10^(−αL/10): o canal clássico se atenua junto com o QCh (Moghaddam et al., 2021, eq. 1)' } },
-      multiband: { label: 'Multibanda', default: { enabled: true, architecture: 'MB', ramanModel: 'fisico', qchCenterNm: 1381.0, hostCoreId: 0, intercoreRaman: true, bidirectionalFiber: false, classicalBandStartThz: 191.3, attenuationModel: 'g652d', waterPeakDbPerKm: 0.0, temperatureK: 300.0 } },
+      multiband: { label: 'Multibanda', default: { enabled: true, architecture: 'MB', ramanModel: 'fisico', qchCenterNm: 1381.0, hostCoreId: 0, intercoreRaman: true, bidirectionalFiber: false, classicalBandStartThz: 191.3, attenuationModel: 'g652d', waterPeakDbPerKm: 0.0, temperatureK: 300.0, nliModel: 'nenhum' } },
       'multiband.enabled': { label: 'Ativar a camada física multibanda', default: true },
       'multiband.architecture': { label: 'Arquitetura', default: 'MB', enum: {
         MF: 'MF — QCh numa fibra escura dedicada (p_b = p_dark)',
@@ -188,6 +193,12 @@
         quadratica: 'quadratica — o ajuste do grupo Fibra (só banda C)' } },
       'multiband.waterPeakDbPerKm': { label: 'Pico de OH em 1383 nm', unit: 'dB/km', default: 0.0, help: '0 para fibra G.652.D de baixo pico d’água.' },
       'multiband.temperatureK': { label: 'Temperatura da fibra', unit: 'K', default: 300.0 },
+      'multiband.nliModel': { label: 'Ruído não linear (NLI) no QCh', default: 'nenhum', enum: {
+        nenhum: 'nenhum — sem NLI',
+        gn: 'gn — modelo GN (todos os produtos de FWM) dos circuitos do núcleo hospedeiro; só pesa com o QCh perto da banda clássica (banda S/C)' } },
+      'multiband.nliGammaPerWKm': { label: 'γ da fibra (NLI)', unit: '1/(W·km)', default: 1.2 },
+      'multiband.nliBeta2Ps2PerKm': { label: 'β2 (NLI)', unit: 'ps²/km', default: -22.317 },
+      'multiband.nliBeta3Ps3PerKm': { label: 'β3 (NLI)', unit: 'ps³/km', default: 0.1331 },
     },
   };
 

@@ -60,7 +60,7 @@ import qkd.resource.QKDSession;
  * capacity.QKDLinkChannelEvaluator. The equations and their order of evaluation are
  * unchanged (bit-identical results).</p>
  */
-public final class QKDPhysicalLayer {
+public final class QKDPhysicalLayer implements java.io.Serializable {
 
     private final QKDPhysicalParameters parameters;
     private final BB84DecoyModel bb84Model;
@@ -1265,13 +1265,20 @@ public final class QKDPhysicalLayer {
                         couplingCoefficientPerM * 1000.0, candidate)
                 : 0.0;
         final double pRaman = ramanW > 0.0 ? ramanBackgroundProbability(mb, ramanW, wavelengthNm) : 0.0;
-        final double pb = pRaman > 0.0
+        double pb = pRaman > 0.0
                 ? combineIndependentProbabilities(noise.getTotalBackgroundProbability(), pRaman)
                 : noise.getTotalBackgroundProbability();
+        // Parte 45: NLI of the host-core classical circuits (GN model)
+        final double nliW = mb.hasNli()
+                ? nliPowerAtReceiverW(mb, link, lengthKm, wavelengthNm, resolver, candidate) : 0.0;
+        final double pNli = nliW > 0.0 ? ramanBackgroundProbability(mb, nliW, wavelengthNm) : 0.0;
+        if (pNli > 0.0) {
+            pb = combineIndependentProbabilities(pb, pNli);
+        }
 
         final QKDPhysicalResult physical = bb84Model.evaluateWithAttenuation(attenuationDbPerKm, lengthKm, pb);
         return new QKDSpanPhysicalResult(span, xt, noise, physical, minimumSecretKeyRateBps, maximumQber,
-                ramanW, pRaman);
+                ramanW, pRaman).withNli(nliW, pNli);
     }
 
     /**
@@ -1396,6 +1403,59 @@ public final class QKDPhysicalLayer {
             final Double previous = terms.get(key);
             terms.put(key, Double.valueOf(previous == null ? term : previous.doubleValue() + term));
         }
+    }
+
+    /**
+     * Parte 45: NLI power (W) inside the QCh filter at the receiver of a span: GN model
+     * ({@link qkd.multiband.NonlinearInterferenceModel}) over the PSD of the circuits of the host core of this link
+     * (plus the candidate), each spread evenly over its slots. The circuits' launch power is used at the span input.
+     */
+    double nliPowerAtReceiverW(qkd.multiband.MultiBandSettings mb, Link link, double lengthKm, double qchNm,
+            LaunchPowerResolver resolver, Circuit candidate) {
+        final Core host = link.getCore(mb.getHostCoreId());
+        if (host == null) return 0.0;
+        final int slots = host.getNumOfSlots();
+        final double slotHz = host.getSlotSpectrumBand();
+        final double[] psd = new double[slots];
+        // circuits in id order (ids may be null for verification circuits; the candidate goes last)
+        final List<Circuit> circuits = new ArrayList<Circuit>();
+        if (host.getCircuitList() != null) {
+            for (Circuit c : host.getCircuitList()) {
+                if (c != null) circuits.add(c);
+            }
+        }
+        Collections.sort(circuits, new java.util.Comparator<Circuit>() {
+            @Override
+            public int compare(Circuit x, Circuit y) {
+                if (x.getId() == null) return y.getId() == null ? 0 : 1;
+                if (y.getId() == null) return -1;
+                return x.getId().compareTo(y.getId());
+            }
+        });
+        if (candidate != null && !circuits.contains(candidate) && candidateTraversesLink(candidate, link)
+                && qkd.metrics.BlockingDetailRecorder.rawCore(candidate) == host.getId()) {
+            circuits.add(candidate);
+        }
+        boolean any = false;
+        for (Circuit c : circuits) {
+            final int[] band = c.getSpectrumAssigned();
+            if (band == null) continue;
+            final int a = Math.max(1, band[0]);
+            final int b = Math.min(slots, band[1]);
+            if (b < a) continue;
+            final double g = resolver.resolve(c) / ((b - a + 1) * slotHz);
+            for (int k = a; k <= b; k++) psd[k - 1] += g;
+            any = true;
+        }
+        if (!any) return 0.0;
+        final double startHz = mb.getClassicalBandStartHz();
+        final double centreNm = parameters.getSpeedOfLightMPerS()
+                / qkd.multiband.NonlinearInterferenceModel.weightedCentreHz(psd, startHz, slotHz) * 1e9;
+        final double alphaC = parameters.attenuationDbPerKm(centreNm) * qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
+        final double alphaQ = parameters.attenuationDbPerKm(qchNm) * qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
+        final double fq = parameters.getSpeedOfLightMPerS() / (qchNm * 1e-9);
+        return mb.getNli().psdWPerHz(psd, startHz, slotHz, fq, lengthKm, alphaC, alphaQ)
+                * parameters.getQchBandwidthHz();
     }
 
     /** Detector background probability of an SpRS power at the QCh receiver. */

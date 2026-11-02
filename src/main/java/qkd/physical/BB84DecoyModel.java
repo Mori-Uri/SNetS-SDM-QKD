@@ -11,7 +11,7 @@ package qkd.physical;
  *
  * <p>Refer\u00eancias: Eq. (1) de [DIBAJ24] M. R. Dibaj et al., "Cost-Optimized Quantum Communication Networks: The Crucial Role of Trusted Node Placement in Multi-Band and Multi-Fiber Realms", IWCIT 2024 (artigo-base) (limite inferior do BB84 com estados decoy); Eqs. (9)-(18) de [MOGH21] E. E. Moghaddam, H. Beyranvand, J. A. Salehi, "Resource Allocation in SDM-EONs Secured With QKD", IEEE JSAC 39(9), 2021; verifica\u00e7\u00e3o num\u00e9rica na Tabela 5 de [MORI26] U. P. Mori, qualifica\u00e7\u00e3o "Planejamento de N\u00f3s Confi\u00e1veis para QKD em SDM-EONs: An\u00e1lise da Coexist\u00eancia Qu\u00e2ntico-Cl\u00e1ssica", UFPI, 2026.</p>
  */
-public final class BB84DecoyModel {
+public final class BB84DecoyModel implements java.io.Serializable {
 
     private final QKDPhysicalParameters parameters;
 

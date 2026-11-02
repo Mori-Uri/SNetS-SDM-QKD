@@ -19,6 +19,17 @@ public class EventMachine implements Serializable {
 
     private Vector<Event> eventList;
     private double countEvent = 0;
+    /** Parte 45: save-state hook run between two events at most every checkpointIntervalNanos; null = off. */
+    private transient Runnable checkpointHook;
+    private transient long checkpointIntervalNanos;
+    private transient long lastCheckpointNanos;
+
+    /** Parte 45: runs {@code hook} between events, at most once every {@code intervalNanos}. */
+    public void setCheckpoint(Runnable hook, long intervalNanos) {
+        this.checkpointHook = hook;
+        this.checkpointIntervalNanos = intervalNanos;
+        this.lastCheckpointNanos = System.nanoTime();
+    }
 
     /**
      * Creates a new instance of EventMachine
@@ -35,11 +46,17 @@ public class EventMachine implements Serializable {
     public void insert(Event e) {
         e.setId(this.countEvent);
         this.countEvent++;
-        int i = 0;
-        while (i < eventList.size() && (eventList.elementAt(i)).getTimeHours() < e.getTimeHours()) {
-            i++;
+        // Parte 45 (desempenho): binary search of the first event with time >= e.time, the same position as the
+        // former linear scan (events with equal time keep their order: the new one goes before them).
+        final double t = e.getTimeHours();
+        int lo = 0;
+        int hi = eventList.size();
+        while (lo < hi) {
+            final int mid = (lo + hi) >>> 1;
+            if (eventList.elementAt(mid).getTimeHours() < t) lo = mid + 1;
+            else hi = mid;
         }
-        eventList.insertElementAt(e, i);
+        eventList.insertElementAt(e, lo);
     }
 
     /**
@@ -51,6 +68,10 @@ public class EventMachine implements Serializable {
             Event e = eventList.firstElement();
             eventList.removeElementAt(0);
             e.listener().execute(e);
+            if (checkpointHook != null && System.nanoTime() - lastCheckpointNanos >= checkpointIntervalNanos) {
+                checkpointHook.run();
+                lastCheckpointNanos = System.nanoTime();
+            }
         }
     }
 

@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [45](#parte-45) | Parte 45 — NLI no QCh (N2), verificação MB × MF em rede, custo dos algoritmos, save states, desempenho e launcher 1.20.0 |
 | [44](#parte-44) | Parte 44 — pasta experimental paralela, launcher 1.19.1 (edição experimental), SpRS nos resultados e fibra bidirecional |
 | [43](#parte-43) | Parte 43 — multibanda no simulador (N0 e N1), modelos de Raman selecionáveis e launcher 1.19.0 |
 | [42](#parte-42) | Parte 42 — branch experimental: teste de regressão, camada física multibanda e calculadora de enlace |
@@ -26,6 +27,115 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-45"></a>
+
+## Parte 45 — NLI no QCh (N2), verificação de rede MB × MF, custo dos algoritmos, save states, desempenho e launcher 1.20.0
+
+**1. Nível N2: ruído não linear (NLI) no canal quântico**
+
+- `qkd.multiband.NonlinearInterferenceModel`: integral do modelo GN, com todos os produtos de FWM, na frequência do
+  QCh.
+  - O integrando tem cristas estreitas de casamento de fase, e as células perto delas são subamostradas até
+    0,15 GHz.
+  - Quando nenhum produto pode cair no QCh, o resultado é 0 sem integrar. É o caso do QCh em O/E com a banda
+    clássica em C+L.
+- No simulador, nova opção `multiband.nliModel` = `nenhum` (padrão) | `gn`. Com `gn`:
+  - o NLI vem dos circuitos do núcleo hospedeiro;
+  - os valores padrão de γ, β2 e β3 são os de Mehdizadeh e Dibaj e podem ser trocados;
+  - p_b = 1 − (1 − p_dark)(1 − p_XT)(1 − p_SpRS)(1 − p_NLI);
+  - o `QKDMetrics.csv` ganha as linhas de NLI.
+- Calculadora de enlace: opção `nli=gn`. O `ClassicalChannel` passou a ter largura de banda; o comb de referência usa
+  75 GHz.
+- **QoT clássica por banda não foi feita.** Os casos usam a grade clássica só na banda C. A mudança mexe no núcleo da
+  camada física clássica (`PhysicalLayer`, com α, NF e γ globais) e fica para quando houver grade C+L e revisão sua.
+
+**2. Verificação**
+
+`MultiBandNliVerification` (VMB-11a–f):
+
+| Item | O que confere | Resultado |
+|---|---|---|
+| VMB-11a | NLI no centro de um espectro plano × forma fechada de Poggiolini 2014 | erro 0,13 % |
+| VMB-11b | independência do passo da grade (2,5 a 10 GHz); NLI cúbico na potência e proporcional a γ² | OK |
+| VMB-11c | NLI = 0 no QCh de 1260 a 1400 nm com o comb C+L | OK |
+| VMB-11d | NLI cai com a distância da borda da banda | OK |
+| VMB-11e | simulador = calculadora | erro 0 no NLI; 1e-3 na SKR |
+| VMB-11f | Mehdizadeh, 1522 nm a 5 km | **PENDENTE** |
+
+Detalhe do VMB-11f:
+- artigo: 25,8 Mbit/s;
+- modelo (SpRS + NLI): 76,8 Mbit/s, com p_NLI = 4,7e-5;
+- o NLI do GN fica cerca de 2 ordens abaixo do que faltaria para reproduzir a QBER do artigo.
+
+`MultiBandIwcitVerification` (VMB-10a/b), Dibaj IWCIT 2024:
+
+| Item | Alvo do artigo | Modelo |
+|---|---|---|
+| VMB-10a, Fig. 3: SKR/Q-TRx | 40 / 50 / 30,83 Mbit/s | 4–7 % acima |
+| VMB-10b, Fig. 5: QTND ótimo em MB a 1380 nm | 20 km | 20 km |
+| VMB-10b, Fig. 5: QTND ótimo em MF a 1550 nm | 25 km | 25 km |
+| VMB-10b: ganho do MF sobre sem nó confiável | 15 % | 19 % |
+| VMB-10b: ganho do MB | +40 % | **PENDENTE** |
+
+**VMB-10c, rede completa no motor nativo do SNetS.**
+- Novo: `QKDNativeReferenceMain --arquitetura mb --raman artigo|fisico|nenhum`.
+- O MB gera o mesmo cenário do MF do artigo-base, com o QCh na banda O+E da fibra clássica 0.
+- Rodada de 5 replicações:
+
+| Topologia | MB: mínimo de Q-TRx | MF: mínimo de Q-TRx | MF usa menos (artigo) |
+|---|---|---|---|
+| Small Core | 357 em QTND 20 km | 242 em QTND 30 km | **32,2 %** (31 %) |
+| Butterfly | 221 em QTND 20 km | 151 em QTND 30 km | **31,6 %** (28 %) |
+| Metro | 209 em QTND 20 km | 146 em QTND 25 km | **30,2 %** (28 %) |
+
+- O QTND ótimo do MB (20 km) é o do artigo.
+- Os três modelos de Raman dão praticamente o mesmo resultado (no O-band o SpRS pesa pouco), o que bate com o que
+  o artigo diz.
+
+**3. Custo computacional dos algoritmos (métrica `AlgorithmCost`)**
+
+- Gera `<caso>_AlgorithmCost.csv`, com chamadas e tempo de cada algoritmo:
+  - grooming, RMLSA integrado, roteamento, espectro, núcleo e espectro, modulação, potência, realocação;
+  - admissão QKD, proteção e atualização das sessões.
+- Proxies das interfaces medem tempo e chamadas sem mudar resultados (conferido).
+- Arquivos: `simulator/AlgorithmCostRecorder.java`, `Simulation`, `SimulationManagement`, `SimulationFileManager`,
+  `SimulationConfig.Metrics.AlgorithmCost`, `SimulationRequest`, `QKDControlPlane`.
+
+**4. Save states**
+
+- Opção `simulation.saveState` (`enabled`, `intervalMinutes`).
+- Cada simulação grava `savestate/lp<L>_rep<R>.state` periodicamente e ao terminar.
+- Rodando o caso de novo:
+  - simulações concluídas são reaproveitadas;
+  - as interrompidas continuam do ponto salvo, com os mesmos resultados;
+  - estados de entradas diferentes são ignorados.
+- Arquivos: `simulator/SaveStateStore.java`, `Simulator`, `EventMachine` (gancho entre eventos),
+  `SimulationManagement`; `Serializable` em 9 classes; `Circuit` grava o `id` primeiro.
+- O `Util` comum às simulações é gravado como marca e religado na leitura. A leitura e a gravação usam pilha de
+  1 GB (redes grandes).
+- Detalhes em `docs/SAVE_STATES_CUSTO_DESEMPENHO.md`.
+
+**5. Desempenho, sem mudar resultados**
+
+- Faixas livres lidas uma vez por observação nas métricas de fragmentação e utilização.
+- Busca binária na inserção de eventos.
+- Q01 com uma thread: 25,8 s → 19,9 s (−23 %).
+
+**6. Launcher 1.20.0**
+
+- Simulação: grupo **Save states**.
+- Camada física QKD: opções de NLI.
+- Métricas: **AlgorithmCost** (aparece sozinha, lida do código).
+- Descrições das linhas de NLI.
+
+**Regressão desta parte**
+
+- Casos C e Q: idênticos ou equivalentes à referência `main`.
+- Casos M: iguais à referência `experimental`.
+- Retomada de save state: Q01, C01, M02 e C05 iguais aos da execução sem interrupção.
 
 ---
 

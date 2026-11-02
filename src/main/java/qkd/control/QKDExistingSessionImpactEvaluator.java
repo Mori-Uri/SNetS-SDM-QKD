@@ -33,7 +33,7 @@ import java.util.Set;
  *
  * <p>Refer\u00eancias: [MORI26]; an\u00e1logo qu\u00e2ntico do teste de XT nos outros circuitos (XTO) de [LACERDA24] J. C. Lacerda Jr., A. V. T. Cartaxo, A. C. B. Soares, "Novel dynamic impairment-aware algorithm for modulation, core, and spectrum assignment in SDM-EONs", Opt. Switch. Netw. 51, 2024.</p>
  */
-public final class QKDExistingSessionImpactEvaluator {
+public final class QKDExistingSessionImpactEvaluator implements java.io.Serializable {
 
     private final QKDMesh mesh;
     private final QKDPhysicalLayer physicalEvaluator;

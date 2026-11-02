@@ -38,8 +38,46 @@ public class Simulator {
      // Creating the ArriveRequest event listener
         arriveRequest = new ArriveRequestForConexionListener(this.getEventMachine(), simulation);
         this.scheduleFirstEvents();
+        installCheckpoint();
         this.eMachine.executeEvents();
+        saveFinished();
         return this.simulation.getMeasurements();
+    }
+
+    /** Parte 45: save states of this simulation (null = off). */
+    private transient SaveStateStore saveStates;
+
+    /** Parte 45: enables the save states of this simulation. */
+    public void setSaveStates(SaveStateStore store) {
+        this.saveStates = store;
+    }
+
+    /**
+     * Parte 45: continues a simulation from an unfinished save state (the Simulation given to the constructor must be
+     * the one of the state).
+     */
+    public Measurements resume(SaveStateStore.State state) throws Exception {
+        eMachine = state.eventMachine;
+        arriveRequest = state.arriveListener;
+        installCheckpoint();
+        this.eMachine.executeEvents();
+        saveFinished();
+        return this.simulation.getMeasurements();
+    }
+
+    private void installCheckpoint() {
+        if (saveStates == null) return;
+        final SaveStateStore store = saveStates;
+        eMachine.setCheckpoint(new Runnable() {
+            @Override
+            public void run() {
+                store.save(simulation, eMachine, arriveRequest, false);
+            }
+        }, store.getIntervalNanos());
+    }
+
+    private void saveFinished() {
+        if (saveStates != null) saveStates.save(simulation, eMachine, arriveRequest, true);
     }
 
     /**

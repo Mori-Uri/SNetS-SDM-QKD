@@ -152,18 +152,44 @@ public class SimulationManagement {
                 simulationRequest.getSimulationConfig().getThreads());
         done = 0;
         failed = 0;
+        // Parte 45: save states (simulation.saveState); null = off
+        final simulator.SaveStateStore saveStates = simulator.SaveStateStore.forRequest(simulationRequest);
 
         for (List<Simulation> loadPoint : simulations) {
-            for (final Simulation replication : loadPoint) {
+            for (int index = 0; index < loadPoint.size(); index++) {
+                final simulator.SaveStateStore.State state = saveStates == null ? null
+                        : saveStates.load(loadPoint.get(index).getLoadPoint(), loadPoint.get(index).getReplication(),
+                                loadPoint.get(index).getUtil());
+                if (state != null) {
+                    loadPoint.set(index, state.getSimulation());
+                    System.out.println("Save state: carga " + state.getSimulation().getLoadPoint() + ", replicacao "
+                            + state.getSimulation().getReplication() + (state.isFinished() ? " ja concluida"
+                            : " retomada do ponto salvo"));
+                }
+                final Simulation replication = loadPoint.get(index);
+                if (state != null && state.isFinished()) {
+                    mainMeasuremens.get(replication.getLoadPoint()).set(replication.getReplication(),
+                            replication.getMeasurements());
+                    synchronized (SimulationManagement.this) {
+                        done++;
+                    }
+                    continue;
+                }
                 executor.execute(new Runnable() {
                     @Override
                     public void run() {
                         try {
                             Simulator simulator = new Simulator(replication);
+                            simulator.setSaveStates(saveStates);
 
+                            final long wall0 = System.nanoTime(); // Parte 45
                             mainMeasuremens
                                 .get(replication.getLoadPoint())
-                                .set(replication.getReplication(), simulator.start());
+                                .set(replication.getReplication(),
+                                        state != null ? simulator.resume(state) : simulator.start());
+                            if (replication.getCostRecorder() != null) {
+                                replication.getCostRecorder().setWallNanos(System.nanoTime() - wall0);
+                            }
 
                             int finished;
                             synchronized (SimulationManagement.this) {
@@ -204,6 +230,7 @@ public class SimulationManagement {
         ResultManager resultManager = new ResultManager(mainMeasuremens);
         SimulationRequest.Result finalResult = resultManager.getResults();
         finalResult.qkdStatistics = buildQkdStatisticsCsv();
+        finalResult.algorithmCost = buildAlgorithmCostCsv();
         finalResult.qkdMetrics = buildQkdMetricsCsv();
         finalResult.blockingDetails = buildBlockingDetailsCsv();
         finalResult.qkdChannelBlocking = buildChannelCsv(false);
@@ -355,6 +382,10 @@ public class SimulationManagement {
             metrics.put("Maximum admission SpRS background probability", m -> m.accepted > 0 ? m.maximumAdmissionRamanProbability : Double.NaN);
             metrics.put("Maximum admission SpRS power (W)", m -> m.accepted > 0 ? m.maximumAdmissionRamanPowerW : Double.NaN);
         }
+        if (snaps.get(0).get(0).nli) { // Parte 45: only with multiband.nliModel = gn
+            metrics.put("Mean admission NLI background probability", m -> m.accepted > 0 ? m.meanAdmissionNliProbability : Double.NaN);
+            metrics.put("Maximum admission NLI background probability", m -> m.accepted > 0 ? m.maximumAdmissionNliProbability : Double.NaN);
+        }
         metrics.put("Mean key demand (Mbit/s)", m -> m.accepted > 0 ? m.totalDemandMbps / m.accepted : Double.NaN);
         metrics.put("Mean active QChs", m -> m.meanActiveQchs);
         metrics.put("Mean active Q-TRx pairs", m -> m.meanActiveQTrxPairs);
@@ -415,6 +446,21 @@ public class SimulationManagement {
             }
         }
         return sb.toString();
+    }
+
+    /** Parte 45: AlgorithmCost.csv (activeMetrics.AlgorithmCost), or null when the metric is off. */
+    private String buildAlgorithmCostCsv() {
+        StringBuilder sb = new StringBuilder(simulator.AlgorithmCostRecorder.header());
+        boolean any = false;
+        long requests = simulationRequest.getSimulationConfig().getRequests();
+        for (List<Simulation> load : simulations) {
+            for (Simulation sim : load) {
+                if (sim.getCostRecorder() == null) continue;
+                any = true;
+                sb.append(sim.getCostRecorder().rows(sim.getLoadPoint(), sim.getReplication(), requests));
+            }
+        }
+        return any ? sb.toString() : null;
     }
 
     private String buildQkdStatisticsCsv() {

@@ -13,7 +13,7 @@ import simulator.Simulation;
  *
  * @author Iallen
  */
-public class ArriveRequestForConexionListener implements EventListener {
+public class ArriveRequestForConexionListener implements EventListener, java.io.Serializable {
 
     private EventMachine em;
     private Simulation simulation;

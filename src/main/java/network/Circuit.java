@@ -397,6 +397,21 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	}
 
 	/**
+	 * Parte 45 (save states): writes the id before the other fields. A circuit can be reached again through its own
+	 * references while it is being read (route, cores, active-circuit sets); the HashSets that contain it call
+	 * hashCode(), which needs the id. Reading the id first keeps those sets valid. No effect on the simulation.
+	 */
+	private void writeObject(java.io.ObjectOutputStream out) throws java.io.IOException {
+		out.writeObject(this.id);
+		out.defaultWriteObject();
+	}
+
+	private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
+		this.id = (Integer) in.readObject();
+		in.defaultReadObject();
+	}
+
+	/**
 	 * @return int
 	 */
 	@Override

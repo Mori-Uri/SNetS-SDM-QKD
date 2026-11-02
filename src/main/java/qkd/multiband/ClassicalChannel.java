@@ -29,6 +29,8 @@ public final class ClassicalChannel implements Serializable {
     private final double frequencyHz;
     private final double powerW;
     private final Direction direction;
+    /** Parte 45: optical bandwidth (Hz) used by the NLI model; 0 = not given. */
+    private final double bandwidthHz;
 
     /**
      * @param frequencyHz centre frequency in Hz (&gt; 0)
@@ -36,6 +38,18 @@ public final class ClassicalChannel implements Serializable {
      * @param direction direction relative to the QCh
      */
     public ClassicalChannel(double frequencyHz, double powerW, Direction direction) {
+        this(frequencyHz, powerW, direction, 0.0);
+    }
+
+    /**
+     * Parte 45: channel with its optical bandwidth (needed by {@link NonlinearInterferenceModel}).
+     *
+     * @param bandwidthHz bandwidth of the channel in Hz (&gt;= 0)
+     */
+    public ClassicalChannel(double frequencyHz, double powerW, Direction direction, double bandwidthHz) {
+        if (!(bandwidthHz >= 0.0) || Double.isInfinite(bandwidthHz)) {
+            throw new IllegalArgumentException("bandwidthHz must be finite and >= 0");
+        }
         if (!(frequencyHz > 0.0) || Double.isInfinite(frequencyHz)) {
             throw new IllegalArgumentException("frequencyHz must be finite and > 0");
         }
@@ -48,6 +62,7 @@ public final class ClassicalChannel implements Serializable {
         this.frequencyHz = frequencyHz;
         this.powerW = powerW;
         this.direction = direction;
+        this.bandwidthHz = bandwidthHz;
     }
 
     /** Channel given by wavelength in nm and power in dBm. */
@@ -67,6 +82,12 @@ public final class ClassicalChannel implements Serializable {
      */
     public static List<ClassicalChannel> comb(double startHz, double endHz, double spacingHz, double powerDbm,
             Direction direction) {
+        return comb(startHz, endHz, spacingHz, powerDbm, direction, 0.0);
+    }
+
+    /** Parte 45: same comb, every channel with the given optical bandwidth (Hz). */
+    public static List<ClassicalChannel> comb(double startHz, double endHz, double spacingHz, double powerDbm,
+            Direction direction, double bandwidthHz) {
         if (!(spacingHz > 0.0) || !(endHz > startHz)) {
             throw new IllegalArgumentException("need spacingHz > 0 and endHz > startHz");
         }
@@ -74,14 +95,14 @@ public final class ClassicalChannel implements Serializable {
         final double w = dbmToW(powerDbm);
         final List<ClassicalChannel> list = new ArrayList<>(n);
         for (int i = 0; i < n; i++) {
-            list.add(new ClassicalChannel(startHz + spacingHz * (i + 0.5), w, direction));
+            list.add(new ClassicalChannel(startHz + spacingHz * (i + 0.5), w, direction, bandwidthHz));
         }
         return Collections.unmodifiableList(list);
     }
 
-    /** Fully loaded C+L comb of [MEHDI24]/[DIBAJ25]: 184.4-196.8 THz, 112.5 GHz, 110 channels. */
+    /** Fully loaded C+L comb of [MEHDI24]/[DIBAJ25]: 184.4-196.8 THz, 112.5 GHz, 110 channels of 75 GHz. */
     public static List<ClassicalChannel> referenceCLComb(double powerDbm, Direction direction) {
-        return comb(184.4e12, 196.8e12, 112.5e9, powerDbm, direction);
+        return comb(184.4e12, 196.8e12, 112.5e9, powerDbm, direction, 75e9);
     }
 
     /** dBm to W. */
@@ -96,6 +117,9 @@ public final class ClassicalChannel implements Serializable {
     public double getPowerW() { return powerW; }
 
     public Direction getDirection() { return direction; }
+
+    /** Parte 45: optical bandwidth in Hz (0 = not given). */
+    public double getBandwidthHz() { return bandwidthHz; }
 
     @Override
     public String toString() {

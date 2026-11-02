@@ -1,0 +1,5 @@
+VMB-10c - MB x MF (Dibaj et al. 2024, Fig. 7), motor nativo do SNetS
+
+small_core  MB: minimo 357.0 Q-TRx em QTND 20 km | MF: minimo 242.2 Q-TRx em QTND 30 km | MF usa 32.2 % menos Q-TRx (artigo: 31 %)
+butterfly   MB: minimo 220.8 Q-TRx em QTND 20 km | MF: minimo 151.0 Q-TRx em QTND 30 km | MF usa 31.6 % menos Q-TRx (artigo: 28 %)
+metro       MB: minimo 208.8 Q-TRx em QTND 20 km | MF: minimo 145.8 Q-TRx em QTND 25 km | MF usa 30.2 % menos Q-TRx (artigo: 28 %)

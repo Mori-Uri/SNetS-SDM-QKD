@@ -25,10 +25,22 @@ public final class MultiBandLinkResult implements Serializable {
     private final double ramanProbabilitySameCore;
     private final double ramanProbabilityNeighbour;
     private final QKDPhysicalResult qkd;
+    /** Parte 45: NLI power at the QCh receiver (W) and its background probability. */
+    private final double nliPowerW;
+    private final double nliProbability;
 
     MultiBandLinkResult(double wavelengthNm, double lengthKm, double attenuationDbPerKm, double ramanPowerSameCoreW,
             double ramanPowerNeighbourW, double darkProbability, double ramanProbabilitySameCore,
             double ramanProbabilityNeighbour, QKDPhysicalResult qkd) {
+        this(wavelengthNm, lengthKm, attenuationDbPerKm, ramanPowerSameCoreW, ramanPowerNeighbourW, darkProbability,
+                ramanProbabilitySameCore, ramanProbabilityNeighbour, 0.0, 0.0, qkd);
+    }
+
+    MultiBandLinkResult(double wavelengthNm, double lengthKm, double attenuationDbPerKm, double ramanPowerSameCoreW,
+            double ramanPowerNeighbourW, double darkProbability, double ramanProbabilitySameCore,
+            double ramanProbabilityNeighbour, double nliPowerW, double nliProbability, QKDPhysicalResult qkd) {
+        this.nliPowerW = nliPowerW;
+        this.nliProbability = nliProbability;
         this.wavelengthNm = wavelengthNm;
         this.lengthKm = lengthKm;
         this.attenuationDbPerKm = attenuationDbPerKm;
@@ -64,8 +76,11 @@ public final class MultiBandLinkResult implements Serializable {
     /** Noise probability per gate due to intercore SpRS. */
     public double getRamanProbabilityNeighbour() { return ramanProbabilityNeighbour; }
 
-    /** Non-linear interference noise probability (not modelled yet, always 0). */
-    public double getNliProbability() { return 0.0; }
+    /** Non-linear interference noise probability per gate (0 when no NLI model is set). */
+    public double getNliProbability() { return nliProbability; }
+
+    /** Parte 45: NLI power inside the QCh filter at the receiver (W). */
+    public double getNliPowerW() { return nliPowerW; }
 
     /** Total background probability p_b used in the BB84 bound. */
     public double getBackgroundProbability() { return qkd.getBackgroundProbability(); }
@@ -82,7 +97,7 @@ public final class MultiBandLinkResult implements Serializable {
     /** CSV header matching {@link #toCsvRow()}. */
     public static String csvHeader() {
         return "wavelength_nm,length_km,alpha_db_km,p_raman_same_w,p_raman_neighbour_w,pb_dark,pb_raman_same,"
-                + "pb_raman_neighbour,pb_nli,pb_total,qber,skr_bps";
+                + "pb_raman_neighbour,pb_nli,pb_total,qber,skr_bps,p_nli_w";
     }
 
     /** One CSV row (dot as decimal separator). */
@@ -90,7 +105,7 @@ public final class MultiBandLinkResult implements Serializable {
         return String.format(Locale.ROOT, "%.4f,%.4f,%.6f,%.6e,%.6e,%.6e,%.6e,%.6e,%.6e,%.6e,%.6f,%.6e",
                 wavelengthNm, lengthKm, attenuationDbPerKm, ramanPowerSameCoreW, ramanPowerNeighbourW,
                 darkProbability, ramanProbabilitySameCore, ramanProbabilityNeighbour, getNliProbability(),
-                getBackgroundProbability(), getQber(), getSecretKeyRateBps());
+                getBackgroundProbability(), getQber(), getSecretKeyRateBps()) + String.format(Locale.ROOT, ",%.6e", nliPowerW);
     }
 
     @Override

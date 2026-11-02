@@ -148,8 +148,9 @@ public class ExternalFragmentation extends Measurement {
         	double entropyExternalFragAllCores = 0.0;
 
         	for (Core core: link.getCores()) {
-        		externalFragAllCores += cf.externalFragmentation(core.getFreeSpectrumBands(0));
-        		entropyExternalFragAllCores += cf.entropyExternalFragmentation(core.getFreeSpectrumBands(0), core.getNumOfSlots());
+        		final List<int[]> free = core.getFreeSpectrumBands(0); // Parte 45: read once (same values)
+        		externalFragAllCores += cf.externalFragmentation(free);
+        		entropyExternalFragAllCores += cf.entropyExternalFragmentation(free, core.getNumOfSlots());
         	}
 
         	externalFragAllCores = externalFragAllCores / link.getNumberOfCores();

@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
  */
 public final class LauncherServer {
 
-    static final String VERSION = "1.19.1";
+    static final String VERSION = "1.20.0";
 
     private final Settings settings;
     private final Workspace workspace;

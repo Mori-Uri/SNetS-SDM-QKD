@@ -25,6 +25,9 @@ public final class QKDSpanPhysicalResult implements Serializable {
     /** Parte 43: SpRS power at the QCh receiver (W) and its background probability; 0 outside multi-band mode. */
     private final double ramanPowerW;
     private final double ramanBackgroundProbability;
+    /** Parte 45: NLI power at the QCh receiver (W) and its background probability. */
+    private double nliPowerW;
+    private double nliBackgroundProbability;
 
     public QKDSpanPhysicalResult(
             QKDSpan span,
@@ -112,9 +115,22 @@ public final class QKDSpanPhysicalResult implements Serializable {
     }
 
     public double getTotalBackgroundProbability() {
-        return ramanBackgroundProbability > 0.0 ? bb84Result.getBackgroundProbability()
+        return ramanBackgroundProbability > 0.0 || nliBackgroundProbability > 0.0 ? bb84Result.getBackgroundProbability()
                 : crosstalkNoise.getTotalBackgroundProbability();
     }
+
+    /** Parte 45: records the NLI noise of this span (multi-band layer with nliModel = gn). */
+    QKDSpanPhysicalResult withNli(double powerW, double probability) {
+        this.nliPowerW = powerW;
+        this.nliBackgroundProbability = probability;
+        return this;
+    }
+
+    /** Parte 45: NLI power at the QCh receiver (W); 0 without the NLI model. */
+    public double getNliPowerW() { return nliPowerW; }
+
+    /** Parte 45: background probability per gate due to NLI; 0 without the NLI model. */
+    public double getNliBackgroundProbability() { return nliBackgroundProbability; }
 
     /** Parte 43: SpRS power at the QCh receiver (W); 0 outside multi-band mode. */
     public double getRamanPowerW() {

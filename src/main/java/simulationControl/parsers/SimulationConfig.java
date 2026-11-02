@@ -27,6 +27,21 @@ public class SimulationConfig {
     private int loadPoints;
     private int replications;
     private Metrics activeMetrics;
+    /** Parte 45: save states (simulator.SaveStateStore); null = off. */
+    private SaveState saveState;
+
+    /** Parte 45: "saveState": { "enabled": true, "intervalMinutes": 10 }. */
+    public static class SaveState implements Serializable {
+        private static final long serialVersionUID = 1L;
+        private boolean enabled = true;
+        private double intervalMinutes = 10.0;
+
+        public boolean isEnabled() { return enabled; }
+        public double getIntervalMinutes() { return intervalMinutes; }
+    }
+
+    /** Parte 45: save-state options, or null when absent. */
+    public SaveState getSaveState() { return saveState; }
     private String regeneratorAssignment;
     private int networkType;
     private int threads;
@@ -410,6 +425,12 @@ public class SimulationConfig {
          * (needs BlockingProbability).
          */
         public boolean SlotBlocking;
+        /**
+         * Parte 45: AlgorithmCost.csv, number of calls and time of each algorithm of the simulation (routing,
+         * spectrum/core assignment, integrated RMLSA, QKD admission...). Off by default; it does not change any
+         * result (simulator.AlgorithmCostRecorder).
+         */
+        public boolean AlgorithmCost;
 
         public Metrics() {
             QKDMetrics = true;

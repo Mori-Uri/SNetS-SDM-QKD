@@ -92,6 +92,8 @@ public final class MultiBandSettings implements Serializable {
     private final boolean intercoreRaman;
     private final double qchCenterNm;
     private final boolean bidirectionalFiber;
+    /** Parte 45: NLI on the QCh (null = not modelled). */
+    private NonlinearInterferenceModel nli;
 
     /**
      * @param architecture MF, MB or MBSDM
@@ -162,6 +164,25 @@ public final class MultiBandSettings implements Serializable {
 
     /** Parte 44: the reverse link shares the fibre (backward SpRS from its circuits). */
     public boolean isBidirectionalFiber() { return bidirectionalFiber; }
+
+    /**
+     * Parte 45: copy with the GN-model NLI of the host-core classical circuits added to the QCh noise
+     * ({@link NonlinearInterferenceModel}); {@code null} removes it.
+     */
+    public MultiBandSettings withNli(NonlinearInterferenceModel model) {
+        final MultiBandSettings s = new MultiBandSettings(architecture, ramanModel, attenuation, raman, hostCoreId,
+                classicalBandStartHz, intercoreRaman, qchCenterNm, bidirectionalFiber);
+        s.nli = model;
+        return s;
+    }
+
+    /** Parte 45: NLI model, or {@code null}. */
+    public NonlinearInterferenceModel getNli() { return nli; }
+
+    /** Parte 45: true when the NLI of the classical channels reaches the QCh (MB/MBSDM with an NLI model). */
+    public boolean hasNli() {
+        return nli != null && architecture != Architecture.MF;
+    }
 
     /** True when classical channels generate SpRS on the QCh (MB/MBSDM with a Raman model other than nenhum). */
     public boolean hasRaman() {

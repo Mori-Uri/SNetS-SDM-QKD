@@ -35,6 +35,7 @@ import qkd.physical.QKDPhysicalParameters;
  *   h=1e-6                 coeficiente de acoplamento de potencia entre nucleos em 1/km (mbsdm)
  *   mesmo=0|1              mbsdm: comb tambem no nucleo do QCh
  *   mu=0.7 pdark=1e-8 etad=0.3 ed=0.015 f=1.16 ts=250e-12 gate=100e-12 bqch=12.5e9
+ *   nli=gn                 soma o NLI (modelo GN) dos canais do mesmo nucleo (Parte 45); passonli=2.5 (GHz)
  *   saida=arquivo.csv      grava CSV (sem saida: imprime na tela)
  * </pre>
  *
@@ -52,8 +53,11 @@ public final class LinkCalculator {
             return;
         }
         final QKDPhysicalParameters p = parameters(opt);
-        final MultiBandQkdLinkModel model = "fisico".equals(opt.getOrDefault("preset", "artigo"))
+        MultiBandQkdLinkModel model = "fisico".equals(opt.getOrDefault("preset", "artigo"))
                 ? MultiBandQkdLinkModel.physical(p) : MultiBandQkdLinkModel.paperCompatible(p);
+        if ("gn".equals(opt.get("nli"))) { // Parte 45
+            model = model.withNli(NonlinearInterferenceModel.standard(), num(opt, "passonli", 2.5) * 1e9);
+        }
 
         final String arq = opt.getOrDefault("arq", "mb");
         final ClassicalChannel.Direction dir = "contra".equals(opt.getOrDefault("sentido", "co"))
@@ -171,6 +175,6 @@ public final class LinkCalculator {
         out.println("uso: java -cp SNetS-SDM-QKD-exp.jar qkd.multiband.LinkCalculator arq=mb lambda=1260:1460:5 "
                 + "L=5,15,30 preset=artigo saida=varredura.csv");
         out.println("opcoes: arq, lambda, L, preset, pot, sentido, vizinhos, h, mesmo, mu, pdark, etad, ed, f, ts, "
-                + "gate, bqch, saida");
+                + "gate, bqch, nli, passonli, saida");
     }
 }

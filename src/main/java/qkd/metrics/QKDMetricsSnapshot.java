@@ -28,6 +28,9 @@ public final class QKDMetricsSnapshot implements Serializable {
     public double meanAdmissionRamanProbability, maximumAdmissionRamanProbability;
     /** Parte 44: largest SpRS power at a QCh receiver among the admitted sessions (W). */
     public double maximumAdmissionRamanPowerW;
+    /** Parte 45: NLI on the QCh (only with multiband.nliModel = gn). */
+    public boolean nli;
+    public double meanAdmissionNliProbability, maximumAdmissionNliProbability;
     public double acceptanceRatio = Double.NaN;
     public double blockingProbability = Double.NaN;
     /** Arrival-averaged (PASTA) occupancy after warm-up. */

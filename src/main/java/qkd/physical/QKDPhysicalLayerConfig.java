@@ -64,6 +64,12 @@ public final class QKDPhysicalLayerConfig implements Serializable {
         boolean intercoreRaman = true;
         /** Parte 44: the two directions of a link share the fibre (backward SpRS from the reverse link). */
         boolean bidirectionalFiber = false;
+        /** Parte 45: NLI of the classical channels on the QCh: nenhum or gn (GN model, host core). */
+        String nliModel = "nenhum";
+        /** Parte 45: fibre non-linear coefficient (1/(W km)) and dispersion of the NLI model. */
+        double nliGammaPerWKm = 1.2;
+        double nliBeta2Ps2PerKm = -22.317;
+        double nliBeta3Ps3PerKm = 0.1331;
         /** Lower edge of classical slot 1 (THz). 191.3 = start of the C band; 184.4 for the C+L comb. */
         double classicalBandStartThz = 191.3;
         /** g652d (O to U band) or quadratica (fit of the fiber group). */
@@ -200,6 +206,17 @@ public final class QKDPhysicalLayerConfig implements Serializable {
         } else {
             throw new IllegalArgumentException(FILE_NAME + ".multiband.attenuationModel must be g652d or quadratica");
         }
+        final String nliName = multiband.nliModel == null ? "nenhum"
+                : multiband.nliModel.trim().toLowerCase(java.util.Locale.ROOT);
+        final qkd.multiband.NonlinearInterferenceModel nli;
+        if (nliName.equals("gn")) {
+            nli = new qkd.multiband.NonlinearInterferenceModel(multiband.nliGammaPerWKm, multiband.nliBeta2Ps2PerKm,
+                    multiband.nliBeta3Ps3PerKm, qkd.multiband.NonlinearInterferenceModel.DEFAULT_REFERENCE_HZ);
+        } else if (nliName.equals("nenhum") || nliName.equals("none")) {
+            nli = null;
+        } else {
+            throw new IllegalArgumentException(FILE_NAME + ".multiband.nliModel must be nenhum or gn");
+        }
         return new qkd.multiband.MultiBandSettings(
                 qkd.multiband.MultiBandSettings.Architecture.parse(multiband.architecture),
                 qkd.multiband.MultiBandSettings.RamanModel.parse(multiband.ramanModel),
@@ -210,7 +227,7 @@ public final class QKDPhysicalLayerConfig implements Serializable {
                 multiband.classicalBandStartThz * 1e12,
                 multiband.intercoreRaman,
                 multiband.qchCenterNm,
-                multiband.bidirectionalFiber);
+                multiband.bidirectionalFiber).withNli(nli);
     }
 
     /** Same parameters with the QCh grid centred at {@code centerNm} (multi-band mode). */

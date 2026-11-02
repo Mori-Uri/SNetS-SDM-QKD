@@ -110,7 +110,8 @@ public class SpectrumUtilization extends Measurement {
         		utLinkAllCores += coreUtilization;
 
 	            // Calculates the non-utilization of slots
-	            for (int[] faixa : core.getFreeSpectrumBands(0)) {
+	            final List<int[]> classicalFree = core.getFreeSpectrumBands(0); // Parte 45: read once, reused below
+	            for (int[] faixa : classicalFree) {
 	                incrementarDesUtFaixa(faixa);
 	            }
 	            // Part 27: real occupancy of each slot (a QKD-reserved core is read through its QKD view,
@@ -118,7 +119,7 @@ public class SpectrumUtilization extends Measurement {
 	            int[] freeSlot = freeSlotsOf(linkIndex, link, coreId);
 	            if (freeSlot != null) {
 	                List<int[]> bands = core.isQkdReserved() ? core.getFreeSpectrumBandsForQKD(0)
-	                        : core.isDisabled() ? core.getFreeSpectrumBandsIgnoringReservation(0) : core.getFreeSpectrumBands(0);
+	                        : core.isDisabled() ? core.getFreeSpectrumBandsIgnoringReservation(0) : classicalFree;
 	                for (int[] faixa : bands) {
 	                    for (int i = faixa[0] - 1; i < faixa[1] && i < freeSlot.length; i++) freeSlot[i]++;
 	                }

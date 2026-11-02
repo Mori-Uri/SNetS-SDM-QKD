@@ -56,6 +56,14 @@ import com.google.gson.GsonBuilder;
  * <p>Usage: {@code java -cp SNetS-SDM-QKD.jar qkd.reference.QKDNativeReferenceMain
  * <prepare|run|analyze|all> <Dibaj_MF folder> [native folder] [--replications N] [--threads N]}</p>
  *
+ * <p>Parte 45 (VMB-10c, experimental): {@code --arquitetura mb [--raman artigo|fisico|nenhum] [--mf <pasta MF nativa>]}
+ * builds the multi-band (MB) scenario of the same article with the multi-band layer of the simulator: the quantum
+ * core becomes the O+E band of classical fibre 0 (multiband MB, hostCoreId = 0, QCh grid of 960 channels of
+ * 12.5 GHz centred at 1343 nm, i.e. 1308-1380 nm, used from the lowest-loss wavelength, near 1380 nm), with SpRS
+ * from the circuits of fibre 0 (classical grid from 184.4 THz). The other 9 classical fibres and all classical
+ * settings are those of the MF scenario. The analysis compares the minimum Q-TRx over QTND with the MF run
+ * (article: MF needs 31 %, 28 % and 28 % fewer Q-TRx than MB in Small Core, Butterfly and Metro).</p>
+ *
  * <p>Refer\u00eancias: [DIBAJ24] M. R. Dibaj et al., "Cost-Optimized Quantum Communication Networks: The Crucial Role of Trusted Node Placement in Multi-Band and Multi-Fiber Realms", IWCIT 2024 (artigo-base).</p>
  */
 public final class QKDNativeReferenceMain {
@@ -79,17 +87,26 @@ public final class QKDNativeReferenceMain {
         int threads = Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors()));
         List<String> topologies = null;
         int[] qtnds = null;
+        boolean mb = false;           // Parte 45
+        String raman = "artigo";
+        File mfNative = null;
         for (int i = 2; i < args.length; i++) {
             if ("--replications".equals(args[i]) && i + 1 < args.length) replications = Integer.parseInt(args[++i]);
             else if ("--threads".equals(args[i]) && i + 1 < args.length) threads = Integer.parseInt(args[++i]);
             else if ("--topologies".equals(args[i]) && i + 1 < args.length) topologies = Arrays.asList(args[++i].split(","));
+            else if ("--arquitetura".equals(args[i]) && i + 1 < args.length) mb = "mb".equalsIgnoreCase(args[++i].trim());
+            else if ("--raman".equals(args[i]) && i + 1 < args.length) raman = args[++i].trim();
+            else if ("--mf".equals(args[i]) && i + 1 < args.length) mfNative = new File(args[++i]).getAbsoluteFile();
             else if ("--qtnd".equals(args[i]) && i + 1 < args.length) {
                 String[] p = args[++i].split(",");
                 qtnds = new int[p.length];
                 for (int j = 0; j < p.length; j++) qtnds[j] = Integer.parseInt(p[j].trim());
             } else if (!args[i].startsWith("--")) nativeDir = new File(args[i]).getAbsoluteFile();
         }
-        if (nativeDir == null) nativeDir = new File(root.getParentFile(), root.getName() + "_SNetS");
+        if (nativeDir == null) nativeDir = new File(root.getParentFile(),
+                (mb ? root.getName().replace("_MF", "_MB") : root.getName()) + "_SNetS");
+        if (mfNative == null) mfNative = new File(root.getParentFile(), root.getName() + "_SNetS");
+        MULTIBAND_RAMAN = mb ? raman : null;
         ReferenceExperimentConfig config = ReferenceExperimentConfig.load(new File(root, "config.json"));
         if (topologies == null) topologies = config.getTopologies();
         if (qtnds == null) qtnds = config.getQtndValuesKm();
@@ -101,6 +118,11 @@ public final class QKDNativeReferenceMain {
         }
         if ("run".equals(mode) || "all".equals(mode)) {
             run(nativeDir, topologies, qtnds);
+        }
+        if (mb && ("analyze".equals(mode) || "all".equals(mode) || "run".equals(mode))) {
+            analyzeMultiband(mfNative, nativeDir, topologies, qtnds);
+            System.out.println("Elapsed seconds: " + (System.currentTimeMillis() - start) / 1000.0);
+            return;
         }
         if ("analyze".equals(mode) || "all".equals(mode) || "run".equals(mode)) {
             boolean ok = analyze(root, nativeDir, topologies, qtnds);
@@ -143,6 +165,10 @@ public final class QKDNativeReferenceMain {
                 write(new File(dir, "simulation"), gson.toJson(simulation(requests, replications, threads)));
                 write(new File(dir, "traffic"), traffic(topology));
                 write(new File(dir, "others"), gson.toJson(others(config)));
+                if (MULTIBAND_RAMAN != null) {
+                    write(new File(dir, "qkdPhysicalLayer.json"), gson.toJson(multibandQkdPhysicalLayer(
+                            config.getClassicalFibersPerLink(), MULTIBAND_RAMAN)));
+                }
                 created++;
             }
         }
@@ -155,6 +181,107 @@ public final class QKDNativeReferenceMain {
                 + "<Dibaj_MF> <esta pasta>\n"
                 + "Resultados agregados: results/ (snets_native_report.txt, *_statistics.csv, *_summary.csv).\n");
         System.out.println("Prepared " + created + " SNetS cases in " + nativeDir.getAbsolutePath());
+    }
+
+    /** Parte 45: Raman model of the MB scenario being prepared (null = MF, the original reconstruction). */
+    static String MULTIBAND_RAMAN = null;
+
+    /**
+     * Parte 45: qkdPhysicalLayer of the MB scenario: same BB84/detector values as the MF reconstruction, crosstalk
+     * path on (the cores have no neighbours, so XT = 0) and the multiband group (MB, host = classical fibre 0).
+     */
+    public static Map<String, Object> multibandQkdPhysicalLayer(int classicalFibers, String raman) {
+        Map<String, Object> q = new LinkedHashMap<String, Object>();
+        Map<String, Object> source = new LinkedHashMap<String, Object>();
+        source.put("meanPhotonNumber", 0.7);
+        source.put("pulseIntervalPs", 250.0);
+        source.put("qchPowerDbm", -80.0);
+        source.put("qchBandwidthGHz", 12.5);
+        q.put("source", source);
+        Map<String, Object> protocol = new LinkedHashMap<String, Object>();
+        protocol.put("errorCorrectionInefficiency", 1.16);
+        protocol.put("misalignmentError", 0.015);
+        q.put("protocol", protocol);
+        Map<String, Object> det = new LinkedHashMap<String, Object>();
+        det.put("detectorEfficiency", 0.3);
+        det.put("darkCountProbability", 1e-8);
+        det.put("detectorGateWindowPs", 100.0);
+        det.put("receiverOpticalEfficiency", 1.0);
+        q.put("detector", det);
+        Map<String, Object> xt = new LinkedHashMap<String, Object>();
+        xt.put("intercoreCrosstalkEnabled", true);
+        xt.put("receiverTransferModel", "receiver_referenced");
+        q.put("crosstalk", xt);
+        Map<String, Object> mb = new LinkedHashMap<String, Object>();
+        mb.put("enabled", true);
+        mb.put("architecture", "MB");
+        mb.put("ramanModel", raman);
+        mb.put("qchCenterNm", 1343.0);
+        mb.put("hostCoreId", 0);
+        mb.put("intercoreRaman", false);
+        mb.put("classicalBandStartThz", 184.4);
+        mb.put("attenuationModel", "g652d");
+        q.put("multiband", mb);
+        return q;
+    }
+
+    /**
+     * Parte 45 (VMB-10c): minimum Q-TRx over QTND of the MB run against the MF run of the same article, per
+     * topology. Writes results/multiband_vs_mf.csv and prints the comparison with the article (MF 31 %, 28 % and
+     * 28 % below MB).
+     */
+    public static void analyzeMultiband(File mfNative, File mbNative, List<String> topologies, int[] qtnds)
+            throws IOException {
+        File out = resultsDir(mbNative);
+        if (!out.isDirectory() && !out.mkdirs()) throw new IOException("Cannot create " + out);
+        Map<String, Double> article = new LinkedHashMap<String, Double>();
+        article.put("small_core", 31.0);
+        article.put("butterfly", 28.0);
+        article.put("metro", 28.0);
+        StringBuilder csv = new StringBuilder("topology,qtnd_km,mb_mean_qtrx,mf_mean_qtrx\n");
+        StringBuilder rep = new StringBuilder("VMB-10c - MB x MF (Dibaj et al. 2024, Fig. 7), motor nativo do SNetS\n\n");
+        for (String topology : topologies) {
+            Map<Integer, Double> mbMean = new TreeMap<Integer, Double>();
+            Map<Integer, Double> mfMean = new TreeMap<Integer, Double>();
+            for (int qtnd : qtnds) {
+                Double a = meanPeakQtrx(new File(caseDir(mbNative, topology, qtnd), caseName(topology, qtnd) + "_QKDStatistics.csv"));
+                Double b = meanPeakQtrx(new File(caseDir(mfNative, topology, qtnd), caseName(topology, qtnd) + "_QKDStatistics.csv"));
+                if (a != null) mbMean.put(qtnd, a);
+                if (b != null) mfMean.put(qtnd, b);
+                csv.append(topology).append(',').append(qtnd).append(',').append(a == null ? "" : fmt(a)).append(',')
+                        .append(b == null ? "" : fmt(b)).append('\n');
+            }
+            if (mbMean.isEmpty() || mfMean.isEmpty()) {
+                rep.append(String.format(Locale.US, "%-11s sem resultados (MB %d, MF %d casos)%n", topology,
+                        mbMean.size(), mfMean.size()));
+                continue;
+            }
+            int qMb = argMin(mbMean);
+            int qMf = argMin(mfMean);
+            double minMb = mbMean.get(qMb);
+            double minMf = mfMean.get(qMf);
+            double saving = 100.0 * (minMb - minMf) / minMb;
+            Double target = article.get(topology);
+            rep.append(String.format(Locale.US, "%-11s MB: minimo %.1f Q-TRx em QTND %d km | MF: minimo %.1f Q-TRx em QTND %d km"
+                    + " | MF usa %.1f %% menos Q-TRx (artigo: %s)%n", topology, minMb, qMb, minMf, qMf, saving,
+                    target == null ? "-" : String.format(Locale.US, "%.0f %%", target)));
+        }
+        write(new File(out, "multiband_vs_mf.csv"), csv.toString());
+        write(new File(out, "multiband_vs_mf_report.txt"), rep.toString());
+        System.out.print(rep);
+    }
+
+    private static Double meanPeakQtrx(File stats) throws IOException {
+        if (!stats.isFile()) return null;
+        double sum = 0.0;
+        int n = 0;
+        for (Map<String, String> r : readCsv(stats)) {
+            String v = r.get("PeakQTRxPairs");
+            if (v == null) continue;
+            sum += Double.parseDouble(v.trim());
+            n++;
+        }
+        return n == 0 ? null : sum / n;
     }
 
     public static Map<String, Integer> referenceRequestCounts(File root) throws IOException {

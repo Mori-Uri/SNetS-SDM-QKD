@@ -13,7 +13,7 @@ import request.RequestForConnection;
  *
  * <p>Refer\u00eancias: [DIBAJ24] (repasse de chave hop a hop pelos n\u00f3s confi\u00e1veis), [MORI26].</p>
  */
-public final class QKDRoutePlanner {
+public final class QKDRoutePlanner implements java.io.Serializable {
 
     private final QKDTopologyPlan topologyPlan;
 

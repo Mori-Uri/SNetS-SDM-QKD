@@ -1,4 +1,4 @@
-# Simulação multibanda no SNetS-SDM-QKD (Parte 43, níveis N0 e N1)
+# Simulação multibanda no SNetS-SDM-QKD (Partes 43 a 45, níveis N0, N1 e N2)
 
 ## O que foi implementado
 
@@ -66,7 +66,10 @@ Regras do arquivo `network`:
   `classicalBandStartThz`.
   - Com 320 slots e f₀ = 191,3 THz, a grade cobre a banda C.
   - Para o comb C+L dos artigos, use 992 slots e f₀ = 184,4 THz.
-- **NLI/FWM.** Ainda não modelados (nível N2). Isso só pesa com o QCh na banda S, perto do comb.
+- **NLI/FWM (Parte 45, nível N2).** Com `"nliModel": "gn"`, o ruído não linear dos circuitos do núcleo hospedeiro
+  na frequência do QCh vem do modelo GN (`NonlinearInterferenceModel`) e entra em p_b como mais um fator
+  (1 − p_NLI). Só pesa com o QCh perto do comb (banda S). Com o QCh em O/E e o comb em C+L, é 0. Detalhes no
+  CHANGELOG, Parte 45.
 - **Ordem da soma.** As contribuições são somadas na ordem do id do circuito, então o resultado não depende da ordem
   dos conjuntos de circuitos dos núcleos.
 
@@ -79,4 +82,8 @@ Regras do arquivo `network`:
   - MF e `nenhum` dão a SKR da fibra escura;
   - o XT só entra in-band;
   - a SKR segue a ordem `nenhum` > `artigo` > `fisico`.
+- `MultiBandNliVerification` (VMB-11a a VMB-11f, Parte 45): NLI do modelo GN contra a forma fechada de
+  Poggiolini, e simulador = calculadora.
+- `MultiBandIwcitVerification` (VMB-10a/b, Parte 45) e `QKDNativeReferenceMain --arquitetura mb` (VMB-10c):
+  MB × MF de Dibaj (IWCIT 2024), em enlace e em rede.
 - Teste de regressão: casos sem o grupo `multiband` dão resultados idênticos aos da main.

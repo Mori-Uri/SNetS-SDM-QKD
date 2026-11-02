@@ -10,7 +10,7 @@ import simulator.Simulation;
  *
  * @author Iallen
  */
-public class HoldRequestListener implements EventListener {
+public class HoldRequestListener implements EventListener, java.io.Serializable {
     private Simulation simulation;
 
     /**
