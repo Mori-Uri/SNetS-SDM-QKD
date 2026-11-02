@@ -350,6 +350,11 @@ public class SimulationManagement {
         metrics.put("Minimum admission SKR (Mbit/s)", m -> m.accepted > 0 ? m.minimumAdmissionRawSkrMbps : Double.NaN);
         metrics.put("Mean admission QBER", m -> m.accepted > 0 ? m.meanAdmissionQber : Double.NaN);
         metrics.put("Maximum admission QBER", m -> m.accepted > 0 ? m.maximumAdmissionQber : Double.NaN);
+        if (snaps.get(0).get(0).multiband) { // Parte 44: only with qkdPhysicalLayer.multiband
+            metrics.put("Mean admission SpRS background probability", m -> m.accepted > 0 ? m.meanAdmissionRamanProbability : Double.NaN);
+            metrics.put("Maximum admission SpRS background probability", m -> m.accepted > 0 ? m.maximumAdmissionRamanProbability : Double.NaN);
+            metrics.put("Maximum admission SpRS power (W)", m -> m.accepted > 0 ? m.maximumAdmissionRamanPowerW : Double.NaN);
+        }
         metrics.put("Mean key demand (Mbit/s)", m -> m.accepted > 0 ? m.totalDemandMbps / m.accepted : Double.NaN);
         metrics.put("Mean active QChs", m -> m.meanActiveQchs);
         metrics.put("Mean active Q-TRx pairs", m -> m.meanActiveQTrxPairs);

@@ -501,3 +501,6 @@ tr.row-custom td { background: rgba(112, 48, 160, .07); }
 .fig-controls .field, .fig-controls .stack-s { grid-template-columns: minmax(0, 1fr); }
 .fig-controls .field > .toolbar { min-width: 0; max-width: 100%; }
 input.mirrored { background: rgba(46, 160, 67, .18); transition: background .3s; }
+
+/* Parte 44: edição experimental */
+.edition-badge { margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: #b45309; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; vertical-align: middle; }

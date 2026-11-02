@@ -150,8 +150,19 @@
     CORES['19'] = coreSet('19 núcleos', 'Rede hexagonal: 18 no centro, anel interno 4, 5, 9, 13, 12, 8 e anel externo com 12 núcleos.', pos, adj);
   })();
 
+  // 1.19.1 (Parte 44): fibras multibanda com o núcleo QKD virtual (banda do QCh ou fibra escura), sem vizinhos.
+  CORES['mb1'] = Object.assign(coreSet('Monomodo + núcleo QKD virtual (multibanda)', 'Núcleo 0 = a fibra monomodo do tráfego clássico; núcleo 1 = núcleo QKD virtual (a banda do QCh em MB, ou a fibra escura em MF), sem vizinhos. Use núcleo QKD = 1 e, na Camada física QKD, multiband.hostCoreId = 0.',
+    { 0: { x: 0, y: 0 }, 1: { x: 1.9, y: 0 } }, { 0: [], 1: [] }), { qkdCore: 1 });
+  (function () {
+    const c7 = CORES['7'];
+    const pos = Object.assign({}, c7.pos, { 7: { x: 2.4, y: 0 } });
+    const adj = Object.assign({}, c7.adj, { 7: [] });
+    CORES['mb7'] = Object.assign(coreSet('7 núcleos + núcleo QKD virtual (multibanda)', 'Núcleos 0–6 = MCF de 7 núcleos para o tráfego clássico; núcleo 7 = núcleo QKD virtual (a banda do QCh de um núcleo em MB-SDM, ou a fibra escura em MF), sem vizinhos. Use núcleo QKD = 7 e escolha em multiband.hostCoreId o núcleo que carrega o QCh.',
+      pos, adj), { qkdCore: 7 });
+  })();
+
   /** Keys of the core presets in the order of the menu. */
-  const CORE_KEYS = ['2', '3tri', '3lin', '5', '7', '12', '19'];
+  const CORE_KEYS = ['2', '3tri', '3lin', '5', '7', '12', '19', 'mb1', 'mb7'];
 
   /** network.cores array for a preset (key, or a number for the old 2/7/12/19 names). */
   function coresConfig(key) {

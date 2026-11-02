@@ -168,7 +168,7 @@
         receiver_referenced: 'receiver_referenced — P_XT = P·ISO·h·L já referida ao receptor (T = 1)',
         distributed: 'distributed — cada ponto do trecho sofre a atenuação restante até o receptor',
         attenuated: 'attenuated — P_XT·10^(−αL/10): o canal clássico se atenua junto com o QCh (Moghaddam et al., 2021, eq. 1)' } },
-      multiband: { label: 'Multibanda', default: { enabled: true, architecture: 'MB', ramanModel: 'fisico', qchCenterNm: 1381.0, hostCoreId: 0, intercoreRaman: true, classicalBandStartThz: 191.3, attenuationModel: 'g652d', waterPeakDbPerKm: 0.0, temperatureK: 300.0 } },
+      multiband: { label: 'Multibanda', default: { enabled: true, architecture: 'MB', ramanModel: 'fisico', qchCenterNm: 1381.0, hostCoreId: 0, intercoreRaman: true, bidirectionalFiber: false, classicalBandStartThz: 191.3, attenuationModel: 'g652d', waterPeakDbPerKm: 0.0, temperatureK: 300.0 } },
       'multiband.enabled': { label: 'Ativar a camada física multibanda', default: true },
       'multiband.architecture': { label: 'Arquitetura', default: 'MB', enum: {
         MF: 'MF — QCh numa fibra escura dedicada (p_b = p_dark)',
@@ -180,6 +180,7 @@
         fisico: 'fisico — comprimento efetivo exato e todos os fótons do filtro detectados (Eraerds et al., 2010)' } },
       'multiband.qchCenterNm': { label: 'λ central do QCh', unit: 'nm', default: 1381.0, help: 'Centro da grade de QChs (wavelengthPolicy "grid") ou λ de todos os QChs ("fixed"). 1260–1460 nm = bandas O e E.' },
       'multiband.hostCoreId': { label: 'Núcleo clássico que divide a fibra/núcleo com o QCh', default: 0, help: 'MB: o núcleo da fibra monomodo. MB-SDM: o núcleo da MCF que carrega o QCh. Ignorado em MF.' },
+      'multiband.bidirectionalFiber': { label: 'Os dois sentidos do enlace na mesma fibra', default: false, help: 'Ligado: os circuitos do enlace inverso (b→a) andam na mesma fibra em sentido contrário e somam SpRS backward (Eraerds et al., 2010, eq. 3; Cai et al., 2020, eq. 18). Desligado: um sentido por fibra (padrão do SNetS).' },
       'multiband.intercoreRaman': { label: 'SpRS dos núcleos vizinhos (MB-SDM)', default: true, help: 'Cai, Sun e Ji (2020), eqs. 11 e 18, com o h do crosstalk da camada física.' },
       'multiband.classicalBandStartThz': { label: 'Início da grade clássica (slot 1)', unit: 'THz', default: 191.3, help: '191,3 = início da banda C. Para o comb C+L (184,4–196,8 THz) use 184,4 e 992 slots de 12,5 GHz.' },
       'multiband.attenuationModel': { label: 'Modelo de atenuação', default: 'g652d', enum: {

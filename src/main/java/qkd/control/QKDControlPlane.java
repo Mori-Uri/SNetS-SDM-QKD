@@ -59,6 +59,10 @@ public class QKDControlPlane extends ControlPlane {
     private double qkdAdmissionQberSum;
     private double qkdAdmissionQberMax;
     private double qkdAdmissionPxtWMax;
+    /** Parte 44: SpRS on the spans of admitted sessions (multi-band layer). */
+    private double qkdAdmissionRamanPSum, qkdAdmissionRamanPMax, qkdAdmissionRamanWMax;
+    private long qkdAdmissionRamanSpans;
+    private final boolean multibandEnabled;
     private final double warmupArrivals;
     /**
      * False when the classical channels cannot add noise to the QChs
@@ -119,6 +123,7 @@ public class QKDControlPlane extends ControlPlane {
         this.warmupArrivals = mesh.getQkdWarmupArrivals();
         this.warmupDone = warmupArrivals <= 0.0;
         this.classicalNoiseCoupled = mesh.getQkdPhysicalParameters().isIntercoreCrosstalkEnabled();
+        this.multibandEnabled = mesh.getQkdPhysicalParameters().getMultiband() != null;
         this.blockingDetails = new qkd.metrics.BlockingDetailRecorder(warmupArrivals, this);
     }
 
@@ -154,6 +159,7 @@ public class QKDControlPlane extends ControlPlane {
         qkdAcceptedDemandBpsSum = 0; qkdAdmissionRawSkrBpsSum = 0;
         qkdAdmissionRawSkrBpsMin = Double.POSITIVE_INFINITY; qkdAdmissionQberSum = 0;
         qkdAdmissionQberMax = 0; qkdAdmissionPxtWMax = 0;
+        qkdAdmissionRamanPSum = 0; qkdAdmissionRamanPMax = 0; qkdAdmissionRamanWMax = 0; qkdAdmissionRamanSpans = 0;
         occupancySamples = 0; activeQchSampleSum = 0; activeQtrxSampleSum = 0;
         activeSessionSampleSum = 0;
         qkdBlockedClassical = 0; qkdBlockedSpectrum = 0; qkdBlockedSkr = 0; qkdBlockedPich = 0; qkdBlockedQtrx = 0; qkdBlockedOther = 0;
@@ -536,13 +542,21 @@ public class QKDControlPlane extends ControlPlane {
         qkdAdmissionRawSkrBpsMin = Math.min(qkdAdmissionRawSkrBpsMin, raw);
         qkdAdmissionQberSum += connection.getMaximumQber();
         qkdAdmissionQberMax = Math.max(qkdAdmissionQberMax, connection.getMaximumQber());
-        for (QKDSpanPhysicalResult span : connection.getPhysicalResult().getSpanResults())
+        for (QKDSpanPhysicalResult span : connection.getPhysicalResult().getSpanResults()) {
             qkdAdmissionPxtWMax = Math.max(qkdAdmissionPxtWMax, span.getCrosstalkPowerW());
+            if (multibandEnabled) { // Parte 44
+                qkdAdmissionRamanPSum += span.getRamanBackgroundProbability();
+                qkdAdmissionRamanSpans++;
+                qkdAdmissionRamanPMax = Math.max(qkdAdmissionRamanPMax, span.getRamanBackgroundProbability());
+                qkdAdmissionRamanWMax = Math.max(qkdAdmissionRamanWMax, span.getRamanPowerW());
+            }
+        }
     }
 
     public QKDMetricsSnapshot snapshotQkdMetrics(int loadPoint, int replication) {
         QKDMetricsSnapshot m = new QKDMetricsSnapshot();
         m.loadPoint=loadPoint; m.replication=replication;
+        m.multiband = multibandEnabled;
         m.totalRequestAttempts=totalRequestAttempts; m.protectedAttempts=qkdProtectedAttempts; m.accepted=qkdAccepted; m.rejected=qkdRejected; m.released=qkdReleased;
         m.existingSessionImpactChecks=qkdExistingSessionImpactChecks;
         m.classicalRejectionsByQkdImpact=qkdClassicalRejectionsByExistingSessionImpact;
@@ -587,6 +601,9 @@ public class QKDControlPlane extends ControlPlane {
             m.meanAdmissionQber=qkdAdmissionQberSum/qkdAccepted;
             m.maximumAdmissionQber=qkdAdmissionQberMax;
             m.maximumAdmissionPxtW=qkdAdmissionPxtWMax;
+            m.meanAdmissionRamanProbability = qkdAdmissionRamanSpans > 0 ? qkdAdmissionRamanPSum / qkdAdmissionRamanSpans : 0.0;
+            m.maximumAdmissionRamanProbability = qkdAdmissionRamanPMax;
+            m.maximumAdmissionRamanPowerW = qkdAdmissionRamanWMax;
         }
         return m;
     }

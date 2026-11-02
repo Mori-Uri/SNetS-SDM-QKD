@@ -8,7 +8,9 @@
   function defaultJar() {
     const jars = (App.state.info && App.state.info.jars) || [];
     const pref = App.state.info && App.state.info.settings.defaultJar;
-    return (jars.find((j) => j.path === pref) || jars.find((j) => /qkd/i.test(j.name) && j.location === 'simulations')
+    const own = App.state.info && App.state.info.simulatorJar; // Parte 44: JAR desta edição (experimental: SNetS-SDM-QKD-exp.jar)
+    return (jars.find((j) => j.path === pref) || jars.find((j) => own && j.name === own && j.location === 'simulations')
+      || jars.find((j) => /qkd/i.test(j.name) && j.location === 'simulations')
       || jars.find((j) => j.location === 'simulations') || jars[0] || {}).path || '';
   }
 

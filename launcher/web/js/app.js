@@ -565,7 +565,7 @@
     const info = await App.api.jarInfo();
     const jars = (info.jars || []).filter((j) => !/SBRC26/i.test(j.name));
     const base = el('select.input', jars.map((j) => el('option', { value: j.path }, j.name + ' · ' + j.location)));
-    const pref = jars.find((j) => j.name === 'SNetS-SDM-QKD.jar' && j.location === 'simulations') || jars[0];
+    const pref = jars.find((j) => j.name === 'SNetS-SDM-QKD.jar' && j.location === 'simulations') || jars[0]; // base: só as bibliotecas
     if (pref) base.value = pref.path;
     const out = el('input.input.mono', { type: 'text', value: info.defaultOut || 'SNetS-SDM-QKD.jar' });
     const verify = el('input', { type: 'checkbox', checked: true });
@@ -664,6 +664,12 @@
       return;
     }
     document.getElementById('projectPath').textContent = st.info.settings.simulationsDir;
+    // Parte 44: edição experimental identificada no cabeçalho e no título da aba
+    if (st.info.edition) {
+      const nm = document.querySelector('.brand-name');
+      if (nm && !nm.querySelector('.edition-badge')) nm.appendChild(el('span.edition-badge', st.info.edition));
+      document.title = 'SNetS Launcher (' + st.info.edition + ')';
+    }
     document.getElementById('projectPath').title = st.info.settings.simulationsDir;
     await App.loadTree();
     renderWelcome();

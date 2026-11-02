@@ -1314,19 +1314,17 @@ public final class QKDPhysicalLayer {
                 ? qkd.metrics.BlockingDetailRecorder.rawCore(candidate) : Integer.MIN_VALUE;
 
         final java.util.TreeMap<Integer, Double> terms = new java.util.TreeMap<Integer, Double>();
-        // same core (forward)
-        collectRamanTerms(terms, host, candidateCore == host.getId() ? candidate : null, mb, qchNm, alphaQ,
-                lengthKm, resolver, equalLoss, -1.0);
-        // neighbour cores (intercore, forward)
-        if (mb.getArchitecture() == qkd.multiband.MultiBandSettings.Architecture.MBSDM && mb.isIntercoreRaman()
-                && couplingPerKm > 0.0) {
-            final List<Core> adjacent = link.getAdjacentCores(host.getId());
-            if (adjacent != null) {
-                for (Core core : adjacent) {
-                    if (core == null || core.isQkdReserved()) continue;
-                    collectRamanTerms(terms, core, candidateCore == core.getId() ? candidate : null, mb, qchNm,
-                            alphaQ, lengthKm, resolver, equalLoss, couplingPerKm);
-                }
+        // same link (co-propagating): forward
+        collectLinkRamanTerms(terms, link, host.getId(), candidateCore, candidate, mb, qchNm, alphaQ, lengthKm,
+                resolver, equalLoss, couplingPerKm, false);
+        // Parte 44: reverse link in the same fibre (counter-propagating): backward
+        if (mb.isBidirectionalFiber() && link.getSource() != null && link.getDestination() != null) {
+            final Link reverse = link.getDestination().linkTo(link.getSource());
+            if (reverse != null && reverse != link && reverse.getCore(host.getId()) != null) {
+                final int reverseCandidateCore = candidate != null && candidateTraversesLink(candidate, reverse)
+                        ? qkd.metrics.BlockingDetailRecorder.rawCore(candidate) : Integer.MIN_VALUE;
+                collectLinkRamanTerms(terms, reverse, host.getId(), reverseCandidateCore, candidate, mb, qchNm,
+                        alphaQ, lengthKm, resolver, equalLoss, couplingPerKm, true);
             }
         }
         double sum = 0.0;
@@ -1337,10 +1335,36 @@ public final class QKDPhysicalLayer {
         return sum * filterNm;
     }
 
-    /** Adds P_n rho_n G_n of every circuit of {@code core} (and the candidate) to {@code terms}, keyed by id. */
+    /** Host core of {@code link} (same core) and, in MBSDM with intercoreRaman, its adjacent classical cores. */
+    private void collectLinkRamanTerms(java.util.TreeMap<Integer, Double> terms, Link link, int hostCoreId,
+            int candidateCore, Circuit candidate, qkd.multiband.MultiBandSettings mb, double qchNm, double alphaQ,
+            double lengthKm, LaunchPowerResolver resolver, boolean equalLoss, double couplingPerKm,
+            boolean backward) {
+        final Core host = link.getCore(hostCoreId);
+        if (host == null) return;
+        collectRamanTerms(terms, host, candidateCore == host.getId() ? candidate : null, mb, qchNm, alphaQ,
+                lengthKm, resolver, equalLoss, -1.0, backward);
+        if (mb.getArchitecture() == qkd.multiband.MultiBandSettings.Architecture.MBSDM && mb.isIntercoreRaman()
+                && couplingPerKm > 0.0) {
+            final List<Core> adjacent = link.getAdjacentCores(host.getId());
+            if (adjacent != null) {
+                for (Core core : adjacent) {
+                    if (core == null || core.isQkdReserved()) continue;
+                    collectRamanTerms(terms, core, candidateCore == core.getId() ? candidate : null, mb, qchNm,
+                            alphaQ, lengthKm, resolver, equalLoss, couplingPerKm, backward);
+                }
+            }
+        }
+    }
+
+    /**
+     * Adds P_n rho_n G_n of every circuit of {@code core} (and the candidate) to {@code terms}, keyed by id.
+     * Forward: G = forward (exact or L e^{-a_c L}) or intercore forward ([CAI20] eq. 11). Backward (Parte 44):
+     * G = (1 - e^{-(a_c+a_q) L})/(a_c+a_q) ([ERAERDS10] eq. 3) or intercore backward ([CAI20] eq. 18).
+     */
     private void collectRamanTerms(java.util.TreeMap<Integer, Double> terms, Core core, Circuit candidate,
             qkd.multiband.MultiBandSettings mb, double qchNm, double alphaQ, double lengthKm,
-            LaunchPowerResolver resolver, boolean equalLoss, double couplingPerKm) {
+            LaunchPowerResolver resolver, boolean equalLoss, double couplingPerKm, boolean backward) {
         final ArrayList<Circuit> circuits = new ArrayList<Circuit>();
         if (core.getCircuitList() != null) circuits.addAll(core.getCircuitList());
         if (candidate != null && !circuits.contains(candidate)) circuits.add(candidate);
@@ -1354,7 +1378,12 @@ public final class QKDPhysicalLayer {
             final double alphaC = parameters.attenuationDbPerKm(lambdaC)
                     * qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
             final double g;
-            if (couplingPerKm > 0.0) {
+            if (backward) {
+                g = couplingPerKm > 0.0
+                        ? qkd.multiband.SpontaneousRamanModel.intercoreBackwardLengthKm(alphaC, alphaQ, couplingPerKm,
+                                lengthKm)
+                        : qkd.multiband.SpontaneousRamanModel.backwardLengthKm(alphaC, alphaQ, lengthKm);
+            } else if (couplingPerKm > 0.0) {
                 g = qkd.multiband.SpontaneousRamanModel.intercoreForwardLengthKm(alphaC, alphaQ, couplingPerKm,
                         lengthKm);
             } else if (equalLoss) {

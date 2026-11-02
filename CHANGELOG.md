@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [44](#parte-44) | Parte 44 — pasta experimental paralela, launcher 1.19.1 (edição experimental), SpRS nos resultados e fibra bidirecional |
 | [43](#parte-43) | Parte 43 — multibanda no simulador (N0 e N1), modelos de Raman selecionáveis e launcher 1.19.0 |
 | [42](#parte-42) | Parte 42 — branch experimental: teste de regressão, camada física multibanda e calculadora de enlace |
 | [41](#parte-41) | Parte 41 — repositório SNetS-SDM-QKD: README novo, CHANGELOG único, simulations/ fora do git, enlaces bidirecionais no launcher (1.18.1) |
@@ -25,6 +26,54 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-44"></a>
+
+## Parte 44 — pasta experimental paralela, launcher 1.19.1 (edição experimental), SpRS nos resultados e fibra bidirecional
+
+**Pasta paralela `SNetS-SDM-QKD_ex`**
+
+- A pasta `Documentos\Simulador\SNetS-SDM-QKD_ex` é uma cópia completa do repositório (com o `.git`), sempre na branch
+  `experimental`.
+- A pasta `SNetS-SDM-QKD` volta a ser a da `main`.
+- Os dois launchers podem rodar ao mesmo tempo.
+- Regras do fluxo main → experimental em `docs/FLUXO_BRANCHES.md`.
+
+**Launcher 1.19.1 (edição experimental)**
+
+- `launcher/src/launcher/Edition.java` (só na experimental):
+  - selo **EXPERIMENTAL** no cabeçalho e no título da aba;
+  - porta padrão 8766 (a main usa a 8765);
+  - `SNetS-SDM-QKD-exp.jar` como JAR padrão para rodar e como saída do **Gerar JAR**.
+- Aba Rede, novas fibras prontas com o núcleo QKD virtual:
+  - **Monomodo + núcleo QKD virtual** (núcleos 0 e 1);
+  - **7 núcleos + núcleo QKD virtual** (núcleos 0–6 e 7).
+  - Ao aplicar, o núcleo QKD do caso passa a ser o virtual.
+- Camada física QKD: nova opção `multiband.bidirectionalFiber`.
+- Descrições das novas métricas de SpRS (`metricinfo.js`).
+
+**Simulador**
+
+- `multiband.bidirectionalFiber` (padrão `false`): os circuitos do enlace inverso (b→a) andam na mesma fibra em
+  sentido contrário e somam SpRS backward:
+  - mesmo núcleo: Eraerds 2010, eq. 3;
+  - núcleos vizinhos em MB-SDM: Cai 2020, eq. 18.
+- `QKDMetrics.csv`, só em casos com o grupo `multiband`, ganha três linhas:
+  - `Mean admission SpRS background probability`;
+  - `Maximum admission SpRS background probability`;
+  - `Maximum admission SpRS power (W)`.
+- Casos sem `multiband` geram exatamente os mesmos arquivos de antes.
+
+**Verificação**
+
+- `MultiBandNetworkVerification`, item VMB-9i: com fibra bidirecional, o SpRS forward + backward (mesmo núcleo e
+  intercore) é igual ao da calculadora de enlace com canais contrapropagantes (erro 0).
+- Teste de regressão:
+  - casos C e Q idênticos (ou equivalentes) à referência `main`;
+  - casos M iguais à referência `experimental`, exceto pelas três linhas novas do `QKDMetrics.csv`;
+  - a referência `experimental` foi refeita.
 
 ---
 

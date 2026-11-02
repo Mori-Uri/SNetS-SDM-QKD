@@ -58,7 +58,8 @@ Regras do arquivo `network`:
 ## Hipóteses (para revisar com o orientador)
 
 - **Sentido.** Os circuitos clássicos do mesmo enlace (a→b) andam no mesmo sentido do QCh: SpRS forward. Os enlaces
-  do SNetS são unidirecionais. O SpRS backward de uma fibra bidirecional ainda não entra.
+  do SNetS são unidirecionais. Com `"bidirectionalFiber": true` (Parte 44), os circuitos do enlace inverso (b→a)
+  passam pela mesma fibra em sentido contrário e somam SpRS backward (Eraerds 2010, eq. 3; Cai 2020, eq. 18).
 - **Potência.** Em cada trecho QKD (entre nós confiáveis), a potência clássica vale a potência de lançamento. Os
   amplificadores repõem a potência, e o QCh passa por fora deles.
 - **Grade clássica.** Slot k da grade clássica = [f₀ + (k−1)·12,5 GHz, f₀ + k·12,5 GHz], com f₀ =

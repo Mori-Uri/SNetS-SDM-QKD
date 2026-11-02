@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
  */
 public final class LauncherServer {
 
-    static final String VERSION = "1.19.0";
+    static final String VERSION = "1.19.1";
 
     private final Settings settings;
     private final Workspace workspace;
@@ -53,7 +53,7 @@ public final class LauncherServer {
     }
 
     public static void main(String[] args) throws Exception {
-        int port = 8765;
+        int port = Edition.DEFAULT_PORT; // Parte 44: 8766 na versao experimental
         boolean openBrowser = true;
         String project = null;
         File webDir = null;
@@ -104,7 +104,7 @@ public final class LauncherServer {
 
         final String url = "http://localhost:" + port + "/";
         System.out.println("==============================================");
-        System.out.println(" SNetS Launcher " + VERSION);
+        System.out.println(" SNetS Launcher " + VERSION + (Edition.NAME.isEmpty() ? "" : " (" + Edition.NAME + ")"));
         System.out.println(" Projeto:     " + settings.projectRoot().getAbsolutePath());
         System.out.println(" Simulations: " + settings.simulationsDir().getAbsolutePath());
         System.out.println(" Interface:   " + url);
@@ -181,6 +181,8 @@ public final class LauncherServer {
             case "/api/info": {
                 Map<String, Object> m = new LinkedHashMap<String, Object>();
                 m.put("version", VERSION);
+                m.put("edition", Edition.NAME);
+                m.put("simulatorJar", Edition.SIMULATOR_JAR);
                 m.put("settings", settings.toMap());
                 m.put("jars", workspace.listJars());
                 m.put("javaVersion", System.getProperty("java.version"));
@@ -321,7 +323,7 @@ public final class LauncherServer {
                 m.put("compilerInLauncher", inJvm);
                 m.put("javaVersion", System.getProperty("java.version"));
                 m.put("simulationsDir", settings.simulationsDir().getAbsolutePath());
-                m.put("defaultOut", "SNetS-SDM-QKD.jar");
+                m.put("defaultOut", Edition.SIMULATOR_JAR);
                 m.put("jars", workspace.listJars());
                 return m;
             }

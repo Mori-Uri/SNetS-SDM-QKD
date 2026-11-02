@@ -35,7 +35,9 @@ import simulationControl.parsers.NetworkConfig.CoreConfig;
  *   <li>VMB-9e: Raman model {@code nenhum} and architecture MF: p_b = p_dark, same SKR as a dark fibre;</li>
  *   <li>VMB-9f: MBSDM: intercore SpRS from the cores adjacent to the host equal to the link model ([CAI20]);</li>
  *   <li>VMB-9g: linear crosstalk counted only in band (QCh inside the classical grid), never in MF;</li>
- *   <li>VMB-9h: ordering nenhum &gt; artigo/fisico in SKR, and SpRS grows with the number of classical channels.</li>
+ *   <li>VMB-9h: ordering nenhum &gt; artigo/fisico in SKR, and SpRS grows with the number of classical channels;</li>
+ *   <li>VMB-9i (Parte 44): bidirectional fibre: the circuits of the reverse link add backward SpRS equal to the
+ *       link model with counter-propagating channels (same core and, in MBSDM, intercore).</li>
  * </ul>
  */
 public final class MultiBandNetworkVerification {
@@ -56,8 +58,9 @@ public final class MultiBandNetworkVerification {
         intercore();
         crosstalkInBand();
         ordering();
+        bidirectional();
         System.out.println();
-        System.out.println("Multi-band network verification (Parte 43): ALL CHECKS PASSED");
+        System.out.println("Multi-band network verification (Partes 43-44): ALL CHECKS PASSED");
     }
 
     // ------------------------------------------------------------------ VMB-9a/b
@@ -219,6 +222,57 @@ public final class MultiBandNetworkVerification {
             last = w;
         }
         ok("VMB-9h SpRS grows with the number of classical channels");
+    }
+
+    // ------------------------------------------------------------------ VMB-9i
+
+    private static void bidirectional() {
+        for (String arch : new String[] {"MB", "MBSDM"}) {
+            final QKDPhysicalParameters p = new Gson().fromJson(String.format(Locale.ROOT,
+                    "{\"multiband\":{\"architecture\":\"%s\",\"ramanModel\":\"fisico\",\"qchCenterNm\":%.1f,"
+                    + "\"hostCoreId\":0,\"classicalBandStartThz\":%.1f,\"bidirectionalFiber\":true}}", arch, QCH_NM,
+                    START_HZ * 1e-12), QKDPhysicalLayerConfig.class).toParameters();
+            final List<CoreConfig> cores = Arrays.asList(new CoreConfig(0, Arrays.asList(1)),
+                    new CoreConfig(1, Arrays.asList(0)), new CoreConfig(2, Collections.<Integer>emptyList()));
+            final Oxc a = new Oxc("A");
+            final Oxc b = new Oxc("B");
+            final Link ab = new Link(a, b, 320, SLOT_HZ, SPAN_KM, cores);
+            final Link ba = new Link(b, a, 320, SLOT_HZ, SPAN_KM, cores);
+            a.addLink(ab);
+            b.addLink(ba);
+            final double hPerM = 1e-9;
+            final List<ClassicalChannel> coSame = new ArrayList<ClassicalChannel>();
+            final List<ClassicalChannel> counterSame = new ArrayList<ClassicalChannel>();
+            final List<ClassicalChannel> coNeighbour = new ArrayList<ClassicalChannel>();
+            final List<ClassicalChannel> counterNeighbour = new ArrayList<ClassicalChannel>();
+            ab.getCore(0).addCircuit(circuit(0, new int[] {20, 25}, 1e-3));
+            coSame.add(channel(new int[] {20, 25}, 1e-3));
+            ba.getCore(0).addCircuit(circuit(0, new int[] {60, 63}, 2e-3));
+            counterSame.add(counter(new int[] {60, 63}, 2e-3));
+            ab.getCore(1).addCircuit(circuit(1, new int[] {100, 110}, 1.5e-3));
+            coNeighbour.add(channel(new int[] {100, 110}, 1.5e-3));
+            ba.getCore(1).addCircuit(circuit(1, new int[] {200, 204}, 0.5e-3));
+            counterNeighbour.add(counter(new int[] {200, 204}, 0.5e-3));
+            final QKDSpanPhysicalResult r = new QKDPhysicalLayer(p).evaluateSpanUsingStoredLaunchPowers(ab, span(), 2,
+                    new int[] {1, 1}, hPerM, QCH_NM);
+            final List<ClassicalChannel> same = new ArrayList<ClassicalChannel>(coSame);
+            same.addAll(counterSame);
+            final List<ClassicalChannel> neighbours = new ArrayList<ClassicalChannel>(coNeighbour);
+            neighbours.addAll(counterNeighbour);
+            final boolean sdm = arch.equals("MBSDM");
+            final MultiBandLinkResult ref = MultiBandQkdLinkModel.physical(p).evaluate(QCH_NM, SPAN_KM, same,
+                    sdm ? neighbours : Collections.<ClassicalChannel>emptyList(), sdm ? hPerM * 1000.0 : 0.0);
+            relative(r.getRamanPowerW(), ref.getRamanPowerSameCoreW() + ref.getRamanPowerNeighbourW(), 1e-12,
+                    "VMB-9i " + arch + " bidirectional fibre: forward + backward SpRS equals the link model");
+            final QKDSpanPhysicalResult forwardOnly = new QKDPhysicalLayer(params(arch, "fisico", 0))
+                    .evaluateSpanUsingStoredLaunchPowers(ab, span(), 2, new int[] {1, 1}, hPerM, QCH_NM);
+            check(forwardOnly.getRamanPowerW() < r.getRamanPowerW(), "VMB-9i backward SpRS adds to the forward one");
+        }
+    }
+
+    private static ClassicalChannel counter(int[] band, double powerW) {
+        final double f = START_HZ + ((band[0] + band[1]) / 2.0 - 0.5) * SLOT_HZ;
+        return new ClassicalChannel(f, powerW, ClassicalChannel.Direction.COUNTER_PROPAGATING);
     }
 
     // ------------------------------------------------------------------ helpers

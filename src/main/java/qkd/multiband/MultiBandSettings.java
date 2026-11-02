@@ -91,6 +91,7 @@ public final class MultiBandSettings implements Serializable {
     private final double classicalBandStartHz;
     private final boolean intercoreRaman;
     private final double qchCenterNm;
+    private final boolean bidirectionalFiber;
 
     /**
      * @param architecture MF, MB or MBSDM
@@ -106,6 +107,19 @@ public final class MultiBandSettings implements Serializable {
     public MultiBandSettings(Architecture architecture, RamanModel ramanModel, FiberAttenuationModel attenuation,
             SpontaneousRamanModel raman, int hostCoreId, double classicalBandStartHz, boolean intercoreRaman,
             double qchCenterNm) {
+        this(architecture, ramanModel, attenuation, raman, hostCoreId, classicalBandStartHz, intercoreRaman,
+                qchCenterNm, false);
+    }
+
+    /**
+     * Parte 44: same, choosing whether the two directions of a link share the fibre.
+     *
+     * @param bidirectionalFiber true: the circuits of the reverse link (b-&gt;a) travel in the same fibre in the
+     *        opposite direction and add backward SpRS ([ERAERDS10] eq. 3; [CAI20] eq. 18 for the neighbour cores)
+     */
+    public MultiBandSettings(Architecture architecture, RamanModel ramanModel, FiberAttenuationModel attenuation,
+            SpontaneousRamanModel raman, int hostCoreId, double classicalBandStartHz, boolean intercoreRaman,
+            double qchCenterNm, boolean bidirectionalFiber) {
         if (architecture == null || ramanModel == null || raman == null) {
             throw new IllegalArgumentException("architecture, ramanModel and raman cannot be null");
         }
@@ -126,6 +140,7 @@ public final class MultiBandSettings implements Serializable {
         this.classicalBandStartHz = classicalBandStartHz;
         this.intercoreRaman = intercoreRaman;
         this.qchCenterNm = qchCenterNm;
+        this.bidirectionalFiber = bidirectionalFiber;
     }
 
     public Architecture getArchitecture() { return architecture; }
@@ -144,6 +159,9 @@ public final class MultiBandSettings implements Serializable {
     public boolean isIntercoreRaman() { return intercoreRaman; }
 
     public double getQchCenterNm() { return qchCenterNm; }
+
+    /** Parte 44: the reverse link shares the fibre (backward SpRS from its circuits). */
+    public boolean isBidirectionalFiber() { return bidirectionalFiber; }
 
     /** True when classical channels generate SpRS on the QCh (MB/MBSDM with a Raman model other than nenhum). */
     public boolean hasRaman() {
@@ -179,8 +197,8 @@ public final class MultiBandSettings implements Serializable {
     @Override
     public String toString() {
         return String.format(Locale.ROOT,
-                "MultiBandSettings[%s, raman=%s, host=%d, intercore=%s, qch=%.2f nm, classical from %.3f THz, loss=%s]",
-                architecture, ramanModel, hostCoreId, intercoreRaman, qchCenterNm, classicalBandStartHz * 1e-12,
-                attenuation == null ? "quadratica" : "g652d");
+                "MultiBandSettings[%s, raman=%s, host=%d, intercore=%s, bidirectional=%s, qch=%.2f nm, classical from %.3f THz, loss=%s]",
+                architecture, ramanModel, hostCoreId, intercoreRaman, bidirectionalFiber, qchCenterNm,
+                classicalBandStartHz * 1e-12, attenuation == null ? "quadratica" : "g652d");
     }
 }

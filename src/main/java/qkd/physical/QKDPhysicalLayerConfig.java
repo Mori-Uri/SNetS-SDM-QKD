@@ -18,7 +18,7 @@ import simulationControl.parsers.PhysicalLayerConfig;
  *   "fiber":     { "attenuationFloorDbPerKm": 0.18, "attenuationQuadraticDbPerKmNm2": 8e-6, "attenuationCenterNm": 1550.0 },
  *   "crosstalk": { "intercoreCrosstalkEnabled": true, "receiverTransferModel": "receiver_referenced" },
  *   "multiband": { "enabled": true, "architecture": "MB", "ramanModel": "fisico", "qchCenterNm": 1381.0,
- *                  "hostCoreId": 0, "intercoreRaman": true, "classicalBandStartThz": 191.3,
+ *                  "hostCoreId": 0, "intercoreRaman": true, "bidirectionalFiber": false, "classicalBandStartThz": 191.3,
  *                  "attenuationModel": "g652d", "waterPeakDbPerKm": 0.0, "temperatureK": 300.0 }
  * }
  * </pre>
@@ -62,6 +62,8 @@ public final class QKDPhysicalLayerConfig implements Serializable {
         int hostCoreId = 0;
         /** MBSDM: SpRS from the cores adjacent to the host core ([CAI20]). */
         boolean intercoreRaman = true;
+        /** Parte 44: the two directions of a link share the fibre (backward SpRS from the reverse link). */
+        boolean bidirectionalFiber = false;
         /** Lower edge of classical slot 1 (THz). 191.3 = start of the C band; 184.4 for the C+L comb. */
         double classicalBandStartThz = 191.3;
         /** g652d (O to U band) or quadratica (fit of the fiber group). */
@@ -207,7 +209,8 @@ public final class QKDPhysicalLayerConfig implements Serializable {
                 multiband.hostCoreId,
                 multiband.classicalBandStartThz * 1e12,
                 multiband.intercoreRaman,
-                multiband.qchCenterNm);
+                multiband.qchCenterNm,
+                multiband.bidirectionalFiber);
     }
 
     /** Same parameters with the QCh grid centred at {@code centerNm} (multi-band mode). */
