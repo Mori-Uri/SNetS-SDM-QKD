@@ -22,6 +22,9 @@ public final class QKDSpanPhysicalResult implements Serializable {
     private final double minimumSecretKeyRateBps;
     private final double maximumQber;
     private final boolean viable;
+    /** Parte 43: SpRS power at the QCh receiver (W) and its background probability; 0 outside multi-band mode. */
+    private final double ramanPowerW;
+    private final double ramanBackgroundProbability;
 
     public QKDSpanPhysicalResult(
             QKDSpan span,
@@ -30,6 +33,19 @@ public final class QKDSpanPhysicalResult implements Serializable {
             QKDPhysicalResult bb84Result,
             double minimumSecretKeyRateBps,
             double maximumQber) {
+        this(span, crosstalkPower, crosstalkNoise, bb84Result, minimumSecretKeyRateBps, maximumQber, 0.0, 0.0);
+    }
+
+    /** Parte 43: span result with the spontaneous-Raman noise of the multi-band layer. */
+    public QKDSpanPhysicalResult(
+            QKDSpan span,
+            QKDCrosstalkPowerResult crosstalkPower,
+            QKDCrosstalkNoiseResult crosstalkNoise,
+            QKDPhysicalResult bb84Result,
+            double minimumSecretKeyRateBps,
+            double maximumQber,
+            double ramanPowerW,
+            double ramanBackgroundProbability) {
 
         if (span == null || crosstalkPower == null
                 || crosstalkNoise == null || bb84Result == null) {
@@ -53,6 +69,8 @@ public final class QKDSpanPhysicalResult implements Serializable {
         this.bb84Result = bb84Result;
         this.minimumSecretKeyRateBps = minimumSecretKeyRateBps;
         this.maximumQber = maximumQber;
+        this.ramanPowerW = ramanPowerW;
+        this.ramanBackgroundProbability = ramanBackgroundProbability;
         this.viable = bb84Result.getSecretKeyRateBps() >= minimumSecretKeyRateBps
                 && bb84Result.getQber() <= maximumQber;
     }
@@ -94,7 +112,18 @@ public final class QKDSpanPhysicalResult implements Serializable {
     }
 
     public double getTotalBackgroundProbability() {
-        return crosstalkNoise.getTotalBackgroundProbability();
+        return ramanBackgroundProbability > 0.0 ? bb84Result.getBackgroundProbability()
+                : crosstalkNoise.getTotalBackgroundProbability();
+    }
+
+    /** Parte 43: SpRS power at the QCh receiver (W); 0 outside multi-band mode. */
+    public double getRamanPowerW() {
+        return ramanPowerW;
+    }
+
+    /** Parte 43: background probability per gate due to SpRS; 0 outside multi-band mode. */
+    public double getRamanBackgroundProbability() {
+        return ramanBackgroundProbability;
     }
 
     public double getQber() {

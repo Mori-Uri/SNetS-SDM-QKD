@@ -1,0 +1,5 @@
+{
+  "ignorar": ["BlockingProbability.csv", "BitRateBlockingProbability.csv", "ExternalFragmentation.csv"],
+  "motivo": "causa do bloqueio clássico sorteada sem semente pelo spcsav2 (já ocorre na main)",
+  "detalhe": "ShortestPathsCoreAndSpectrumAssignment_v2, linha 117: num bloqueio, o núcleo usado para classificar a causa é sorteado com new Random(). Com 1 núcleo clássico isso muda a divisão fragmentação × outros e a fragmentação externa entre execuções. O bloqueio total e as métricas QKD se repetem."
+}

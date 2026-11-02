@@ -210,3 +210,13 @@ physicalLayer.before_p26
 !/simulations/run_SNetS-SDM-SBRC26_jar.bat
 !/simulations/QKD_qualificacao/
 !/simulations/QKD_experiments/
+
+# Parte 42 - teste de regressão: os CSVs das referências ficam locais (o manifesto.json vai para o git)
+tools/regressao/referencias/*/csv/
+# Parte 42 - JAR da branch experimental
+!/simulations/SNetS-SDM-QKD-exp.jar
+# Parte 43 - casos multibanda de exemplo (sem os resultados)
+!/simulations/QKD_Multibanda/
+/simulations/QKD_Multibanda/**/*.csv
+/simulations/QKD_Multibanda/**/*.txt
+/simulations/QKD_Multibanda/**/savestate/

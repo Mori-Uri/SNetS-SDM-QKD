@@ -1,0 +1,12 @@
+{"requestGenerators":[
+{"source":"1","destination":"2","bitRate":100000000000,"arrivalRate":89.74358974358974,"holdRate":1,"arrivalRateIncrease":44.87179487179487},
+{"source":"1","destination":"2","bitRate":200000000000,"arrivalRate":64.1025641025641,"holdRate":1,"arrivalRateIncrease":32.05128205128205},
+{"source":"1","destination":"2","bitRate":300000000000,"arrivalRate":48.07692307692308,"holdRate":1,"arrivalRateIncrease":24.03846153846154},
+{"source":"1","destination":"2","bitRate":400000000000,"arrivalRate":32.05128205128205,"holdRate":1,"arrivalRateIncrease":16.025641025641026},
+{"source":"1","destination":"2","bitRate":500000000000,"arrivalRate":16.025641025641026,"holdRate":1,"arrivalRateIncrease":8.012820512820513},
+{"source":"2","destination":"1","bitRate":100000000000,"arrivalRate":89.74358974358974,"holdRate":1,"arrivalRateIncrease":44.87179487179487},
+{"source":"2","destination":"1","bitRate":200000000000,"arrivalRate":64.1025641025641,"holdRate":1,"arrivalRateIncrease":32.05128205128205},
+{"source":"2","destination":"1","bitRate":300000000000,"arrivalRate":48.07692307692308,"holdRate":1,"arrivalRateIncrease":24.03846153846154},
+{"source":"2","destination":"1","bitRate":400000000000,"arrivalRate":32.05128205128205,"holdRate":1,"arrivalRateIncrease":16.025641025641026},
+{"source":"2","destination":"1","bitRate":500000000000,"arrivalRate":16.025641025641026,"holdRate":1,"arrivalRateIncrease":8.012820512820513}
+]}

@@ -60,8 +60,30 @@ public final class BB84DecoyModel {
             throw new IllegalArgumentException("lengthKm must be finite and >= 0");
         }
         requireProbability(backgroundProbability, "backgroundProbability");
+        return evaluateWithAttenuation(attenuationDbPerKm(wavelengthNm), lengthKm, backgroundProbability);
+    }
 
-        final double alpha = attenuationDbPerKm(wavelengthNm);
+    /**
+     * Parte 42: same decoy-state BB84 bound with the fibre attenuation given by the caller, so that a
+     * wavelength-dependent loss model other than the quadratic C-band fit (e.g. the multi-band G.652.D model of
+     * {@code qkd.multiband.FiberAttenuationModel}) can be used. {@link #evaluate(double, double, double)} delegates
+     * here with {@code attenuationDbPerKm(wavelengthNm)}, so its results are unchanged.
+     *
+     * @param alphaDbPerKm fibre attenuation at the quantum-channel wavelength, in dB/km (&gt;= 0)
+     * @param lengthKm QKD span length in km
+     * @param backgroundProbability total background probability p_b per detection window
+     */
+    public QKDPhysicalResult evaluateWithAttenuation(double alphaDbPerKm, double lengthKm,
+            double backgroundProbability) {
+        if (!Double.isFinite(alphaDbPerKm) || alphaDbPerKm < 0.0) {
+            throw new IllegalArgumentException("alphaDbPerKm must be finite and >= 0");
+        }
+        if (!Double.isFinite(lengthKm) || lengthKm < 0.0) {
+            throw new IllegalArgumentException("lengthKm must be finite and >= 0");
+        }
+        requireProbability(backgroundProbability, "backgroundProbability");
+
+        final double alpha = alphaDbPerKm;
         final double eta = parameters.getDetectorEfficiency()
                 * Math.pow(10.0, -alpha * lengthKm / 10.0);
         final double mu = parameters.getMu();

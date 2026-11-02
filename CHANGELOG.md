@@ -5,6 +5,8 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [43](#parte-43) | Parte 43 — multibanda no simulador (N0 e N1), modelos de Raman selecionáveis e launcher 1.19.0 |
+| [42](#parte-42) | Parte 42 — branch experimental: teste de regressão, camada física multibanda e calculadora de enlace |
 | [41](#parte-41) | Parte 41 — repositório SNetS-SDM-QKD: README novo, CHANGELOG único, simulations/ fora do git, enlaces bidirecionais no launcher (1.18.1) |
 | [40](#parte-40) | Parte 40 — topologias e fibras de pequena escala, regra ABNE nos QChs, PICh configurável (launcher 1.18.0) |
 | [39](#parte-39) | Parte 39 — canal QKD bloqueado, nós confiáveis por enlace, qabne e launcher 1.17.0 |
@@ -23,6 +25,210 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-43"></a>
+
+## Parte 43 — multibanda no simulador (N0 e N1), modelos de Raman selecionáveis e launcher 1.19.0
+
+Agora dá para simular uma rede multibanda. O multibanda entra num grupo novo e opcional, `multiband`, do arquivo
+`qkdPhysicalLayer.json`. Sem esse grupo, nada muda: os 14 casos do teste de regressão dão os mesmos valores da main.
+
+**Simulador**
+
+- Arquiteturas MF, MB e MB-SDM (`multiband.architecture`).
+  - O núcleo QKD da rede vira um núcleo virtual, declarado sem vizinhos:
+    - MF: representa a fibra escura;
+    - MB e MB-SDM: representa a banda do QCh dentro do núcleo `hostCoreId`.
+  - Os QChs continuam com os recursos de hoje: slots, TDM, PICh, Q-TRx e nós confiáveis.
+- QCh em qualquer banda (`qchCenterNm`, ex.: 1381 nm). A perda vem da curva G.652.D de 1260 a 1675 nm em todo o
+  cálculo: SKR, grade de λ e XT.
+- Ruído Raman espontâneo (SpRS) na admissão QKD e na proteção das sessões ativas:
+  - a fonte são os circuitos clássicos ativos e o candidato;
+  - no mesmo núcleo, forward;
+  - nos núcleos vizinhos (MB-SDM), pelo SpRS intercore de Cai et al. 2020;
+  - p_b = 1 − (1 − p_dark)(1 − p_XT)(1 − p_SpRS).
+- Três modelos de Raman (`ramanModel`), escolhidos por caso como as variantes de XT e de modulação:
+  - `nenhum`: Dibaj, JLT 2025;
+  - `artigo`: Mehdizadeh 2024 e Dibaj 2025, eq. 6;
+  - `fisico`: Eraerds 2010.
+- O XT linear no QCh só conta quando o QCh está dentro da grade clássica (in-band); em MF ele nunca conta.
+- Arquivos alterados:
+  - `QKDPhysicalParameters` e `QKDPhysicalLayerConfig`: grupo `multiband`;
+  - `QKDPhysicalLayer`: seção 6, "multi-band spans";
+  - `QKDSpanPhysicalResult`: potência e p_b do SpRS.
+- Classe nova: `qkd.multiband.MultiBandSettings`.
+- Hipóteses:
+  - SpRS só forward (os enlaces do SNetS são unidirecionais);
+  - potência clássica = potência de lançamento em cada trecho QKD;
+  - sem NLI/FWM.
+  - Detalhes em `docs/multibanda/SIMULACAO_MULTIBANDA.md`.
+
+**Launcher 1.19.0**
+
+- Aba **Camada física QKD**, grupo novo **Multibanda (experimental)**: arquitetura, modelo de Raman, λ do QCh, núcleo
+  hospedeiro, SpRS dos vizinhos, início da grade clássica, modelo de atenuação, pico de OH e temperatura.
+- Mudaram `web/js/schema.js` e `LauncherServer.java` (versão).
+
+**Casos (`simulations/QKD_Multibanda/`)**
+
+- Topologias: `Linha` (2 nós, 1 enlace de 50 km) e `Losango` (5 nós, 6 enlaces).
+- Em cada topologia, 9 casos:
+  - fibra monomodo: MF, e MB com os 3 modelos de Raman;
+  - MCF de 7 núcleos: MF, e MB-SDM com os 3 modelos;
+  - o modelo atual (núcleo QKD na banda C), para comparação.
+- Os casos partem do `QKD_Test10/Q100_R100`, com QTND de 25 km. Ver `QKD_Multibanda/LEIA-ME.md`.
+
+**Verificação**
+
+- `qkd.verification.MultiBandNetworkVerification` (VMB-9a a VMB-9h), com enlaces e circuitos do SNetS:
+  - sem o grupo `multiband`, os parâmetros são os da Parte 42;
+  - o grupo é lido do arquivo;
+  - o SpRS é igual ao da calculadora de enlace (erro 0), nos modelos `artigo` e `fisico` e no intercore;
+  - a SKR é igual (erro ≤ 1e-7);
+  - MF e `nenhum` dão a SKR da fibra escura;
+  - o XT só entra in-band;
+  - a SKR segue a ordem `nenhum` > `artigo` > `fisico`.
+- Teste de regressão:
+  - os 14 casos C e Q batem com a referência `main`;
+  - nas tabelas por par muda só a ordem das linhas;
+  - 3 casos multibanda novos (M01–M03) com a referência `experimental`;
+  - o arquivo opcional `casos/<caso>/regressao.json` permite ignorar CSVs que não se repetem.
+- Rodada curta dos 18 casos (4000 requisições, 2 cargas), SKR média na admissão:
+
+| Linha, QTND 25 km | SKR (Mbit/s) | QBER |
+|---|---|---|
+| MF e MB/MB-SDM com Raman `nenhum` (1381 nm) | 58,4 | 0,0150 |
+| MB-SDM `artigo` / `fisico` | 57,5–58,0 / 57,0–57,8 | 0,0152–0,0159 |
+| MB (monomodo) `artigo` / `fisico` | 54,9–55,2 / 52,7–53,3 | 0,017–0,019 |
+| Modelo atual, banda C (1550 nm) | 93,9 | 0,0150 |
+
+- Com demanda de 2,33 Mbit/s e QTND de 25 km, ainda não há bloqueio por SKR; os modelos de Raman mudam só a SKR e a
+  QBER. A diferença no bloqueio aparece com QTND maior ou com demanda maior.
+
+**Achado (sem alteração, precisa de aprovação)**
+
+- O `spcsav2` sorteia sem semente (`new Random()`) o núcleo usado para classificar a causa de um bloqueio clássico
+  (`ShortestPathsCoreAndSpectrumAssignment_v2`, linha 117).
+- Com poucos núcleos clássicos, a divisão do bloqueio por causa (fragmentação × outros) e a fragmentação externa
+  mudam entre execuções com a mesma semente. Isso também acontece no JAR da main.
+- O bloqueio total e as métricas QKD não são afetados.
+
+---
+
+<a id="parte-42"></a>
+
+## Parte 42 — branch experimental: teste de regressão, camada física multibanda e calculadora de enlace
+
+Primeira entrega da branch `experimental`. Nada muda nos resultados dos casos existentes: o JAR experimental foi
+comparado com o da main em 14 casos (4 clássicos e 10 QKD), com resultado idêntico, e o SNetS-SDM-QKD foi
+comparado com o SBRC26 original (ver "Regressão desta entrega").
+
+**Teste de regressão (`tools/regressao/`)**
+
+- `regressao.py` (Python, só biblioteca padrão), com três comandos:
+  - `gerar`: roda os casos e grava uma referência;
+  - `comparar`: compara um JAR com a referência;
+  - `determinismo`: roda o mesmo JAR duas vezes.
+- 14 casos pequenos em `casos/` (C01–C05 clássicos, Q01–Q10 QKD), todos com `trafficRandomSeed` fixo.
+- `referencias/<nome>/manifesto.json` guarda o SHA-256 de cada CSV e vai para o git. Os CSVs ficam locais.
+- Diferenças aceitas como `EQUIVALENTE`:
+  - números iguais até 1e-12 relativo;
+  - linhas em outra ordem;
+  - rótulo `Numm Attempts` corrigido.
+  Qualquer outra diferença é falha. Detalhes em `tools/regressao/LEIA-ME.md`.
+
+**Achados do teste de regressão**
+
+- O `SNetS-SDM-SBRC26.jar` original **não repete os próprios resultados**. A semente do tráfego vem do relógio
+  (`new RandGenerator()` em `Mesh`), e duas execuções do mesmo caso diferem em até 25 % (ex.: utilização de Tx).
+  - Por isso a comparação byte a byte com ele não faz sentido.
+  - Para comparar mesmo assim, o SBRC26 foi recompilado só para teste (não versionado), com uma única mudança: a
+    semente lida de `trafficRandomSeed`, com o mesmo deslocamento por carga e replicação do SNetS-SDM-QKD.
+  - Resultado em C01 (metro), C03 (USA, IMPA) e C05 (prmscav3 + apamem): ver "Regressão desta entrega".
+  - O patch está em `tools/regressao/sbrc26_semente/`.
+- O SNetS-SDM-QKD é determinístico com semente fixa. A única variação entre execuções é a última casa decimal de
+  `ConsumedEnergy.csv` (≈1e-15 relativo), por causa da ordem de soma entre threads.
+
+**Camada física multibanda (`qkd.multiband`, novo pacote, ainda fora da simulação de rede)**
+
+| Classe | O que faz | Referência |
+|---|---|---|
+| `OpticalBand` | Bandas O, E, S, C, L, U: limites, amplificador, NF e γ | Ferrari et al. 2020, Tab. II |
+| `FiberAttenuationModel` | Perda da G.652.D de 1260 a 1675 nm: Rayleigh + IR + pico de OH opcional, ou tabela (0,377 dB/km em 1260 nm; 0,185 em 1550 nm) | Ferrari 2020; Mehdizadeh 2024 |
+| `RamanGainProfile` | Perfil g0(Δν) da SSMF, 0–42 THz | GNPy (BSD-3) |
+| `SpontaneousRamanModel` | Seção de choque do SpRS com fator de Bose (Stokes e anti-Stokes), escala ajustada à medida de Eraerds; comprimentos efetivos forward (exato e o do artigo), backward e intercore | Eraerds 2010; Kawahara 2011; Cai 2020 |
+| `ClassicalChannel` | Canal clássico (frequência, potência, sentido) e o comb C+L de referência (184,4–196,8 THz, 112,5 GHz) | Mehdizadeh 2024; Dibaj 2025 |
+| `MultiBandQkdLinkModel` | Orçamento de ruído p_b = p_dark + p_SpRS (mesmo núcleo) + p_SpRS (núcleos vizinhos) e SKR do BB84 decoy para MF, MB e MB-SDM | — |
+| `MultiBandLinkResult` | Resultado com o ruído separado por origem (NLI ainda 0) | — |
+| `LinkCalculator` | Calculadora de enlace em linha de comando (ponto único ou varredura, saída CSV) | — |
+
+- `MultiBandQkdLinkModel` tem duas predefinições:
+  - `paperCompatible`: convenção de Mehdizadeh/Dibaj, com L·e^{-αL} e fração detectada 0,5;
+  - `physical`: forma exata e fração 1.
+- `BB84DecoyModel.evaluateWithAttenuation(alphaDbPerKm, L, pb)` é uma sobrecarga nova que recebe a perda já
+  calculada. O `evaluate` antigo agora delega a ela, com a mesma conta. O verificador VMB-7 prova bit a bit que os
+  resultados não mudam.
+
+Exemplo da calculadora:
+
+```bat
+java -cp simulations\SNetS-SDM-QKD-exp.jar qkd.multiband.LinkCalculator arq=mb lambda=1260:1460:5 L=5,15,30 saida=varredura.csv
+```
+
+**Verificação (`qkd.verification.MultiBandPhysicsVerification`)**
+
+O verificador aparece sozinho no botão "Verificação QKD" do launcher. Ele tem 8 itens:
+
+| Item | O que confere | Resultado |
+|---|---|---|
+| VMB-1 | Perda em 1260, 1360 e 1550 nm (0,38 / 0,28 / 0,18 dB/km) e mínimo na banda C | OK |
+| VMB-2 | ρ contra a medida de Eraerds 2010, 9 pontos de −5 a +11 THz | OK (±20 %) |
+| VMB-3 | Mehdizadeh 2024: SKR 3,08 Mbit/s (1381 nm, 70 km), 0,53 Mbit/s (1260 nm, 70 km) e 160,82 Mbit/s (1260 nm, 5 km) | OK (6–13 %) |
+| VMB-4 | Dibaj IWCIT 2024 em 1380 nm: 185 / 100 / 40 Mbit/s a 5 / 15 / 30 km | OK (4–7 %) |
+| VMB-5 | Dibaj JLT 2025, Fig. 10 (μ = 0,5, 1360 nm): 385 kbit/s a 100 km, 15 kbit/s a 150 km e 0,354 kbit/s a 200 km | OK (6 %, 9 %, mesma ordem) |
+| VMB-6 | Cai 2020: pico do SpRS intercore em 40 km e do mesmo núcleo em 20 km; P_F e P_B a 50 km; linearidade em h | OK (≤0,2 %) |
+| VMB-7 | MF = BB84 com p_b = p_dark; a sobrecarga não muda o `evaluate` (45 pontos, bit a bit) | OK |
+| VMB-8 | Limites: α_q = α_c, saturação do backward, L = 0, h = 0, SpRS reduz a SKR | OK |
+
+Dois itens ficam como `[PENDENTE]` e não falham:
+
+- **Banda S junto ao comb (1522 nm, 5 km).** O modelo dá 77 Mbit/s contra 25,8 Mbit/s no artigo. Falta o ruído não
+  linear (NLI/FWM), previsto para o nível N2.
+- **SpRS no VMB-5.** O artigo diz que o ruído é desprezível no O-band, e os limiares dele saem com p_b = p_dark. Com
+  o SpRS do comb C+L, o modelo dá 0,5 kbit/s a 150 km em vez de 15. É um conflito entre o JLT 2025 e o Comm. Lett.
+  2024, dos mesmos autores, a discutir.
+
+**Regressão desta entrega**
+
+| Comparação | Casos | Resultado |
+|---|---|---|
+| `SNetS-SDM-QKD-exp.jar` (esta branch) × `SNetS-SDM-QKD.jar` (main, Parte 41) | 14 (C01–C05, Q01–Q10) | Todos idênticos. A única diferença é `ConsumedEnergy.csv`, equivalente (1e-15) |
+| `SNetS-SDM-QKD.jar` × SBRC26 original com semente fixa (`sbrc26_semente`) | C01, C03, C05 | Todos equivalentes (ver abaixo) |
+
+O que muda entre o SBRC26 original e o SNetS-SDM-QKD nos casos clássicos:
+
+- todos os valores são iguais;
+- as tabelas por par saem em outra ordem de linhas;
+- o rótulo `Numm Attempts` foi corrigido para `Num Attempts`;
+- há CSVs novos do addon (`BlockingDetails`, `SlotBlocking`, `SlotUtilization`).
+
+Isso responde à dúvida sobre resultados clássicos divergentes entre versões: com a mesma semente, o SNetS-SDM-QKD
+reproduz o SBRC26. As diferenças entre execuções do SBRC26 vêm da semente pelo relógio, não do código.
+
+Outras notas:
+
+- O C02 (núcleo desativado) usa um recurso que só existe no SNetS-SDM-QKD, por isso fica fora da comparação com o
+  SBRC26.
+- O código-fonte desta branch é igual ao da main em 343 arquivos (hash). Só mudaram `BB84DecoyModel.java` (a
+  sobrecarga) e os 9 arquivos novos.
+- Verificadores do launcher: todos passam com o JAR experimental, exceto três que já falham com o JAR da main. Eles
+  não foram alterados nesta parte:
+  - `QKDArticleBaseReferenceVerification` e `QKDNativeArticleBaseVerification` precisam da pasta
+    `simulations/QKD_reference/`;
+  - `QKDExistingSessionProtectionVerification` espera o primeiro QCh no slot 1, que mudou com a regra ABNE da
+    Parte 40.
 
 ---
 

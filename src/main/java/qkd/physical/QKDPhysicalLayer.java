@@ -745,7 +745,8 @@ public final class QKDPhysicalLayer {
                         power,
                         wavelengthNm,
                         minimumSecretKeyRateBps,
-                        maximumQber));
+                        maximumQber,
+                        link, liveResolver(physicalLayer), physicalLayer.getCrosstalk().getH(), null));
             }
         }
 
@@ -836,7 +837,8 @@ public final class QKDPhysicalLayer {
                         power,
                         wavelengthNm,
                         minimumSecretKeyRateBps,
-                        maximumQber));
+                        maximumQber,
+                        link, liveResolver(physicalLayer), physicalLayer.getCrosstalk().getH(), null));
             }
         }
 
@@ -935,7 +937,8 @@ public final class QKDPhysicalLayer {
                         power,
                         wavelengthNm,
                         minimumSecretKeyRateBps,
-                        maximumQber));
+                        maximumQber,
+                        link, liveResolver(physicalLayer), physicalLayer.getCrosstalk().getH(), additionalClassicalCircuit));
             }
         }
 
@@ -993,7 +996,8 @@ public final class QKDPhysicalLayer {
                         power,
                         wavelengthNm,
                         minimumSecretKeyRateBps,
-                        maximumQber));
+                        maximumQber,
+                        link, STORED_RESOLVER, couplingCoefficientPerM, null));
             }
         }
 
@@ -1005,7 +1009,17 @@ public final class QKDPhysicalLayer {
             QKDCrosstalkPowerResult power,
             double wavelengthNm,
             double minimumSecretKeyRateBps,
-            double maximumQber) {
+            double maximumQber,
+            Link link,
+            LaunchPowerResolver resolver,
+            double couplingCoefficientPerM,
+            Circuit candidate) {
+
+        final qkd.multiband.MultiBandSettings mb = parameters.getMultiband();
+        if (mb != null) {
+            return evaluateSpanResultMultiBand(mb, span, power, wavelengthNm, minimumSecretKeyRateBps,
+                    maximumQber, link, resolver, couplingCoefficientPerM, candidate);
+        }
 
         final double attenuationDbPerKm =
                 parameters.attenuationDbPerKm(wavelengthNm);
@@ -1154,6 +1168,11 @@ public final class QKDPhysicalLayer {
                         : this.evaluateSegmentWithAdditionalClassicalCircuit(link, physicalLayer,
                                 allocation.getQuantumCoreId(), allocation.getSpectrumBand(), span.getLengthKm(), candidate);
             }
+            if (parameters.getMultiband() != null) {
+                results.add(evaluateSpanResultMultiBand(parameters.getMultiband(), span, power, wavelengthNm,
+                        0.0, 1.0, link, liveResolver(physicalLayer), physicalLayer.getCrosstalk().getH(), candidate));
+                continue;
+            }
             double attenuation = parameters.attenuationDbPerKm(wavelengthNm);
             double pxtRx = toReceiverPowerW(
                     power.getTotalPowerW(), span.getLengthKm(), attenuation,
@@ -1166,6 +1185,197 @@ public final class QKDPhysicalLayer {
             results.add(new QKDSpanPhysicalResult(span, power, noise, physical, 0.0, 1.0));
         }
         return new QKDLinkChannelPhysicalResult(results);
+    }
+
+    // =====================================================================
+    // 6. Parte 43: multi-band spans (architecture MF/MB/MBSDM and SpRS)
+    // =====================================================================
+
+    /** Launch power of a live circuit from the SNetS physical layer (same rule as the crosstalk path). */
+    private static LaunchPowerResolver liveResolver(final PhysicalLayer physicalLayer) {
+        return new LaunchPowerResolver() {
+            @Override
+            public double resolve(Circuit circuit) {
+                final Modulation modulation = circuit.getModulation();
+                if (modulation == null) {
+                    throw new IllegalStateException(
+                            "Classical circuit " + circuit.getId() + " has no modulation assigned");
+                }
+                return physicalLayer.getCircuitLaunchPower(circuit, modulation);
+            }
+        };
+    }
+
+    /** Stored launch power of a circuit (verification path). */
+    private static final LaunchPowerResolver STORED_RESOLVER = new LaunchPowerResolver() {
+        @Override
+        public double resolve(Circuit circuit) {
+            final double powerW = circuit.getLaunchPowerLinear();
+            requireNonNegativeFinite(powerW, "stored launch power of circuit " + circuit.getId());
+            return powerW;
+        }
+    };
+
+    /**
+     * One QKD span in multi-band mode ({@link qkd.multiband.MultiBandSettings}):
+     * <ol>
+     *   <li>loss alpha(lambda) of the multi-band fibre model (through {@link QKDPhysicalParameters#attenuationDbPerKm});</li>
+     *   <li>linear intercore crosstalk kept only when the architecture is not MF and the QCh is inside the classical
+     *       slot grid of the host core (in-band); otherwise it is filtered out (power 0);</li>
+     *   <li>SpRS power at the QCh receiver from the classical circuits of the host core (same core, forward) and of
+     *       the cores adjacent to it (intercore, [CAI20] eq. 11), including the pending candidate circuit;</li>
+     *   <li>p_SpRS = 1 - exp(-N), N = eta_d eta_f P_SpRS T_g / (h nu) f_det, and
+     *       p_b = 1 - (1 - p_dark)(1 - p_XT)(1 - p_SpRS);</li>
+     *   <li>BB84 decoy bound with alpha and p_b.</li>
+     * </ol>
+     * Classical circuits co-propagate with the QCh (SNetS links are unidirectional) and are taken at their launch
+     * power at the start of each QKD span. Contributions are summed in circuit-id order, so results do not depend
+     * on the iteration order of the cores' circuit sets.
+     *
+     * <p>Refer\u00eancias: [MEHDI24], [DIBAJ25], [ERAERDS10], [CAI20]; ver qkd.multiband.MultiBandQkdLinkModel.</p>
+     */
+    private QKDSpanPhysicalResult evaluateSpanResultMultiBand(
+            qkd.multiband.MultiBandSettings mb,
+            QKDSpan span,
+            QKDCrosstalkPowerResult power,
+            double wavelengthNm,
+            double minimumSecretKeyRateBps,
+            double maximumQber,
+            Link link,
+            LaunchPowerResolver resolver,
+            double couplingCoefficientPerM,
+            Circuit candidate) {
+
+        final double lengthKm = span.getLengthKm();
+        final double attenuationDbPerKm = parameters.attenuationDbPerKm(wavelengthNm);
+
+        QKDCrosstalkPowerResult xt = power;
+        if (!multiBandCrosstalkApplies(mb, link, wavelengthNm) || !parameters.isIntercoreCrosstalkEnabled()) {
+            xt = new QKDCrosstalkPowerResult(power.getLinkName(), power.getQuantumCoreId(),
+                    power.getQuantumSpectrumStart(), power.getQuantumSpectrumEnd(), 0.0, lengthKm, 0, 0, 0,
+                    Collections.<QKDCrosstalkContribution>emptyList(), 0.0);
+        }
+        final double receivedXt = toReceiverPowerW(xt.getTotalPowerW(), lengthKm, attenuationDbPerKm,
+                parameters.getReceiverTransferMode());
+        final QKDCrosstalkNoiseResult noise = this.evaluateFromReceivedPower(receivedXt, wavelengthNm,
+                parameters.getReceiverOpticalEfficiency(), parameters.getDetectorGateWindowS());
+
+        final double ramanW = mb.hasRaman()
+                ? ramanPowerAtReceiverW(mb, link, lengthKm, wavelengthNm, resolver,
+                        couplingCoefficientPerM * 1000.0, candidate)
+                : 0.0;
+        final double pRaman = ramanW > 0.0 ? ramanBackgroundProbability(mb, ramanW, wavelengthNm) : 0.0;
+        final double pb = pRaman > 0.0
+                ? combineIndependentProbabilities(noise.getTotalBackgroundProbability(), pRaman)
+                : noise.getTotalBackgroundProbability();
+
+        final QKDPhysicalResult physical = bb84Model.evaluateWithAttenuation(attenuationDbPerKm, lengthKm, pb);
+        return new QKDSpanPhysicalResult(span, xt, noise, physical, minimumSecretKeyRateBps, maximumQber,
+                ramanW, pRaman);
+    }
+
+    /**
+     * Parte 43 (verification path): one QKD span evaluated with the circuits' stored launch powers and an explicit
+     * coupling coefficient, through the same code as production (multi-band or not).
+     */
+    public QKDSpanPhysicalResult evaluateSpanUsingStoredLaunchPowers(Link link, QKDSpan span, int quantumCoreId,
+            int[] quantumSpectrumAssigned, double couplingCoefficientPerM, double wavelengthNm) {
+        final QKDCrosstalkPowerResult power = evaluateSegmentUsingStoredLaunchPowers(link, quantumCoreId,
+                quantumSpectrumAssigned, couplingCoefficientPerM, span.getLengthKm());
+        return evaluateSpanResult(span, power, wavelengthNm, 0.0, 1.0, link, STORED_RESOLVER,
+                couplingCoefficientPerM, null);
+    }
+
+    /** Linear crosstalk on the QCh: never in MF; in MB/MBSDM only when the QCh is inside the classical grid. */
+    private static boolean multiBandCrosstalkApplies(qkd.multiband.MultiBandSettings mb, Link link,
+            double wavelengthNm) {
+        if (mb.getArchitecture() == qkd.multiband.MultiBandSettings.Architecture.MF) {
+            return false;
+        }
+        final Core host = link.getCore(mb.getHostCoreId());
+        return host != null && mb.isInClassicalBand(wavelengthNm, host.getNumOfSlots(), host.getSlotSpectrumBand());
+    }
+
+    /**
+     * SpRS power (W) inside the QCh filter at the receiver of a span of {@code lengthKm}, from the classical
+     * circuits of the host core and (MBSDM, intercoreRaman) of its adjacent classical cores.
+     */
+    double ramanPowerAtReceiverW(qkd.multiband.MultiBandSettings mb, Link link, double lengthKm,
+            double qchNm, LaunchPowerResolver resolver, double couplingPerKm, Circuit candidate) {
+        final Core host = link.getCore(mb.getHostCoreId());
+        if (host == null) {
+            return 0.0;
+        }
+        final qkd.multiband.SpontaneousRamanModel raman = mb.getRaman();
+        final double alphaQ = parameters.attenuationDbPerKm(qchNm) * qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
+        final boolean equalLoss =
+                mb.getForwardForm() == qkd.multiband.MultiBandQkdLinkModel.ForwardForm.EQUAL_LOSS;
+        final int candidateCore = candidate != null && candidateTraversesLink(candidate, link)
+                ? qkd.metrics.BlockingDetailRecorder.rawCore(candidate) : Integer.MIN_VALUE;
+
+        final java.util.TreeMap<Integer, Double> terms = new java.util.TreeMap<Integer, Double>();
+        // same core (forward)
+        collectRamanTerms(terms, host, candidateCore == host.getId() ? candidate : null, mb, qchNm, alphaQ,
+                lengthKm, resolver, equalLoss, -1.0);
+        // neighbour cores (intercore, forward)
+        if (mb.getArchitecture() == qkd.multiband.MultiBandSettings.Architecture.MBSDM && mb.isIntercoreRaman()
+                && couplingPerKm > 0.0) {
+            final List<Core> adjacent = link.getAdjacentCores(host.getId());
+            if (adjacent != null) {
+                for (Core core : adjacent) {
+                    if (core == null || core.isQkdReserved()) continue;
+                    collectRamanTerms(terms, core, candidateCore == core.getId() ? candidate : null, mb, qchNm,
+                            alphaQ, lengthKm, resolver, equalLoss, couplingPerKm);
+                }
+            }
+        }
+        double sum = 0.0;
+        for (Double v : terms.values()) sum += v.doubleValue();
+        final double lambdaQm = qchNm * 1e-9;
+        final double filterNm = lambdaQm * lambdaQm * parameters.getQchBandwidthHz()
+                / parameters.getSpeedOfLightMPerS() * 1e9;
+        return sum * filterNm;
+    }
+
+    /** Adds P_n rho_n G_n of every circuit of {@code core} (and the candidate) to {@code terms}, keyed by id. */
+    private void collectRamanTerms(java.util.TreeMap<Integer, Double> terms, Core core, Circuit candidate,
+            qkd.multiband.MultiBandSettings mb, double qchNm, double alphaQ, double lengthKm,
+            LaunchPowerResolver resolver, boolean equalLoss, double couplingPerKm) {
+        final ArrayList<Circuit> circuits = new ArrayList<Circuit>();
+        if (core.getCircuitList() != null) circuits.addAll(core.getCircuitList());
+        if (candidate != null && !circuits.contains(candidate)) circuits.add(candidate);
+        final double slotWidth = core.getSlotSpectrumBand();
+        for (Circuit c : circuits) {
+            if (c == null) continue;
+            final int[] band = c.getSpectrumAssigned();
+            if (band == null) continue;
+            final double fHz = mb.slotCentreHz(band[0], band[1], slotWidth);
+            final double lambdaC = parameters.getSpeedOfLightMPerS() / fHz * 1e9;
+            final double alphaC = parameters.attenuationDbPerKm(lambdaC)
+                    * qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
+            final double g;
+            if (couplingPerKm > 0.0) {
+                g = qkd.multiband.SpontaneousRamanModel.intercoreForwardLengthKm(alphaC, alphaQ, couplingPerKm,
+                        lengthKm);
+            } else if (equalLoss) {
+                g = qkd.multiband.SpontaneousRamanModel.forwardLengthPaperKm(alphaC, lengthKm);
+            } else {
+                g = qkd.multiband.SpontaneousRamanModel.forwardLengthKm(alphaC, alphaQ, lengthKm);
+            }
+            final double term = resolver.resolve(c) * mb.getRaman().crossSectionPerKmNm(lambdaC, qchNm) * g;
+            final Integer key = c.getId() == null ? Integer.valueOf(Integer.MAX_VALUE) : c.getId();
+            final Double previous = terms.get(key);
+            terms.put(key, Double.valueOf(previous == null ? term : previous.doubleValue() + term));
+        }
+    }
+
+    /** Detector background probability of an SpRS power at the QCh receiver. */
+    private double ramanBackgroundProbability(qkd.multiband.MultiBandSettings mb, double ramanW, double qchNm) {
+        final double photonEnergyJ = parameters.getPlanckConstantJs() * parameters.getSpeedOfLightMPerS()
+                / (qchNm * 1e-9);
+        final double meanEvents = parameters.getDetectorEfficiency() * parameters.getReceiverOpticalEfficiency()
+                * ramanW * parameters.getDetectorGateWindowS() * mb.getDetectedFraction() / photonEnergyJ;
+        return -Math.expm1(-meanEvents);
     }
 
     // =====================================================================

@@ -141,6 +141,8 @@
       { title: 'Detector e receptor', desc: 'p_b = 1 − (1 − p_dark)(1 − p_XT), com p_XT = 1 − exp(−η_d·η_f·P_XT·T_g/hν).', keys: ['detector'] },
       { title: 'Fibra (atenuação do QCh)', desc: 'α(λ) = α₀ + c·(λ − λ₀)².', keys: ['fiber'] },
       { title: 'Crosstalk dos núcleos clássicos no QCh', keys: ['crosstalk'] },
+      // 1.19.0 (Parte 43): multibanda
+      { title: 'Multibanda (experimental)', desc: 'Arquitetura MF, MB ou MB-SDM e o modelo de espalhamento Raman (SpRS). O núcleo QKD da rede passa a representar a banda do QCh (MB, MB-SDM) ou a fibra escura (MF); declare-o sem núcleos vizinhos. Sem este grupo, nada muda. p_b = 1 − (1 − p_dark)(1 − p_XT)(1 − p_SpRS).', keys: ['multiband'] },
     ],
     fields: {
       source: { label: 'Fonte', default: { meanPhotonNumber: 0.7, pulseIntervalPs: 250.0, qchPowerDbm: -80.0, qchBandwidthGHz: 12.5 } },
@@ -166,6 +168,25 @@
         receiver_referenced: 'receiver_referenced — P_XT = P·ISO·h·L já referida ao receptor (T = 1)',
         distributed: 'distributed — cada ponto do trecho sofre a atenuação restante até o receptor',
         attenuated: 'attenuated — P_XT·10^(−αL/10): o canal clássico se atenua junto com o QCh (Moghaddam et al., 2021, eq. 1)' } },
+      multiband: { label: 'Multibanda', default: { enabled: true, architecture: 'MB', ramanModel: 'fisico', qchCenterNm: 1381.0, hostCoreId: 0, intercoreRaman: true, classicalBandStartThz: 191.3, attenuationModel: 'g652d', waterPeakDbPerKm: 0.0, temperatureK: 300.0 } },
+      'multiband.enabled': { label: 'Ativar a camada física multibanda', default: true },
+      'multiband.architecture': { label: 'Arquitetura', default: 'MB', enum: {
+        MF: 'MF — QCh numa fibra escura dedicada (p_b = p_dark)',
+        MB: 'MB — QCh em outra banda da fibra monomodo do tráfego clássico (SpRS do mesmo núcleo)',
+        MBSDM: 'MB-SDM — QCh em outra banda de um núcleo da MCF (SpRS do núcleo e dos vizinhos)' } },
+      'multiband.ramanModel': { label: 'Modelo de espalhamento Raman (SpRS)', default: 'fisico', enum: {
+        nenhum: 'nenhum — SpRS desprezado (Dibaj et al., JLT 2025, banda O)',
+        artigo: 'artigo — L·e^(−α_c L) e metade dos fótons detectados (Mehdizadeh et al., 2024; Dibaj et al., 2025, eq. 6)',
+        fisico: 'fisico — comprimento efetivo exato e todos os fótons do filtro detectados (Eraerds et al., 2010)' } },
+      'multiband.qchCenterNm': { label: 'λ central do QCh', unit: 'nm', default: 1381.0, help: 'Centro da grade de QChs (wavelengthPolicy "grid") ou λ de todos os QChs ("fixed"). 1260–1460 nm = bandas O e E.' },
+      'multiband.hostCoreId': { label: 'Núcleo clássico que divide a fibra/núcleo com o QCh', default: 0, help: 'MB: o núcleo da fibra monomodo. MB-SDM: o núcleo da MCF que carrega o QCh. Ignorado em MF.' },
+      'multiband.intercoreRaman': { label: 'SpRS dos núcleos vizinhos (MB-SDM)', default: true, help: 'Cai, Sun e Ji (2020), eqs. 11 e 18, com o h do crosstalk da camada física.' },
+      'multiband.classicalBandStartThz': { label: 'Início da grade clássica (slot 1)', unit: 'THz', default: 191.3, help: '191,3 = início da banda C. Para o comb C+L (184,4–196,8 THz) use 184,4 e 992 slots de 12,5 GHz.' },
+      'multiband.attenuationModel': { label: 'Modelo de atenuação', default: 'g652d', enum: {
+        g652d: 'g652d — G.652.D de 1260 a 1675 nm (Rayleigh + IR; Ferrari et al., 2020)',
+        quadratica: 'quadratica — o ajuste do grupo Fibra (só banda C)' } },
+      'multiband.waterPeakDbPerKm': { label: 'Pico de OH em 1383 nm', unit: 'dB/km', default: 0.0, help: '0 para fibra G.652.D de baixo pico d’água.' },
+      'multiband.temperatureK': { label: 'Temperatura da fibra', unit: 'K', default: 300.0 },
     },
   };
 

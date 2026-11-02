@@ -1,0 +1,53 @@
+{
+ "gerado_em": "2026-11-01T05:20:59",
+ "jar": "SNetS-SDM-SBRC26-twin.jar",
+ "sha256": "38a7328cbe1e897cd841be98150bfc375a17783f2b92550c3c1cd24c81d3c979",
+ "tamanho": 23713021,
+ "casos": {
+  "C01_classico_metro": {
+   "arquivos": {
+    "BitRateBlockingProbability.csv": "d5b50b8059bae6a1c52822a68148ac7605eb43b3c736ceda2ac7d205bf90efd1",
+    "BlockingProbability.csv": "c16e15626f4125167b108c7580cacd76b0e3958854ab7b1a185fb500cf240e18",
+    "ConsumedEnergy.csv": "259939a04b0725238d04206539c951d0c1e5bfce7928027a55ec1c24587cd8d2",
+    "ExternalFragmentation.csv": "f6d6ab912f41ce656e8f2712a74ec224511391cff20ed6528f9a263a131b7e22",
+    "GroomingStatistics.csv": "4bf9f593aba5d2b52871ab38a53c685ca59e78db2c248102ccc9d9ab7c547f63",
+    "ModulationUtilization.csv": "19194d00014e2c12008fcf071f16577762344eaad243e69cbb3217f69ee13d26",
+    "PhysicalLayerStatistics.csv": "53a9183434f5d0627bc3b60ed899d22b0137a3fbc828fa652cf82bea42e93df5",
+    "RelativeFragmentation.csv": "58cee1074c808cf3f5c0fc8cc74b5d7606e914e2e549883c50245f132ced6176",
+    "SpectrumStatistics.csv": "19cb7debca4999e3bf9168873c4adf6f253184bc0b66f1e872c664b894f26502",
+    "SpectrumUtilization.csv": "c2a5038453cd3cfd814c65cd651b1e2afff500a53d2be54b45aa4bcce2e83997",
+    "TransmittersReceiversRegeneratorsUtilization.csv": "91508bcfadebf053420fb0a9c05d3281e2d4261f1321cfa3d3cdb625909b9ea0"
+   },
+   "segundos": 25.1,
+   "codigo": 0,
+   "erro": ""
+  },
+  "C03_classico_usa_impa": {
+   "arquivos": {
+    "BitRateBlockingProbability.csv": "43d14e633fa85e8713511d282c518e4f87dec1da235099347e200bd4155858f2",
+    "BlockingProbability.csv": "c6e5e3298c26008606c1c59a28f1741d20be9edcf8e17913ba3796c6fdc7d713",
+    "ModulationUtilization.csv": "e690c69a5bc52076a73aa844bdefcd519a55f8071c6ea0257e998276e65219ea",
+    "PhysicalLayerStatistics.csv": "840dfe121364dea453b9433b846619908a7ed66a7b35d05430b509ce51854a37",
+    "SpectrumUtilization.csv": "b6e43d45ed25452f50cf3419c2f92e0faf729ae11cd388be67db8d57ec22f8d6"
+   },
+   "segundos": 188.9,
+   "codigo": 0,
+   "erro": ""
+  },
+  "C05_classico_prmscav3": {
+   "arquivos": {
+    "BitRateBlockingProbability.csv": "422dc6c1431453961a6a7ae7535a5b48d65cef4503c5bd13ea44f0b5f44a8eb8",
+    "BlockingProbability.csv": "ca2ea7712645b018460561066fd52a6ea49d28675d4b5682077b2f4eaf901bdb",
+    "ExternalFragmentation.csv": "835713788a834af4d89c984400f5daa863048174cc99155e264e667d312b64d6",
+    "GroomingStatistics.csv": "4bf9f593aba5d2b52871ab38a53c685ca59e78db2c248102ccc9d9ab7c547f63",
+    "ModulationUtilization.csv": "627bde468b18561c8761d4eaa89696c315f81647be28df9cffd5097e0976eb3b",
+    "PhysicalLayerStatistics.csv": "ceeda795e962a464f787bf152dc52949f51cd44a86b85c8ca8c1c4c6af142bd2",
+    "RelativeFragmentation.csv": "6e3e7ca5e9fc2a2a72bb9659cfabaa8a5f9a1790d4d63943cb7fb66b19dd0955",
+    "SpectrumUtilization.csv": "ddb47868261f63305b97a4500fbc2265a9c1ce8190880c5f406d09db5a430868"
+   },
+   "segundos": 227.9,
+   "codigo": 0,
+   "erro": ""
+  }
+ }
+}
