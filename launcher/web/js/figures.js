@@ -414,7 +414,7 @@
   // ================================================================ templates
 
   // Parte 27: models grouped by subject (optgroups of the "Modelo de gráfico" box); ids are kept, so saved figures still open
-  const TEMPLATE_GROUPS = ['Bloqueio', 'Causas de bloqueio', 'Canais QKD bloqueados', 'Núcleos', 'Espectro e utilização', 'Fragmentação', 'Mapas de calor', 'Correlações', 'QKD', 'Custo QKD', 'Outros'];
+  const TEMPLATE_GROUPS = ['Bloqueio', 'Comparação com um caso de referência', 'Causas de bloqueio', 'Canais QKD bloqueados', 'Núcleos', 'Espectro e utilização', 'Fragmentação', 'Mapas de calor', 'Correlações', 'QKD', 'Custo QKD', 'Outros'];
   const TEMPLATES = [
     // ---- Bloqueio
     { id: 'bp', group: 'Bloqueio', name: 'Bloqueio de circuitos × carga', type: 'line', file: 'BlockingProbability', metric: 'Blocking probability', y: 'Probabilidade de Bloqueio de Circuito', x: 'Carga (Erlangs)', xMode: 'erl' },
@@ -525,6 +525,15 @@
       desc: 'Como o mapa de bloqueio do espectro, mas só com os canais das requisições protegidas (QKDChannelSlotBlocking.csv, Parte 39). Escolha um canal em "Causa" para ver só ele.' },
     { id: 'qkdQtnd', group: 'QKD', name: 'Métrica × QTND (casos de uma varredura)', type: 'line', file: 'QKDMetrics', metric: 'QKD blocking probability', y: 'Probabilidade de bloqueio QKD', x: 'QTND (km)', xMode: 'param', paramPath: 'network:qkd.qtndKm' },
     { id: 'qkdEquip', group: 'QKD', name: 'QTx/QRx em uso por nó (pico)', type: 'bars', file: 'QKDMetrics', metric: 'Peak QTx in use per node', itemsFrom: 'dim', dim: 'src', xAxis: 'items', y: 'QTx em uso (pico)', x: 'Nó', rotate: -60 },
+    // ---- 1.18.3: comparação com um caso de referência (barras divergentes)
+    { id: 'refBp', group: 'Comparação com um caso de referência', name: 'Bloqueio de circuitos em relação a um caso', type: 'ref', file: 'BlockingProbability', itemsFrom: 'metrics', items: ['Blocking probability'], desc: 'Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
+    { id: 'refBbp', group: 'Comparação com um caso de referência', name: 'Bloqueio de banda em relação a um caso', type: 'ref', file: 'BitRateBlockingProbability', itemsFrom: 'metrics', items: ['BitRate blocking probability'], desc: 'Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
+    { id: 'refCauses', group: 'Comparação com um caso de referência', name: 'Causas de bloqueio em relação a um caso (uma seção por causa)', type: 'ref', file: 'BlockingDetails', metric: 'Blocking probability by cause', itemsFrom: 'dim', dim: 'Cause', desc: 'Uma seção por causa de bloqueio; marque só uma causa em "2. Dados" para ver uma de cada vez. As seções ficam lado a lado ou uma embaixo da outra. Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
+    { id: 'refCoreUtil', group: 'Comparação com um caso de referência', name: 'Utilização de cada núcleo em relação a um caso', type: 'ref', file: 'SpectrumUtilization', metric: 'Utilization per Core', itemsFrom: 'dim', dim: 'Core', desc: 'Uma seção por núcleo. Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
+    { id: 'refCoreBlock', group: 'Comparação com um caso de referência', name: 'Bloqueio de cada núcleo em relação a um caso', type: 'ref', file: 'BlockingDetails', metric: 'Blocking probability per core', itemsFrom: 'dim', dim: 'Core', desc: 'Uma seção por núcleo. Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
+    { id: 'refUtil', group: 'Comparação com um caso de referência', name: 'Utilização do espectro em relação a um caso', type: 'ref', file: 'SpectrumUtilization', itemsFrom: 'metrics', items: ['Utilization'], desc: 'Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
+    { id: 'refQkdBp', group: 'Comparação com um caso de referência', name: 'Bloqueio QKD em relação a um caso', type: 'ref', file: 'QKDMetrics', itemsFrom: 'metrics', items: ['QKD blocking probability'], desc: 'Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
+    { id: 'refQkdCauses', group: 'Comparação com um caso de referência', name: 'Causas do bloqueio QKD em relação a um caso', type: 'ref', file: 'QKDMetrics', itemsFrom: 'metrics', itemsRe: /^QKD blocking probability by /i, desc: 'Uma seção por causa do bloqueio QKD. Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
     // ---- Outros
     { id: 'custom', group: 'Outros', name: 'Personalizado (qualquer CSV)', type: 'line', x: 'Carga (Erlangs)', xMode: 'erl' },
   ];
@@ -548,6 +557,7 @@
     if (t.type === 'slotblock') { style.slotScale = 'blues'; style.slotZero = 'gray'; style.slotRange = t.blockMode === 'count' ? 'auto' : 'fixed'; }
     if (t.type === 'scatter') { style.errorBars = 'none'; style.grid = 'both'; style.xAsCategories = false; }
     if (t.type === 'slotline') { style.width = 1000; style.errorBars = 'none'; style.xAsCategories = false; style.lineWidth = 1.5; }
+    if (t.type === 'ref') { style.width = t.itemsFrom === 'dim' || t.itemsRe ? 1400 : 900; style.fontSize = 15; style.grid = 'x'; style.errorBars = 'none'; style.title = ''; }
     if (t.layout === 'panels') { style.panelHeight = 300; style.barGap = 0.3; style.legend = 'none'; style.fontSize = 10; style.errorBars = 'none'; style.titleSize = 13; }
     return {
       version: 1, template: t.id, type: t.type,
@@ -555,9 +565,11 @@
       file: t.file || '', metric: t.metric || '', metrics: (t.metrics || []).slice(), filters: {},
       line: { seriesBy: t.seriesBy || 'case', xMode: t.xMode || 'lp', paramPath: t.paramPath || '', paramLp: -1, lps: [] },
       bars: {
-        lp: -1, itemsFrom: t.itemsFrom || 'metrics', itemsRe: t.itemsRe ? t.itemsRe.source : '', dim: t.dim || '', items: [],
+        lp: -1, itemsFrom: t.itemsFrom || 'metrics', itemsRe: t.itemsRe ? t.itemsRe.source : '', dim: t.dim || '', items: (t.items || []).slice(),
         xAxis: t.xAxis || 'cases', seriesDim: t.seriesDim || '', stacked: !!t.stacked, normalize: !!t.normalize, layout: t.layout || 'grouped', sort: t.sort || 'none', top: 0, hideZero: true,
       },
+      // 1.18.3: chart with a reference case (path '' = first case)
+      ref: { path: '', mode: 'abs', order: 'selection', layout: 'cols', colorBy: 'auto', hideZero: true },
       cores: { lp: -1, utilFile: 'SpectrumUtilization', utilMetric: 'Utilization per Core', blockFile: 'BlockingProbability', blockPrefix: 'Blocking probability per core', normBlock: false },
       topo: { lps: [], range: 'shared', block: !!t.topoBlock, blockFile: 'BlockingDetails', blockMetric: 'Link blocking probability', blockClasses: 'split' },
       slots: { lp: -1, links: [], cores: [], oneWay: false, from: 1, to: 0, order: 'name', caseLayout: 'stack', blockMode: t.blockMode || 'ratio', blockCause: t.blockCause || 'all', onlyBlocked: false, summary: true },
@@ -777,7 +789,7 @@
     if (!avail.length) return { empty: 'Nenhum dos casos selecionados tem o arquivo ' + spec.file + '.csv.' + fileHint(spec.file) };
     const missing = parsed.filter((x) => !x.p).map((x) => caseLabel(x.c));
     for (const x of avail) EXCL.set(x.p, await excludedCores(x.c.path));
-    const m = spec.type === 'line' ? await buildLine(spec, avail) : buildBars(spec, avail);
+    const m = spec.type === 'line' ? await buildLine(spec, avail) : spec.type === 'ref' ? buildRef(spec, avail) : buildBars(spec, avail);
     m.missing = missing;
     return m;
   }
@@ -1003,6 +1015,84 @@
     if (avail.length === 1) return Object.assign(one(avail[0].p), { lpUsed, items: selItems });
     const panels = avail.map(({ c, p }) => ({ title: caseLabel(c), path: c.path, model: one(p) }));
     return { kind: 'panels', panels, lpUsed, items: selItems };
+  }
+
+  // ---------------------------------------------------------------- 1.18.3: comparison with a reference case
+
+  function refCaseOf(spec) {
+    return spec.cases.find((c) => c.path === spec.ref.path) || spec.cases[0] || null;
+  }
+
+  /**
+   * Values of every case for the chosen items (same data as the bars, items on the x axis), then the difference of
+   * each case to the reference case: absolute (value − reference) or relative (% of the reference). One section per
+   * item (cause, core, metric).
+   */
+  function buildRef(spec, avail) {
+    const RF = spec.ref;
+    const refC = refCaseOf(spec);
+    if (!refC) return { empty: 'Selecione os casos na seção 1.' };
+    if (!avail.some((x) => x.c.path === refC.path)) return { empty: 'O caso de referência (' + caseLabel(refC) + ') não tem o arquivo ' + spec.file + '.csv.' };
+    if (avail.length < 2) return { empty: 'Selecione pelo menos dois casos com resultados: o de referência e os que serão comparados com ele.' };
+    const tmp = Object.assign({}, spec, { bars: Object.assign({}, spec.bars, { xAxis: 'items', layout: 'grouped', seriesDim: '', stacked: false, normalize: false, sort: 'none', top: 0, hideZero: RF.hideZero !== false }) });
+    const bm = buildBars(tmp, avail);
+    if (!bm || bm.kind !== 'bars') return { empty: 'Sem dados para a comparação.' };
+    const items = bm.categories.map((c) => c.key);
+    const valOf = (path, it) => { const sr = bm.series.find((x) => x.key === path); const v = sr && sr.values[it]; return v && Number.isFinite(v.mean) ? v.mean : NaN; };
+    const sections = items.map((it) => {
+      const refVal = valOf(refC.path, it);
+      const bars = avail.filter(({ c }) => c.path !== refC.path).map(({ c }) => {
+        const val = valOf(c.path, it);
+        let diff = NaN;
+        if (Number.isFinite(val) && Number.isFinite(refVal)) {
+          if (RF.mode === 'rel') diff = refVal !== 0 ? (val - refVal) / Math.abs(refVal) * 100 : (val === 0 ? 0 : NaN);
+          else diff = val - refVal;
+        }
+        return { key: c.path, item: it, label: caseLabel(c), val, diff, color: '#888888' };
+      });
+      return { key: it, item: it, label: '', refVal, bars };
+    });
+    return { kind: 'ref', mode: RF.mode === 'rel' ? 'rel' : 'abs', refPath: refC.path, refLabel: caseLabel(refC), sections, items, lpUsed: bm.lpUsed, cols: 1 };
+  }
+
+  /** Colours, labels, order and visibility of the comparison (re-applied on every style change). */
+  function styleRef(m, spec) {
+    const RF = spec.ref;
+    const refC = refCaseOf(spec);
+    m.refLabel = refC ? caseLabel(refC) : m.refLabel;
+    m.mode = RF.mode === 'rel' ? 'rel' : 'abs';
+    const single = spec.bars.itemsFrom === 'metrics' && m.sections.length === 1;
+    const caseIdx = (path) => Math.max(0, spec.cases.findIndex((c) => c.path === path));
+    m.sections.forEach((sec, k) => {
+      const it = sec.item;
+      sec.label = single ? '' : (spec.bars.itemsFrom === 'dim' && spec.bars.dim === 'Core' && /^\d+$/.test(it) && !spec.labels[it] ? 'Núcleo ' + it : itemLabel(spec, it));
+      const itemStyle = styleFor(spec, 'i:' + it, k, 'bar', it);
+      const byItem = RF.colorBy === 'item' || (RF.colorBy !== 'case' && !!causeColor(it));
+      sec.color = byItem ? itemStyle.color : null;
+      sec.visible = itemStyle.visible !== false;
+      for (const b of sec.bars) {
+        const c = spec.cases.find((x) => x.path === b.key);
+        b.label = c ? caseLabel(c) : b.label;
+        const vk = 'refval:' + it + '|' + b.key;
+        b.valText = spec.labels[vk] !== undefined ? spec.labels[vk] : '';
+        const cs = styleFor(spec, b.key, caseIdx(b.key), 'bar');
+        b.visible = cs.visible !== false && !(c && c.hidden);
+        b.color = byItem ? itemStyle.color : cs.color;
+      }
+    });
+    m.cols = RF.layout === 'rows' ? 1 : RF.layout === 'grid' ? Math.max(1, Number(spec.style.panelCols) || 2) : m.sections.length;
+  }
+
+  function viewRef(m, spec) {
+    const RF = spec.ref;
+    const sortBars = (bars) => {
+      if (RF.order === 'selection') return bars;
+      const v = (b) => (Number.isFinite(b.diff) ? b.diff : -Infinity);
+      const out = bars.slice().sort((a, b) => v(b) - v(a));
+      return RF.order === 'asc' ? out.reverse() : out;
+    };
+    const sections = m.sections.filter((s) => s.visible !== false).map((s) => Object.assign({}, s, { bars: sortBars(s.bars.filter((b) => b.visible !== false)) })).filter((s) => s.bars.length);
+    return Object.assign({}, m, { sections, cols: Math.max(1, Math.min(m.cols, sections.length || 1)) });
   }
 
   function coreLayout(cores) { return App.presets.coreLayout(cores); }
@@ -1465,6 +1555,12 @@
       }
       return { head, rows };
     }
+    if (model.kind === 'ref') {
+      const head = ['seção', 'caso', 'valor', 'valor da referência (' + model.refLabel + ')', model.mode === 'rel' ? 'diferença (%)' : 'diferença'];
+      const rows = [];
+      for (const sx of model.sections) for (const b of sx.bars) rows.push([sx.label || itemLabel(spec, sx.item), b.label, Number.isFinite(b.val) ? b.val : '', Number.isFinite(sx.refVal) ? sx.refVal : '', Number.isFinite(b.diff) ? b.diff : '']);
+      return { head, rows };
+    }
     if (model.kind === 'topo') {
       const head = ['painel', 'enlace', 'média', 'IC95', 'n'];
       const rows = [];
@@ -1783,6 +1879,7 @@
     out.topo = Object.assign(base.topo, spec.topo || {});
     out.slots = Object.assign(base.slots, spec.slots || {});
     out.scatter = Object.assign(base.scatter, spec.scatter || {});
+    out.ref = Object.assign(base.ref, spec.ref || {});
     out.labels = spec.labels || {}; out.seriesStyle = spec.seriesStyle || {}; out.filters = spec.filters || {};
     return out;
   }
@@ -1858,6 +1955,7 @@
       (seriesBox = el('div')),
       section('4. Aparência', false, appearancePanel()),
       ['line', 'bars'].includes(spec.type) ? section('5. Rótulos dos valores', false, valuesPanel()) : null,
+      spec.type === 'ref' ? section('5. Gráfico de referência', true, refStylePanel()) : null,
       section('6. Eixos e números', false, axesPanel()),
       section('7. Linhas de referência', false, refLinesPanel()),
       section('8. Legenda e título', false, legendPanel()));
@@ -1907,6 +2005,7 @@
         el('label.fig-case-vis', vis),
         el('div.fig-case-main', lab, el('div.small.muted.ell', { title: c.path }, (c.hidden ? 'oculto · ' : '') + c.path)),
         el('div.fig-case-btns',
+          spec.type === 'ref' ? el('button.btn.small.icon' + (refCaseOf(spec) === c ? '.primary' : ''), { type: 'button', title: refCaseOf(spec) === c ? 'Caso de referência' : 'Usar como caso de referência', on: { click: () => { spec.ref.path = c.path; changedData(); } } }, refCaseOf(spec) === c ? '★' : '☆') : null,
           el('button.btn.small.icon', { type: 'button', title: 'Subir', disabled: i === 0, on: { click: () => { spec.cases.splice(i - 1, 0, spec.cases.splice(i, 1)[0]); changedData(); } } }, '↑'),
           el('button.btn.small.icon', { type: 'button', title: 'Descer', disabled: i === spec.cases.length - 1, on: { click: () => { spec.cases.splice(i + 1, 0, spec.cases.splice(i, 1)[0]); changedData(); } } }, '↓'),
           el('button.btn.small.icon', { type: 'button', title: 'Remover', on: { click: () => { spec.cases.splice(i, 1); changedData(); } } }, '✕'))));
@@ -1995,11 +2094,12 @@
     box.append(groupField('Modelo de gráfico', el('div.stack-s', tmplSel, el('div', resetTmpl)),
       (tdesc ? tdesc + ' ' : '') + 'Os ajustes feitos em cada modelo ficam guardados: ao trocar de modelo e voltar, eles reaparecem. "Padrão do modelo" esquece os ajustes deste modelo.'));
 
-    const typeSel = selectInput(spec, 'type', [['line', 'Linhas (métrica × carga ou parâmetro)'], ['bars', 'Barras (agrupadas / empilhadas)'], ['cores', 'Diagrama da fibra (núcleos)'], ['topo', 'Mapa de calor na topologia (enlaces)'], ['slots', 'Mapa de calor do espectro (slots × núcleos × enlaces)'], ['slotblock', 'Mapa de calor do bloqueio no espectro (slots)'], ['slotline', 'Perfil de ocupação por slot (linhas)'], ['scatter', 'Dispersão: métrica × métrica (correlação)']], () => {
+    const typeSel = selectInput(spec, 'type', [['line', 'Linhas (métrica × carga ou parâmetro)'], ['bars', 'Barras (agrupadas / empilhadas)'], ['cores', 'Diagrama da fibra (núcleos)'], ['topo', 'Mapa de calor na topologia (enlaces)'], ['slots', 'Mapa de calor do espectro (slots × núcleos × enlaces)'], ['slotblock', 'Mapa de calor do bloqueio no espectro (slots)'], ['slotline', 'Perfil de ocupação por slot (linhas)'], ['scatter', 'Dispersão: métrica × métrica (correlação)'], ['ref', 'Comparação com um caso de referência (barras divergentes)']], () => {
       if (spec.type === 'topo' && !spec.file) { spec.file = 'SpectrumUtilization'; spec.metric = 'Utilization Per Link'; }
       if (spec.type === 'slots') { spec.file = 'SlotUtilization'; if (!spec.slots) spec.slots = newSpec('slotHeat', []).slots; if (spec.style.width < 1000) spec.style.width = 1400; }
       if (spec.type === 'slotblock') { spec.file = 'SlotBlocking'; if (!spec.slots) spec.slots = newSpec('slotBlock', []).slots; if (spec.style.width < 1000) spec.style.width = 1400; }
       if (spec.type === 'slotline') { spec.file = 'SlotUtilization'; if (!spec.slots) spec.slots = newSpec('slotProfile', []).slots; spec.style.xAsCategories = false; }
+      if (spec.type === 'ref') { if (!spec.ref) spec.ref = newSpec('refBp', []).ref; if (!spec.file) { spec.file = 'BlockingProbability'; spec.bars.itemsFrom = 'metrics'; spec.bars.items = ['Blocking probability']; } spec.style.errorBars = 'none'; }
       if (spec.type === 'scatter') { if (!spec.scatter) spec.scatter = newSpec('scLinkUtilBlock', []).scatter; spec.style.xAsCategories = false; spec.style.errorBars = 'none'; }
       changedData();
     });
@@ -2080,7 +2180,8 @@
       box.append(filterFields(spec, L.seriesBy.startsWith('dim:') ? L.seriesBy.slice(4) : null));
     } else {
       const B = spec.bars;
-      box.append(field('Barras a partir de', selectInput(B, 'itemsFrom', [['metrics', 'Várias métricas (ex.: causas de bloqueio)'], ['dim', 'Valores de uma dimensão (ex.: Link, Modulation, Core)']], () => { B.items = []; changedData(); })));
+      if (spec.type === 'ref') box.append(refDataFields());
+      box.append(field(spec.type === 'ref' ? 'Seções a partir de' : 'Barras a partir de', selectInput(B, 'itemsFrom', [['metrics', 'Várias métricas (ex.: causas de bloqueio)'], ['dim', 'Valores de uma dimensão (ex.: Link, Modulation, Core)']], () => { B.items = []; changedData(); })));
       if (B.itemsFrom === 'metrics') {
         const re = B.itemsRe ? new RegExp(B.itemsRe, 'i') : null;
         const current = B.items.length ? B.items : metrics.filter((m) => (re ? re.test(m) : m === spec.metric));
@@ -2089,7 +2190,7 @@
         const dims = (S.dimOptions[spec.metric] || []).filter((d) => d.values.length > 1);
         if (!dims.find((d) => d.name === B.dim) && dims.length) B.dim = dims[0].name;
         box.append(field('Dimensão', selectInput(B, 'dim', dims.map((d) => [d.name, d.name + ' (' + d.values.length + ')']), () => { B.items = []; changedData(); })));
-        box.append(field('Cores (séries) por', selectInput(B, 'seriesDim', [['', B.xAxis === 'items' ? 'Casos' : 'Valores da dimensão']].concat(dims.filter((x) => x.name !== B.dim).map((x) => [x.name, x.name])), () => { if (B.seriesDim) B.xAxis = 'items'; changedData(); }), 'Ex.: Dimensão = Core e cores por Cause dá as causas de bloqueio em cada núcleo.'));
+        if (spec.type !== 'ref') box.append(field('Cores (séries) por', selectInput(B, 'seriesDim', [['', B.xAxis === 'items' ? 'Casos' : 'Valores da dimensão']].concat(dims.filter((x) => x.name !== B.dim).map((x) => [x.name, x.name])), () => { if (B.seriesDim) B.xAxis = 'items'; changedData(); }), 'Ex.: Dimensão = Core e cores por Cause dá as causas de bloqueio em cada núcleo.'));
         const d = dims.find((x) => x.name === B.dim);
         if (d && d.values.length <= 40) {
           const vals = d.values.filter((v) => v !== 'all');
@@ -2097,6 +2198,7 @@
         }
       }
       box.append(field('Ponto de carga', lpSelect(B, 'lp')));
+      if (spec.type === 'ref') { box.append(filterFields(spec, B.itemsFrom === 'dim' ? [B.dim] : null)); return box; }
       box.append(field('No eixo x', selectInput(B, 'xAxis', [['cases', 'Casos (cores = itens)'], ['items', 'Itens (cores = casos)']], () => changedData())));
       const opts = el('div.checks');
       opts.append(checkInput(B, 'stacked', 'Empilhar', () => { if (B.stacked) spec.style.errorBars = 'none'; changedData(); }));
@@ -2113,6 +2215,23 @@
     return box;
   }
   const changedStyleData = App.debounce(() => { persistDraft(); refresh(); }, 250);
+
+  /** 1.18.3: reference case, difference, order, layout and colours of the comparison chart. */
+  function refDataFields() {
+    const spec = S.spec;
+    const RF = spec.ref;
+    const refC = refCaseOf(spec);
+    const box = el('div.stack-s');
+    box.append(field('Caso de referência', selectInput(Object.assign(RF, { path: refC ? refC.path : '' }), 'path', spec.cases.map((c) => [c.path, caseLabel(c)]), () => changedData()),
+      'A linha vertical do gráfico. Também dá para escolher pela estrela (☆) ao lado do caso na seção 1.'));
+    box.append(el('div.fields.two',
+      field('Diferença', selectInput(RF, 'mode', [['abs', 'Absoluta (valor − referência)'], ['rel', 'Porcentagem da referência']], () => changedData())),
+      field('Ordem das barras', selectInput(RF, 'order', [['selection', 'Ordem de seleção dos casos'], ['desc', 'Maior aumento primeiro'], ['asc', 'Maior redução primeiro']], () => changedData())),
+      field('Seções (uma por item)', selectInput(RF, 'layout', [['cols', 'Lado a lado'], ['rows', 'Uma embaixo da outra'], ['grid', 'Grade (painéis por linha da seção 4)']], () => changedData())),
+      field('Cores', selectInput(RF, 'colorBy', [['auto', 'Automática: cor da causa nas causas, cor do caso nos demais'], ['case', 'Sempre a cor do caso'], ['item', 'Sempre a cor do item (causa, núcleo, métrica)']], () => changedData()))));
+    box.append(el('div.checks', checkInput(RF, 'hideZero', 'Ocultar itens sempre zero', () => changedData())));
+    return box;
+  }
 
   function coresDataFields() {
     const C = S.spec.cores;
@@ -2272,6 +2391,11 @@
   /** Current style of the entry e (index i) of the series panel; panels with a series dimension are looked up by key. */
   function seriesStyleOf(m, e, i) {
     if (m.kind === 'line' || m.kind === 'bars') { const x = m.series.find((s) => s.key === e.key) || m.series[i]; return x ? x.style : null; }
+    if (m.kind === 'ref') {
+      const spec = S.spec;
+      if (e.key.startsWith('i:')) { const k = m.sections.findIndex((sx) => 'i:' + sx.item === e.key); return styleFor(spec, e.key, Math.max(0, k), 'bar', e.key.slice(2)); }
+      return styleFor(spec, e.key, Math.max(0, spec.cases.findIndex((c) => c.path === e.key)), 'bar');
+    }
     if (m.kind === 'panels') {
       for (const p of m.panels) { const x = p.model.series.find((s) => s.key === e.key); if (x && x.style) return x.style; }
       const p = m.panels[i];
@@ -2318,6 +2442,11 @@
       orderable = true;
     }
     else if (m.kind === 'panels') entries = m.panels.map((p) => ({ key: p.model.series[0].key, name: p.title, kind: 'bar' }));
+    else if (m.kind === 'ref') {
+      const sec0 = m.sections[0];
+      entries = (sec0 ? sec0.bars : []).map((b) => ({ key: b.key, name: b.label, kind: 'ref' }));
+      if (m.sections.length > 1 || spec.ref.colorBy === 'item') entries = entries.concat(m.sections.map((sx) => ({ key: 'i:' + sx.item, name: sx.label || itemLabel(spec, sx.item), kind: 'ref' })));
+    }
     const pal = R().PALETTES;
     const palSel = selectInput(spec.style, 'palette', Object.keys(pal).map((k) => [k, R().PALETTE_NAMES[k]]), () => changedStyle());
     const resetBtn = el('button.btn.small', { type: 'button', title: 'Remove as cores, traços e a ordem escolhidos manualmente', on: { click: () => { spec.seriesStyle = {}; spec.seriesOrder = []; persistDraft(); drawSeriesPanel(); refresh(true); } } }, 'Restaurar padrão');
@@ -2487,8 +2616,8 @@
       const xb = el('button.btn.small.ghost', { type: 'button', title: e.kind === 'bar' ? 'Padrão (hachura) da barra e valores desta série' : 'Valores desta série' },
         (extraOpen.has(e.key) ? '▾ ' : '▸ ') + (e.kind === 'bar' ? 'Padrão e valores' : 'Valores') + (hasExtra ? ' •' : ''));
       xb.addEventListener('click', () => { if (extraOpen.has(e.key)) extraOpen.delete(e.key); else extraOpen.add(e.key); drawSeriesPanel(); });
-      row.append(el('div', { style: { marginTop: '2px' } }, xb));
-      if (extraOpen.has(e.key)) row.append(seriesExtras(o, e.kind === 'bar'));
+      if (e.kind !== 'ref') row.append(el('div', { style: { marginTop: '2px' } }, xb));
+      if (e.kind !== 'ref' && extraOpen.has(e.key)) row.append(seriesExtras(o, e.kind === 'bar'));
       body.append(row);
     });
     if (m.kind === 'bars' && spec.bars.xAxis === 'cases' && m.categories.length) body.append(el('p.small.muted', 'Os rótulos dos casos (eixo x) são editados na seção 1.'));
@@ -2499,6 +2628,7 @@
         body.append(el('div.fields.two', cats.map((c) => field(c.key, labelInput(c.key, autoLabel(c.key))))));
       }
     }
+    if (m.kind === 'ref') { const tx = refTexts(m); if (tx) body.append(tx); }
     seriesBox.append(section('3. Séries e cores (' + entries.length + ')', true, body));
   }
 
@@ -2663,6 +2793,71 @@
         field('Opacidade da caixa', numInput(st, 'valBoxOpacity', changedStyle, { min: 0, max: 1, step: 0.05 }))),
       el('div.checks', checkInput(st, 'valBold', 'Negrito', changedStyle)),
       el('p.small.muted', 'Cada série pode ter cor, negrito, caixa, posição própria ou ficar sem valores: botão "Valores" na série (seção 3).'));
+  }
+
+  /** 1.18.3: look of the comparison chart (height of each bar, boxes, numbers). */
+  /** 1.18.3: names of the cases and texts of the values of the comparison chart (section 3). */
+  function refTexts(m) {
+    const spec = S.spec;
+    // texts of this chart: case names (the case label, also in section 1) and the value of each bar
+    let texts = null;
+    if (m && m.sections.length) {
+      const rows = [];
+      const caseKeys = m.sections[0].bars.map((b) => b.key);
+      for (const k of caseKeys) {
+        const c = spec.cases.find((x) => x.path === k);
+        if (!c) continue;
+        const i = el('input.input', { type: 'text', value: c.label, 'data-fk': 'refname:' + k, placeholder: App.caseNameOf(k) });
+        i.addEventListener('input', () => { c.label = i.value; changedStyle(); });
+        rows.push(field('Nome · ' + App.caseNameOf(k), i));
+      }
+      const vals = [];
+      for (const sx of m.sections.slice(0, 20)) for (const b of sx.bars) {
+        const key = 'refval:' + sx.item + '|' + b.key;
+        const i = el('input.input', { type: 'text', value: spec.labels[key] !== undefined ? spec.labels[key] : '', 'data-fk': 'lbl:' + key, placeholder: R().refValueText(b.diff, m.mode, spec.style) + ' (automático)' });
+        i.addEventListener('input', () => { if (i.value === '') delete spec.labels[key]; else spec.labels[key] = i.value; changedStyle(); });
+        vals.push(field('Valor · ' + (sx.label ? sx.label + ' · ' : '') + b.label, i));
+      }
+      const clearVals = el('button.btn.small.ghost', { type: 'button', on: { click: () => { for (const k of Object.keys(spec.labels)) if (k.startsWith('refval:')) delete spec.labels[k]; persistDraft(); drawControls(); refresh(true); } } }, 'Voltar todos os valores ao automático');
+      texts = el('details.fsec', el('summary', 'Textos do gráfico (nomes e valores)'),
+        el('div.stack-s', { style: { padding: '6px 0' } },
+          el('p.small.muted', 'O nome é o rótulo do caso nesta figura (o mesmo da seção 1). O valor vazio usa o número calculado; escreva um texto para trocá-lo só nesta figura.'),
+          el('div.fields.two', rows), el('div.fields.two', vals), clearVals));
+      texts.open = !!S.refTextsOpen;
+      texts.addEventListener('toggle', () => { S.refTextsOpen = texts.open; });
+    }
+    return texts;
+  }
+
+  function refStylePanel() {
+    const st = S.spec.style;
+    const spec = S.spec;
+    return el('div.stack-s',
+      el('div.fields.two',
+        field('Grossura das barras (px)', numInput(st, 'refBarPx', changedStyle, { min: 2, max: 200, step: 1, placeholder: 'auto' })),
+        field('Altura de cada linha (px)', numInput(st, 'refRowH', changedStyle, { min: 30, max: 400, step: 2 }), 'Espaço de cada caso (nome + barra). Aumenta sozinho se o nome e a barra não couberem.'),
+        field('Tamanho do nome do caso (px)', numInput(st, 'refNameSize', changedStyle, { min: 6, max: 60, step: 0.5, placeholder: 'auto' })),
+        field('Tamanho do valor (px)', numInput(st, 'refValueSize', changedStyle, { min: 6, max: 60, step: 0.5, placeholder: 'auto' })),
+        field('Distância do nome até a barra (px)', numInput(st, 'refNameGap', changedStyle, { min: 0, max: 100, step: 1 }), 'Espaço vertical entre o nome e a barra.'),
+        field('Afastamento do nome da linha da referência (px)', numInput(st, 'refNameDx', changedStyle, { min: 0, max: 400, step: 1 })),
+        field('Distância do valor até a ponta da barra (px)', numInput(st, 'refValueGap', changedStyle, { min: 0, max: 100, step: 1 })),
+        field('Casas decimais', numInput(st, 'refDigits', changedStyle, { min: 0, max: 10, placeholder: 'auto (3; 1 em %)' })),
+        field('Formato da diferença absoluta', selectInput(st, 'refFormat', [['fixed', 'Decimal (ex.: +0,026)'], ['sci', 'Científico (ex.: +2,6E-3)']], changedStyle)),
+        field('Tamanho do título da seção (px)', numInput(st, 'refTitleSize', changedStyle, { min: 0, max: 60, step: 1, placeholder: 'auto' })),
+        field('Cor da linha da referência', colorInput(st, 'refZeroColor', changedStyle)),
+        field('Contorno das barras', colorInput(Object.assign(st, { refOutlineColor: st.refOutlineColor || '#1f2d3a' }), 'refOutlineColor', changedStyle))),
+      el('div.checks',
+        checkInput(st, 'refNameBox', 'Moldura nos nomes dos casos', changedStyle),
+        checkInput(st, 'refValueBox', 'Moldura nos valores', changedStyle),
+        checkInput(st, 'refTitleBox', 'Moldura no nome da referência (título)', changedStyle),
+        checkInput(st, 'refNameBold', 'Nomes em negrito', changedStyle),
+        checkInput(st, 'refValueBold', 'Valores em negrito', changedStyle),
+        checkInput(st, 'refOutline', 'Contorno nas barras', changedStyle),
+        checkInput(st, 'refTicks', 'Números no eixo', changedStyle),
+        checkInput(st, 'refShowRefValue', 'Mostrar o valor do caso de referência', changedStyle),
+        checkInput(st, 'refShared', 'Mesma escala em todas as seções', changedStyle),
+        checkInput(st, 'refColorTitle', 'Nome da causa com a cor dela no título', changedStyle)),
+      el('p.small.muted', 'Nomes dos casos e textos dos valores: seção 3 ("Textos do gráfico"). Largura, fonte e tamanho geral do texto: seção 4. Cor de cada caso ou causa: seção 3.'));
   }
 
   /** Per-series overrides: pattern (bars) and value labels. Shown under the series row when opened. */
@@ -2917,6 +3112,7 @@
     if (m.kind === 'cores') return ['cores'];
     if (m.kind === 'slots') return ['slots'];
     if (m.kind === 'topo') return ['topo'];
+    if (m.kind === 'ref') return m.sections.map((sx) => 'i:' + sx.item).concat(m.sections[0] ? m.sections[0].bars.map((b) => b.key) : [], [S.spec.ref.colorBy]);
     return [];
   }
 
@@ -3066,6 +3262,13 @@
       how.push(m.block ? 'Cada célula é um slot de um núcleo de um enlace; a cor é o bloqueio das requisições cuja faixa incluía o slot (ou a causa principal, no modo de causas). Passe o mouse para ver tentativas e bloqueios.'
         : 'Cada célula é um slot de um núcleo de um enlace; a cor é a fração do tempo em que o slot esteve ocupado. Faixas escuras contínuas são espectro quase sempre ocupado; no núcleo QKD aparecem os QChs e PIChs.');
     }
+    if (m.kind === 'ref') {
+      how.push('A linha vertical é o caso de referência (' + m.refLabel + '). Cada barra é outro caso: à direita, valor maior que o da referência; à esquerda, menor.');
+      how.push(m.mode === 'rel' ? 'O número é a diferença em % do valor da referência: (valor − referência) ÷ referência × 100. Com referência zero, a porcentagem não existe (n/d).'
+        : 'O número é a diferença absoluta: valor do caso − valor da referência, na unidade da métrica.');
+      if (m.sections.length > 1) how.push('Uma seção por ' + (spec.bars.dim === 'Core' ? 'núcleo' : spec.bars.dim === 'Cause' || /cause|by /i.test((m.items || []).join(' ')) ? 'causa' : 'item') + (st.refShared !== false ? ', todas na mesma escala.' : ', cada uma com a sua escala.'));
+      how.push('Média das replicações no ponto de carga escolhido; a diferença não mostra o intervalo de confiança (veja os gráficos de barras para isso).');
+    }
 
     // ---- legend items
     const legend = [];
@@ -3196,6 +3399,8 @@
         if (c) { p.title = caseLabel(c); s.name = p.title; }
         for (const cat of p.model.categories) cat.label = itemLabel(spec, cat.key);
       });
+    } else if (m.kind === 'ref') {
+      styleRef(m, spec);
     } else if (m.kind === 'topo') {
       m.legendTitle = spec.labels.__heat || App.metricInfo.axisTitle(spec.metric) || spec.metric;
     } else if (m.kind === 'slots') {
@@ -3230,6 +3435,7 @@
       const c = caseOfKey(spec, s.key);
       return c && hid.has(c.path) ? Object.assign({}, s, { hiddenCase: true, style: Object.assign({}, s.style, { visible: false }) }) : s;
     }), spec);
+    if (m.kind === 'ref') return viewRef(m, spec);
     if (m.kind === 'line') return Object.assign({}, m, { series: fix(m.series) });
     if (m.kind === 'bars') return Object.assign({}, m, { series: fix(m.series), categories: m.categories.filter((c) => !hid.has(c.key)) });
     if (m.kind === 'panels') {
@@ -3242,6 +3448,7 @@
     if (v.kind === 'line') return !v.series.some((s) => s.style.visible !== false);
     if (v.kind === 'bars') return !v.categories.length || !v.series.some((s) => s.style.visible !== false);
     if (v.kind === 'panels') return !v.panels.length;
+    if (v.kind === 'ref') return !v.sections.length;
     return false;
   }
 
