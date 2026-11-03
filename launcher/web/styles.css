@@ -159,8 +159,10 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 .step .n { font-family: var(--mono); color: var(--accent-ink); font-size: 12px; }
 
 /* ---------- case header & tabs ---------- */
+/* 1.18.2: title, actions and tabs form one fixed block (before, the tabs slid under a taller header) */
+.case-sticky { position: sticky; top: 0; z-index: 6; background: var(--bg); margin-bottom: 18px; }
 .case-head {
-  position: sticky; top: 0; z-index: 5; background: var(--bg);
+  background: var(--bg);
   display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap;
   padding: 18px 0 10px;
 }
@@ -170,8 +172,8 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 .case-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .dirty-badge { background: var(--warn-soft); color: var(--warn); border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
 .tabs {
-  position: sticky; top: 64px; z-index: 4; background: var(--bg);
-  display: flex; gap: 2px; border-bottom: 1px solid var(--border); overflow-x: auto; margin-bottom: 18px;
+  background: var(--bg);
+  display: flex; gap: 2px; border-bottom: 1px solid var(--border); overflow-x: auto;
 }
 .tab {
   border: 0; background: transparent; padding: 8px 10px; cursor: pointer; color: var(--fg-2);
@@ -344,13 +346,15 @@ svg.chart .axis line, svg.chart .axis path { stroke: var(--border-strong); }
   .sidebar { width: auto; flex: 0 0 auto; max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--border); }
   .main { padding: 0 16px 40px; overflow: visible; }
   .two-col { grid-template-columns: 1fr; }
-  .tabs { top: 0; }
-  .case-head { position: static; }
+  .case-head { padding-top: 10px; }
 }
 
 /* ------------------------------------------------------------ estúdio de gráficos */
-#figView { padding-top: 18px; }
 .fig-head { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: flex-end; justify-content: space-between; margin-bottom: 14px; }
+/* 1.18.2: the figure toolbar (Salvar, Baixar SVG/PNG...) stays visible while the page scrolls */
+#figView { padding-top: 18px; }
+.fig-stickybar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 8px 0; margin: -6px 0 12px; border-bottom: 1px solid var(--border); }
+.results-studio .fig-stickybar { top: var(--case-sticky-h, 0px); }
 .fig-head h1 { font-size: 20px; margin: 0 0 2px; }
 .fig-head p { margin: 0; max-width: 80ch; }
 .fig-toolbar { margin: 0; }
@@ -504,3 +508,14 @@ input.mirrored { background: rgba(46, 160, 67, .18); transition: background .3s;
 
 /* Parte 44: edição experimental */
 .edition-badge { margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: #b45309; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; vertical-align: middle; }
+
+/* ---- 1.18.2: edição em lote ---- */
+#btnSelect[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
+.sel-bar { position: sticky; top: 0; z-index: 2; display: grid; gap: 6px; padding: 8px 10px; margin: 0 0 6px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
+.sel-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.tree-cb { width: 14px; height: 14px; margin: 0 2px 0 0; flex: 0 0 auto; }
+.tree-item.marked { background: var(--accent-soft); }
+.tree-item.in-bulk .label { font-weight: 600; }
+.bulk-mode .case-head { border-left: 3px solid var(--accent); padding-left: 10px; }
+td.bulk-diff { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+tr.bulk-tpl td { background: var(--accent-soft); }

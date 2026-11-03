@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
  */
 public final class LauncherServer {
 
-    static final String VERSION = "1.20.0";
+    static final String VERSION = "1.20.1";
 
     private final Settings settings;
     private final Workspace workspace;
@@ -217,12 +217,12 @@ public final class LauncherServer {
             case "/api/file": {
                 requirePost(post);
                 long mtime = q.containsKey("mtime") ? Long.parseLong(q.get("mtime")) : 0L;
-                workspace.writeCaseFile(required(q, "path"), required(q, "name"), readBody(ex), mtime);
+                workspace.writeCaseFile(required(q, "path"), required(q, "name"), readBody(ex), mtime, q.get("backup"));
                 return ok();
             }
             case "/api/routes/delete": {
                 requirePost(post);
-                workspace.deleteRoutesFile(required(q, "path"));
+                workspace.deleteRoutesFile(required(q, "path"), q.get("backup"));
                 return ok();
             }
             case "/api/csv": {
