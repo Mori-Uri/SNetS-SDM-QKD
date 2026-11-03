@@ -41,6 +41,10 @@ P_SpRS = Δλ · Σ_n P_n · ρ(λ_n → λ_q) · G_n(L)
 Como nas variantes de XT e de modulação, o modelo é escolhido por caso, e a comparação é feita com casos iguais que
 só mudam essa opção. Exemplo: `QKD_Multibanda/*/SSMF_MB_Raman-*`.
 
+**Qual modelo corresponde a qual artigo (Parte 46).** `artigo` segue Dibaj et al. (JLT 2025, eq. 6), com fração
+0,5 dos fótons de SpRS. Mehdizadeh et al. (2024) contam todos os fótons (fração 1), o que fica mais perto de
+`fisico`. Detalhes em `VALIDACAO_LITERATURA.md`.
+
 ## Arquiteturas
 
 | `architecture` | O que o núcleo QKD (virtual) representa | SpRS | Crosstalk linear no QCh |

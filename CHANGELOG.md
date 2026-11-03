@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [46](#parte-46) | Parte 46 — validação contra a literatura: FWM de Peters, SpRS medido, NLI de Mehdizadeh reproduzido no GNPy |
 | [45](#parte-45) | Parte 45 — NLI no QCh (N2), verificação MB × MF em rede, custo dos algoritmos, save states, desempenho e launcher 1.20.0 |
 | [44](#parte-44) | Parte 44 — pasta experimental paralela, launcher 1.19.1 (edição experimental), SpRS nos resultados e fibra bidirecional |
 | [43](#parte-43) | Parte 43 — multibanda no simulador (N0 e N1), modelos de Raman selecionáveis e launcher 1.19.0 |
@@ -27,6 +28,47 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-46"></a>
+
+## Parte 46 — validação contra a literatura: FWM de Peters, SpRS medido, NLI de Mehdizadeh reproduzido no GNPy
+
+**Mehdizadeh 2024 (QCh a 1522 nm, item VMB-11f da Parte 45): resolvido.**
+
+- O "NLI" da Fig. 3 do artigo é o NLI que o GNPy calcula para o QCh tratado como canal de −80 dBm (SPM + XPM sobre o
+  próprio QCh). Reproduzido com o GNPy 2.14.2 e com a fórmula fechada que ele usa, dentro de 1 dB da figura.
+- Esse ruído dá cerca de 1e-8 fótons por janela, desprezível.
+- A diferença vinha do SpRS. O artigo conta todos os fótons de SpRS (fração 1), sem o fator 0,5 de Dibaj 2025
+  (eq. 6). Com fração 1, a QBER da Fig. 5(b) bate de 1440 a 1522 nm (erro máximo de 0,026).
+- **Os dois artigos do grupo usam convenções diferentes.** O modelo `artigo` do simulador segue Dibaj 2025, e o
+  `fisico` fica mais perto de Mehdizadeh. Nada mudou no comportamento do simulador.
+
+**Novos itens (`MultiBandLiteratureVerification`, VMB-12a–e):**
+
+| Item | O que confere | Resultado |
+|---|---|---|
+| VMB-12a | FWM de 2 canais CW (Peters 2009) | ±1 dB |
+| VMB-12b | NLI do simulador × FWM CW | ±2,4 dB |
+| VMB-12c | espectros de SpRS medidos por Peters 2009 | modelo 13 a 33 % abaixo; a forma com a distância confere |
+| VMB-12d | NLI de Mehdizadeh, Fig. 3 | ±1 dB |
+| VMB-12e | QBER de Mehdizadeh, Fig. 5(b) | ±0,026 |
+
+- **Pendente:** de 1392 a 1450 nm, o artigo tem 2 a 5 vezes mais SpRS que o nosso perfil Raman. Nessa região, a
+  seção de choque está fora da faixa medida, e o artigo não diz como a estendeu.
+
+**Arquivos:**
+
+- Novos: `qkd/multiband/FourWaveMixingModel.java` (FWM de canais CW, fórmula de Inoue) e
+  `qkd/verification/MultiBandLiteratureVerification.java`.
+- Atualizados: `MultiBandPhysicsVerification` (VMB-3) e `MultiBandNliVerification` (VMB-11f). Os dois pendentes de
+  1522 nm passaram a [INFO] com a explicação.
+- Novos dados: `verificacao/QKD_reference/Mehdizadeh_GNPy/`, com o script do GNPy, o CSV e o LEIA-ME.
+- Nova documentação: `docs/multibanda/VALIDACAO_LITERATURA.md`, com a tabela de todas as validações (VMB-1 a VMB-12)
+  e os pendentes.
+
+**Regressão:** o simulador não mudou; os casos M continuam iguais à referência `experimental`.
 
 ---
 

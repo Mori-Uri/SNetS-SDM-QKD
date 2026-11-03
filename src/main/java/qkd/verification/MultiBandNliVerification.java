@@ -34,7 +34,7 @@ import simulationControl.parsers.NetworkConfig.CoreConfig;
  *       above ~1405 nm the edge of the E band can be reached);</li>
  *   <li>VMB-11d: the NLI falls off with the distance from the edge of the classical band;</li>
  *   <li>VMB-11e: the simulator (live SNetS circuits, nliModel = gn) gives the same NLI as the link model;</li>
- *   <li>VMB-11f: [MEHDI24] 1522 nm / 5 km is reported (still [PENDENTE]): with SpRS + GN NLI the model gives about
+ *   <li>VMB-11f: [MEHDI24] 1522 nm / 5 km is reported ([INFO]; explained by VMB-12d/e in Parte 46): with SpRS + GN NLI the model gives about
  *       77 Mbit/s against 25.82 Mbit/s in the paper.</li>
  * </ul>
  */
@@ -51,7 +51,7 @@ public final class MultiBandNliVerification {
         simulatorEqualsLinkModel();
         mehdizadeh1522();
         System.out.println();
-        System.out.println("Multi-band NLI verification (Parte 45): ALL CHECKS PASSED (1 item pendente, ver acima)");
+        System.out.println("Multi-band NLI verification (Parte 45): ALL CHECKS PASSED");
     }
 
     private static final double C = 299792458.0;
@@ -175,9 +175,10 @@ public final class MultiBandNliVerification {
         final MultiBandLinkResult r = MultiBandQkdLinkModel.paperCompatible(p)
                 .withNli(NonlinearInterferenceModel.standard(), 2.5e9)
                 .evaluate(1522, 5, ClassicalChannel.referenceCLComb(0.0, ClassicalChannel.Direction.CO_PROPAGATING));
-        System.out.println(String.format(Locale.ROOT, "[PENDENTE] VMB-11f [MEHDI24] 1522 nm / 5 km: 25,82 Mbit/s, QBER "
-                + "0,066. Modelo com SpRS + NLI (GN): %.1f Mbit/s, QBER %.3f (p_SpRS %.1e, p_NLI %.1e). Para a QBER do "
-                + "artigo, p_b ~ 2e-2: o NLI do GN com canais de 0 dBm/75 GHz fica ~2 ordens abaixo do que faltaria.",
+        System.out.println(String.format(Locale.ROOT, "[INFO] VMB-11f [MEHDI24] 1522 nm / 5 km: 25,82 Mbit/s, QBER "
+                + "0,066. Modelo (preset do artigo, fracao 0,5) com SpRS + NLI (GN): %.1f Mbit/s, QBER %.3f (p_SpRS %.1e, "
+                + "p_NLI %.1e). Explicado na Parte 46 (VMB-12d/e): o NLI do artigo e o do GNPy para um QCh de -80 dBm "
+                + "(desprezivel) e a diferenca vem da fracao 0,5 do SpRS, que o [MEHDI24] nao usa.",
                 r.getSecretKeyRateBps() / 1e6, r.getQber(), r.getRamanProbabilitySameCore(), r.getNliProbability()));
     }
 

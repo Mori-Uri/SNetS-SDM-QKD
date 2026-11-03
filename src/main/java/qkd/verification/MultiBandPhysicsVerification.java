@@ -119,8 +119,9 @@ public final class MultiBandPhysicsVerification {
         relative(r5.getSecretKeyRateBps(), 160.82e6, 0.10, "VMB-3 [MEHDI24] SKR(1260 nm, 5 km) = 160,82 Mbit/s");
         within(r5.getQber(), 0.015, 0.001, "VMB-3 [MEHDI24] QBER(1260 nm, 5 km) = 0,015");
         final MultiBandLinkResult s = m.evaluate(1522, 5, comb);
-        pending(String.format(Locale.ROOT, "VMB-3 [MEHDI24] SKR(1522 nm, 5 km) = 25,82 Mbit/s, QBER 0,066: modelo "
-                + "da %.1f Mbit/s, QBER %.3f (S-band junto ao comb: falta NLI/FWM, nivel N2)",
+        System.out.println(String.format(Locale.ROOT, "[INFO] VMB-3 [MEHDI24] SKR(1522 nm, 5 km) = 25,82 Mbit/s, QBER "
+                + "0,066: com a fracao 0,5 deste preset o modelo da %.1f Mbit/s, QBER %.3f. Explicado na Parte 46 "
+                + "(VMB-12e): o [MEHDI24] conta todos os fotons de SpRS (fracao 1), e o NLI nao pesa.",
                 s.getSecretKeyRateBps() / 1e6, s.getQber()));
     }
 
