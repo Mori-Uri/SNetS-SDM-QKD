@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [47](#parte-47) | Parte 47 — launcher 1.18.2: cabeçalhos fixos e edição em lote |
 | [41](#parte-41) | Parte 41 — repositório SNetS-SDM-QKD: README novo, CHANGELOG único, simulations/ fora do git, enlaces bidirecionais no launcher (1.18.1) |
 | [40](#parte-40) | Parte 40 — topologias e fibras de pequena escala, regra ABNE nos QChs, PICh configurável (launcher 1.18.0) |
 | [39](#parte-39) | Parte 39 — canal QKD bloqueado, nós confiáveis por enlace, qabne e launcher 1.17.0 |
@@ -23,6 +24,44 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-47"></a>
+
+## Parte 47 — launcher: cabeçalhos fixos e edição em lote (main 1.18.2, experimental 1.20.1)
+
+**Barras fixas ao rolar a página**
+
+- Nos casos, o título, os botões (Abrir pasta, Recarregar, Revisar e salvar) e as abas (Visão geral, Tráfego, Rede,
+  ...) formam um bloco só, que fica fixo no topo. Antes as abas deslizavam por baixo do cabeçalho.
+- Em Gráficos e na aba Resultados, a barra com Salvar, Salvar como, Baixar SVG, Baixar PNG etc. fica fixa no topo
+  (na aba Resultados, logo abaixo das abas do caso).
+
+**Edição em lote**
+
+1. Clique em **Selecionar** (barra lateral) para mostrar caixas de seleção nos casos e nas pastas. Marcar uma pasta
+   marca todos os casos dentro dela, respeitando o filtro. Depois clique em **Editar em lote**.
+2. A **Visão geral** do lote mostra uma tabela dos casos marcados com nós, enlaces, núcleos, carga, pontos,
+   replicações, requisições, algoritmos e QKD. As células diferentes do caso modelo ficam destacadas.
+3. As abas Tráfego, Rede, Camada física, Simulação, Métricas, QKD e Others são as mesmas de um caso e mostram os
+   valores do **caso modelo**, que pode ser trocado.
+4. **Só os campos alterados são aplicados**; o resto de cada caso não muda.
+   - Elementos de listas com identidade são casados pela identidade, não pela posição: núcleos pelo `id`, nós pelo
+     `name`, enlaces e geradores de tráfego por origem/destino/taxa. Remover o núcleo 6 remove o núcleo 6 em cada
+     caso e mantém os outros, inclusive os núcleos QKD.
+5. **Aplicar nos casos** mostra, por caso:
+   - o número de mudanças;
+   - os campos em que o caso tinha outro valor;
+   - as mudanças que não cabem nele (arquivo ausente, par de nós de outra topologia), que são ignoradas;
+   - a validação do resultado.
+   Cada caso pode ser desmarcado antes de gravar.
+6. Antes de gravar, cada arquivo vai para `simulations/backup_lote/lote_<data-hora>/<caso>/<arquivo>.bak`. Essa
+   pasta não aparece na lista de casos.
+   - Se a topologia muda, o `kRoutesByPar.txt` (rotas antigas) pode ser movido para a mesma cópia.
+
+**Arquivos:** `launcher/web/js/bulk.js` (novo), `app.js`, `api.js`, `figures.js`, `index.html`, `styles.css`,
+`launcher/src/launcher/Workspace.java`, `LauncherServer.java` e `snets-launcher.jar`. O simulador não mudou.
 
 ---
 

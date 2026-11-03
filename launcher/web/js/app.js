@@ -10,6 +10,8 @@
     casePath: null, caseData: null,
     base: {}, model: {}, dirty: {}, parseErrors: {}, rawText: {}, viewMode: {},
     tab: 'overview', expanded: new Set(),
+    // 1.18.2: batch editor (bulk.js): selection mode of the sidebar and the open batch
+    selectMode: false, selected: new Set(), bulk: null,
   };
 
   const TABS = [
@@ -32,13 +34,14 @@
   // ================================================================== serialization
 
   /** Writes each file in the same style the simulator's own files use. */
-  App.serialize = function (name, obj) {
+  App.serialize = function (name, obj, othersText) {
     if (name === 'traffic' && isPlainObject(obj) && Array.isArray(obj.requestGenerators)
       && Object.keys(obj).length === 1) {
       return '{"requestGenerators":[\n' + obj.requestGenerators.map((g) => JSON.stringify(g)).join(',\n') + '\n]}';
     }
     if (name === 'others') {
-      const orig = st.caseData && st.caseData.files.others;
+      // 1.18.2: the batch editor passes the original text of each case
+      const orig = othersText !== undefined ? othersText : st.caseData && st.caseData.files.others;
       if (!orig || orig.trim().indexOf('\n') < 0) return JSON.stringify(obj);
     }
     return JSON.stringify(obj, null, 2);
@@ -104,6 +107,9 @@
 
   function drawTree() {
     const box = clear(document.getElementById('tree'));
+    const sel = st.selectMode;
+    document.getElementById('btnSelect').setAttribute('aria-pressed', String(!!sel));
+    if (sel) box.appendChild(App.bulk.selectionBar());
     if (!st.tree || !st.tree.exists) {
       box.appendChild(el('div.tree-empty', 'Pasta simulations não encontrada: ', el('code', st.tree ? st.tree.simulationsDir : '?'),
         '. Ajuste em Configurações.'));
@@ -114,11 +120,13 @@
     const nodeEl = (n) => {
       if (!matches(n)) return null;
       if (n.isCase) {
-        const item = el('div.tree-item' + (n.path === st.casePath ? '.active' : ''), {
+        const marked = sel && st.selected.has(n.path);
+        const item = el('div.tree-item' + (n.path === st.casePath && !st.bulk ? '.active' : '') + (marked ? '.marked' : '')
+          + (st.bulk && st.bulk.paths.includes(n.path) ? '.in-bulk' : ''), {
           title: n.path + (n.csvCount ? '\nResultados: ' + fmtDate(n.lastResult) : ''),
-          on: { click: () => App.openCase(n.path) },
+          on: { click: () => (sel ? App.selection.set([n.path], !marked) : App.openCase(n.path)) },
         },
-        el('span.tw', ''),
+        sel ? el('input.tree-cb', { type: 'checkbox', checked: marked, tabIndex: -1 }) : el('span.tw', ''),
         caseIcon(),
         el('span.label', n.name),
         n.csvCount ? el('span.badge', n.csvCount + ' csv') : null);
@@ -126,9 +134,20 @@
       }
       const open = q || st.expanded.has(n.path);
       const wrap = el('div');
+      let fcb = null;
+      if (sel) {
+        // marking a folder marks every case inside it (only those that pass the filter)
+        const inside = [];
+        const walk = (x) => { if (x.isCase) { if (matches(x)) inside.push(x.path); } else (x.children || []).forEach(walk); };
+        walk(n);
+        const k = inside.filter((p) => st.selected.has(p)).length;
+        fcb = el('input.tree-cb', { type: 'checkbox', checked: inside.length > 0 && k === inside.length, title: 'Marcar todos os casos desta pasta' });
+        fcb.indeterminate = k > 0 && k < inside.length;
+        fcb.addEventListener('click', (ev) => { ev.stopPropagation(); App.selection.set(inside, k < inside.length); });
+      }
       wrap.appendChild(el('div.tree-item', {
         on: { click: () => { if (st.expanded.has(n.path)) st.expanded.delete(n.path); else st.expanded.add(n.path); drawTree(); } },
-      }, el('span.tw', open ? '▾' : '▸'), folderIcon(), el('span.label', n.name),
+      }, el('span.tw', open ? '▾' : '▸'), fcb, folderIcon(), el('span.label', n.name),
       el('span.badge', String(countCases(n)))));
       if (open) {
         const kids = el('div.tree-children');
@@ -149,6 +168,8 @@
       if (vItems.length) { box.appendChild(head); vItems.forEach((i) => box.appendChild(i)); }
     }
   }
+
+  App.redrawTree = () => drawTree();
 
   function countCases(n) { return n.isCase ? 1 : (n.children || []).reduce((s, c) => s + countCases(c), 0); }
 
@@ -175,11 +196,15 @@
    */
   App.caseHooks = App.caseHooks || [];
 
-  App.openCase = async function (path, tab) {
-    if (st.casePath && path !== st.casePath && App.dirtyFiles().length
-      && !window.confirm('Há alterações não salvas em ' + st.casePath + '. Descartá-las e abrir outro caso?')) return;
-    let data;
-    try { data = await App.api.readCase(path); } catch (e) { App.toast(e.message, 'err'); return; }
+  App.openCase = async function (path, tab, bulk, preloaded) {
+    if (st.casePath && (path !== st.casePath || (st.bulk && !bulk)) && App.dirtyFiles().length
+      && !window.confirm('Há alterações não salvas em ' + (st.bulk ? 'edição em lote' : st.casePath) + '. Descartá-las e abrir outro caso?')) return;
+    let data = preloaded;
+    if (!data) {
+      try { data = await App.api.readCase(path); } catch (e) { App.toast(e.message, 'err'); return; }
+    }
+    // 1.18.2: bulk = batch editor (bulk.js); a plain open leaves it
+    st.bulk = bulk || null;
     st.casePath = path;
     st.caseData = data;
     st.base = {}; st.model = {}; st.dirty = {}; st.parseErrors = {}; st.rawText = {};
@@ -202,13 +227,19 @@
     document.getElementById('figView').hidden = true;
     document.getElementById('caseView').hidden = false;
     const parts = path.split('/');
-    document.getElementById('caseName').textContent = parts[parts.length - 1];
-    document.getElementById('caseCrumbs').textContent = App.isVerificationPath(path)
+    document.getElementById('caseName').textContent = st.bulk ? 'Edição em lote · ' + st.bulk.paths.length + ' casos' : parts[parts.length - 1];
+    document.getElementById('caseCrumbs').textContent = st.bulk ? 'modelo: ' + App.displayPath(path) : App.isVerificationPath(path)
       ? parts.slice(0, -1).map((p) => p + '/').join('').slice(1)
       : 'simulations/' + parts.slice(0, -1).map((p) => p + '/').join('');
+    document.getElementById('caseView').classList.toggle('bulk-mode', !!st.bulk);
+    document.getElementById('btnExitBulk').hidden = !st.bulk;
+    document.getElementById('btnGoReview').textContent = st.bulk ? 'Aplicar nos casos' : 'Revisar e salvar';
+    document.getElementById('btnReload').title = st.bulk ? 'Descartar alterações e reler os casos do lote' : 'Descartar alterações e recarregar do disco';
     for (const h of App.caseHooks) { try { h(path); } catch (e) { /* a panel must not block the case */ } }
     if (tab) st.tab = tab;
     if (st.tab === 'qkd' && !App.qkdcase.isQkd()) st.tab = 'overview';
+    if (st.bulk && !App.bulk.isBulkTab(st.tab)) st.tab = 'overview';
+    if (!st.bulk && st.tab === 'bulk') st.tab = 'overview';
     drawTabs();
     App.qkdcase.drawModeBar();
     App.refreshDirty();
@@ -218,6 +249,7 @@
 
   App.reloadCase = async function (force) {
     if (!st.casePath) return;
+    if (st.bulk) { App.bulk.reload(); return; }
     if (!force && App.dirtyFiles().length && !window.confirm('Descartar as alterações não salvas e recarregar do disco?')) return;
     const p = st.casePath;
     st.dirty = {};
@@ -227,7 +259,7 @@
 
   /** Refreshes only the list of result files (after a run) without touching edits. */
   App.refreshCaseFiles = async function () {
-    if (!st.casePath) return;
+    if (!st.casePath || st.bulk) return;
     App.results.invalidate(st.casePath);
     if (App.figures) App.figures.invalidate(st.casePath);
     if (!App.dirtyFiles().length) {
@@ -275,7 +307,8 @@
 
   function drawTabs() {
     const box = clear(document.getElementById('tabs'));
-    for (const t of TABS) {
+    const tabs = st.bulk ? TABS.filter((t) => !t.id || App.bulk.isBulkTab(t.id)).concat([{ id: 'bulk', label: 'Aplicar nos casos' }]) : TABS;
+    for (const t of tabs) {
       if (t.sep) { box.appendChild(el('span.tab-sep')); continue; }
       if (t.qkdOnly && !App.qkdcase.isQkd()) continue;
       const b = el('button.tab', {
@@ -307,7 +340,8 @@
     let node;
     try {
       switch (st.tab) {
-        case 'overview': node = renderOverview(); break;
+        case 'overview': node = st.bulk ? App.bulk.renderOverview() : renderOverview(); break;
+        case 'bulk': node = App.bulk.renderApply(); break;
         case 'traffic': node = st.parseErrors.traffic ? configTab('traffic') : App.traffic.render(); break;
         case 'network': case 'physicalLayer': case 'simulation': case 'others': case 'qkdPhysicalLayer': node = configTab(st.tab); break;
         case 'metrics': node = renderMetrics(); break;
@@ -696,6 +730,7 @@
     if (st.casePath && App.dirtyFiles().length && !window.confirm('Há alterações não salvas em ' + st.casePath + '. Sair do caso mesmo assim?')) return false;
     if (st.casePath) { st.dirty = {}; }
     st.casePath = null;
+    st.bulk = null;
     drawTree();
     return true;
   }
@@ -732,10 +767,18 @@
     const d = document.getElementById('runsDrawer');
     if (ev.key === 'Escape' && d && !d.hidden && !document.querySelector('dialog[open]')) App.run.closeDrawer();
   });
-  document.getElementById('btnGoReview').addEventListener('click', () => App.selectTab('review'));
+  document.getElementById('btnGoReview').addEventListener('click', () => App.selectTab(st.bulk ? 'bulk' : 'review'));
+  document.getElementById('btnExitBulk').addEventListener('click', () => App.bulk.exit());
+  document.getElementById('btnSelect').addEventListener('click', () => App.selection.toggleMode());
   document.getElementById('btnReload').addEventListener('click', () => App.reloadCase(false));
   document.getElementById('btnOpenFolder').addEventListener('click', () => App.api.openFolder(st.casePath).catch((e) => App.toast(e.message, 'err')));
   window.addEventListener('resize', App.debounce(() => { if (st.tab === 'results' && st.casePath) App.renderTab(); }, 250));
+
+  // 1.18.2: height of the fixed case header (title + tabs), used by the toolbars that stay fixed under it
+  const stickyHead = document.getElementById('caseSticky');
+  if (stickyHead && window.ResizeObserver) {
+    new ResizeObserver(() => document.getElementById('main').style.setProperty('--case-sticky-h', stickyHead.offsetHeight + 'px')).observe(stickyHead);
+  }
 
   init().then(() => App.run.pollList());
 })(window.App);

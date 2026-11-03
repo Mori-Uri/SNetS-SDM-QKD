@@ -41,6 +41,7 @@
       <div class="sidebar-buttons">
         <button class="btn small primary" id="btnNewCase">+ Caso</button>
         <button class="btn small" id="btnNewFolder">+ Pasta</button>
+        <button class="btn small" id="btnSelect" aria-pressed="false" title="Marcar vários casos para editar em lote">Selecionar</button>
         <button class="btn small icon" id="btnRefreshTree" title="Atualizar lista">↻</button>
       </div>
       <input type="search" id="treeFilter" class="input" placeholder="Filtrar casos…" autocomplete="off">
@@ -53,6 +54,7 @@
     <section id="qkdView" hidden></section>
     <section id="figView" hidden></section>
     <section id="caseView" hidden>
+      <div class="case-sticky" id="caseSticky">
       <div class="case-head">
         <div class="case-title">
           <div class="crumbs" id="caseCrumbs"></div>
@@ -63,10 +65,12 @@
           <span class="dirty-badge" id="dirtyBadge" hidden></span>
           <button class="btn" id="btnOpenFolder" title="Abrir a pasta do caso no explorador">Abrir pasta</button>
           <button class="btn" id="btnReload" title="Descartar alterações e recarregar do disco">Recarregar</button>
+          <button class="btn" id="btnExitBulk" hidden title="Fechar a edição em lote e voltar ao caso modelo">Sair do lote</button>
           <button class="btn primary" id="btnGoReview">Revisar e salvar</button>
         </div>
       </div>
       <nav class="tabs" id="tabs" role="tablist"></nav>
+      </div>
       <div class="tab-body" id="tabBody"></div>
     </section>
   </main>
@@ -112,6 +116,7 @@
 <script src="js/figures.js"></script>
 <script src="js/netedit.js"></script>
 <script src="js/qkdcase.js"></script>
+<script src="js/bulk.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

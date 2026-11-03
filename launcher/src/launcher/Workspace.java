@@ -164,7 +164,9 @@ final class Workspace {
                     }
                 });
                 for (File f : list) {
-                    if (f.isDirectory() && !f.getName().startsWith(".")) {
+                    // 1.18.2: the copies of the batch editor are not shown in the list of cases
+                    if (f.isDirectory() && !f.getName().startsWith(".")
+                            && !(depth == 0 && BATCH_BACKUP_DIR.equals(f.getName()))) {
                         String childRel = rel.isEmpty() ? f.getName() : rel + "/" + f.getName();
                         Map<String, Object> c = node(f, childRel, depth + 1);
                         // keep folders that are cases or contain cases somewhere below
@@ -239,6 +241,31 @@ final class Workspace {
     }
 
     void writeCaseFile(String rel, String name, String content, long expectedMtime) throws IOException {
+        writeCaseFile(rel, name, content, expectedMtime, null);
+    }
+
+    /**
+     * 1.18.2: folder of the copies kept by the batch editor, one sub-folder per batch:
+     * simulations/backup_lote/&lt;batch&gt;/&lt;case path&gt;/&lt;file&gt;.bak (the .bak name keeps the copies out of the
+     * list of cases).
+     */
+    static final String BATCH_BACKUP_DIR = "backup_lote";
+
+    private File batchBackupFile(String batch, String rel, String fileName) throws IOException {
+        if (batch == null || !batch.matches("[0-9A-Za-z_-]{1,40}")) {
+            throw new IllegalArgumentException("Identificador de lote inválido: " + batch);
+        }
+        String caseDir = rel.replace('\\', '/').replace("@", "_");
+        File dir = new File(new File(new File(simulationsDir(), BATCH_BACKUP_DIR), batch),
+                caseDir.replace('/', File.separatorChar));
+        if (!dir.isDirectory() && !dir.mkdirs()) {
+            throw new IOException("Não foi possível criar a pasta de cópias " + dir);
+        }
+        return new File(dir, fileName + ".bak");
+    }
+
+    /** Same as {@link #writeCaseFile(String, String, String, long)}; with a batch id, copies the old file first. */
+    void writeCaseFile(String rel, String name, String content, long expectedMtime, String batch) throws IOException {
         if (!CASE_FILES.contains(name)) {
             throw new IllegalArgumentException("Arquivo não editável pelo launcher: " + name);
         }
@@ -251,12 +278,28 @@ final class Workspace {
             throw new IllegalStateException("O arquivo '" + name + "' foi alterado fora do launcher desde que "
                     + "foi aberto. Recarregue o caso antes de salvar para não sobrescrever essa alteração.");
         }
+        if (batch != null && target.isFile()) {
+            Files.copy(target.toPath(), batchBackupFile(batch, rel, target.getName()).toPath(),
+                    StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+        }
         writeAtomically(target, content);
     }
 
     void deleteRoutesFile(String rel) throws IOException {
+        deleteRoutesFile(rel, null);
+    }
+
+    /** With a batch id (1.18.2), the routes file is moved to the batch copies instead of deleted. */
+    void deleteRoutesFile(String rel, String batch) throws IOException {
         File f = new File(resolve(rel), ROUTES_FILE);
-        if (f.isFile() && !f.delete()) {
+        if (!f.isFile()) {
+            return;
+        }
+        if (batch != null) {
+            Files.move(f.toPath(), batchBackupFile(batch, rel, ROUTES_FILE).toPath(), StandardCopyOption.REPLACE_EXISTING);
+            return;
+        }
+        if (!f.delete()) {
             throw new IOException("Não foi possível apagar " + f);
         }
     }

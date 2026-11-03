@@ -1676,23 +1676,25 @@
     previewBox = el('div.fig-preview');
     tableBox = el('div.fig-table');
     infoBox = el('div.fig-info');
+    // 1.18.2: the title stays in place and the toolbar goes to a bar that stays fixed while the page scrolls
+    // (a sticky element only stays in view inside its parent, so title and bar are direct children of host)
     const head = S.mode === 'case'
-      ? el('div.fig-head',
-        el('div', el('h2', 'Resultados do caso'),
-          el('p.muted', 'Média das replicações com IC 95 % (t de Student). Escolha o arquivo e a métrica em "2. Dados"; adicione outros casos em "1. Casos" para comparar. Estilo, exportação e figuras salvas funcionam como no botão Gráficos.')),
-        el('div.toolbar', { style: { margin: 0 } }, toolbar(),
+      ? [
+        el('div.fig-head', el('div', el('h2', 'Resultados do caso'),
+          el('p.muted', 'Média das replicações com IC 95 % (t de Student). Escolha o arquivo e a métrica em "2. Dados"; adicione outros casos em "1. Casos" para comparar. Estilo, exportação e figuras salvas funcionam como no botão Gráficos.'))),
+        el('div.toolbar.fig-stickybar', toolbar(),
           el('button.btn.small.ghost', { type: 'button', title: 'Continua esta figura na página Gráficos', on: { click: () => {
             try { localStorage.setItem('snets.figure.draft', JSON.stringify({ spec: S.spec, savedName: S.savedName })); } catch (e) { /* ignore */ }
             S.mode = 'page'; S.casePath = null; S.spec = null;
             App.showFigures();
-          } } }, 'Abrir na página Gráficos')))
-      : el('div.fig-head',
-        el('div', el('h1', 'Estúdio de gráficos'),
-          el('p.muted', 'Monte figuras com os CSVs de vários casos, ajuste o estilo e exporte em SVG/PNG. As figuras salvas ficam em launcher/figures e são recalculadas com os resultados atuais.')),
-        toolbar());
+          } } }, 'Abrir na página Gráficos'))]
+      : [
+        el('div.fig-head', el('div', el('h1', 'Estúdio de gráficos'),
+          el('p.muted', 'Monte figuras com os CSVs de vários casos, ajuste o estilo e exporte em SVG/PNG. As figuras salvas ficam em launcher/figures e são recalculadas com os resultados atuais.'))),
+        el('div.fig-stickybar', toolbar())];
     const reportSec = section('Relatório: várias figuras numa imagem (SVG/PNG/PDF)', false, reportPanel());
     reportSec.classList.add('fig-report');
-    host.append(head, el('div.fig-layout', leftCol, el('div.fig-right', infoBox, previewBox, tableBox, reportSec)));
+    host.append(...head, el('div.fig-layout', leftCol, el('div.fig-right', infoBox, previewBox, tableBox, reportSec)));
     await refreshSaved();
     drawControls();
     await refresh();
