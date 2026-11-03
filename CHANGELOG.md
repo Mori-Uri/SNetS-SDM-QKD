@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [50](#parte-50) | Parte 50 — launcher 1.18.3: gráfico de comparação com um caso de referência |
 | [47](#parte-47) | Parte 47 — launcher 1.18.2: cabeçalhos fixos e edição em lote |
 | [41](#parte-41) | Parte 41 — repositório SNetS-SDM-QKD: README novo, CHANGELOG único, simulations/ fora do git, enlaces bidirecionais no launcher (1.18.1) |
 | [40](#parte-40) | Parte 40 — topologias e fibras de pequena escala, regra ABNE nos QChs, PICh configurável (launcher 1.18.0) |
@@ -24,6 +25,65 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-50"></a>
+
+## Parte 50 — launcher 1.18.3: gráfico de comparação com um caso de referência
+
+Novo tipo de gráfico no Estúdio de gráficos: **Comparação com um caso de referência** (barras divergentes).
+
+- Um caso da seleção é a referência. Ele é a linha vertical do gráfico.
+- Cada outro caso é uma barra com a diferença para a referência: à direita, valor maior; à esquerda, menor. Cada barra tem o nome do caso e o valor da diferença.
+
+**Modelos prontos** (grupo "Comparação com um caso de referência"):
+
+- bloqueio de circuitos;
+- bloqueio de banda;
+- causas de bloqueio, uma seção por causa;
+- utilização de cada núcleo;
+- bloqueio de cada núcleo;
+- utilização do espectro;
+- bloqueio QKD;
+- causas do bloqueio QKD.
+
+O tipo também pode ser escolhido para qualquer outro arquivo ou métrica.
+
+**Opções em "2. Dados":**
+
+- caso de referência (também pela estrela ☆ ao lado do caso na seção 1);
+- diferença absoluta ou em % da referência;
+- ordem das barras: ordem de seleção (padrão), maior aumento primeiro ou maior redução primeiro;
+- seções lado a lado, uma embaixo da outra ou em grade;
+- cores: automática (cor da causa nas causas, cor do caso nos demais), sempre a do caso ou sempre a do item;
+- ponto de carga;
+- itens (causas, núcleos ou métricas) mostrados. Marcar uma só causa dá o gráfico de uma causa; todas dão o gráfico completo.
+
+**Seção "5. Gráfico de referência":**
+
+- grossura das barras (px) e altura de cada linha (a altura da imagem é calculada);
+- tamanho do nome dos casos e tamanho dos valores;
+- distância do nome até a barra, afastamento do nome da linha da referência e distância do valor até a ponta da barra;
+- moldura nos nomes, nos valores e no título (cada uma liga e desliga separada) e negrito nos nomes e nos valores;
+- casas decimais e formato;
+- contorno das barras;
+- números no eixo;
+- valor da referência;
+- mesma escala em todas as seções.
+
+**Textos do gráfico** (seção 3, "Textos do gráfico"):
+
+- o nome de cada caso, que é o rótulo do caso nesta figura (o mesmo da seção 1);
+- o texto do valor de cada barra. Vazio usa o número calculado; um texto escrito troca o valor só nesta figura, e um botão volta todos ao automático.
+
+**Outros pontos:**
+
+- A tabela "Dados do gráfico" e o CSV trazem o valor, o valor da referência e a diferença.
+- A diferença usa a média das replicações e não mostra o intervalo de confiança.
+- Correção na validação do launcher: casos com `qkd.qchGranularity = route` eram marcados com o erro "qkd.qchGranularity deve ser "link" ou "span"", uma regra antiga; o simulador aceita `route`, `link` e `span`.
+
+**Arquivos:** `launcher/web/js/figures.js`, `launcher/web/js/figrender.js`, `launcher/web/js/validate.js`, `launcher/src/launcher/LauncherServer.java` e `launcher/snets-launcher.jar`.
 
 ---
 

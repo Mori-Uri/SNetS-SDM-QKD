@@ -10,6 +10,7 @@
  *   panels: { panels:[{title, model}] }    (small multiples of bars/line)
  *   cores : { diagrams:[{title, cores:[{id,x,y,util,block,unused}]}] }
  *   slots : { panels:[{title, from, to, rows:[{link, core, values:Float64Array}]}], range:{min,max}, legendTitle }
+ *   ref   : { refLabel, mode, cols, sections:[{key, label, color, refVal, bars:[{key, label, val, diff, color}]}] } (1.18.3)
  */
 (function (App) {
   'use strict';
@@ -70,6 +71,9 @@
       slotCauseColors: {},
       // spectrum (slot) heat map
       slotScale: 'traffic', slotRange: 'fixed', slotMin: '', slotMax: '', slotRowH: 12, slotTickStep: '', slotLegend: 'right',
+      // 1.18.3: chart with a reference case
+      refRowH: 72, refBoxes: true, refOutline: true, refTicks: true, refShowRefValue: true, refShared: true, refDigits: '', refFormat: 'fixed', refTitleSize: '', refColorTitle: true,
+      refNameBox: true, refValueBox: true, refTitleBox: true, refNameBold: true, refValueBold: true, refNameSize: '', refValueSize: '', refBarPx: '', refNameGap: 8, refNameDx: 12, refValueGap: 10,
       slotFormat: 'percent', slotDigits: 1, slotGridColor: '#000000', slotZero: 'scale', slotNoData: '#FFFFFF', slotCellGrid: true, slotLinkSep: true, slotPanelTitle: true,
     };
   }
@@ -1429,6 +1433,141 @@
 
   // ------------------------------------------------------------ entry point
 
+  // ------------------------------------------------------------ 1.18.3: comparison with a reference case
+
+  /**
+   * ref: { refLabel, mode ('abs'|'rel'), sections:[{ key, label, refVal, bars:[{ key, label, val, diff, color }] }],
+   *        cols, shared }. One horizontal diverging chart per section: zero line = the reference case, bars to the
+   * right = more than the reference, to the left = less. The geometry is fixed by the style (refRowH), so the
+   * height is computed (refHeight).
+   */
+  /** Sizes and switches of the comparison chart (1.18.3: names, values and bars adjustable separately). */
+  function refLook(st, fs) {
+    const on = (k) => (st[k] === undefined || st[k] === '' ? st.refBoxes !== false : !!st[k]);
+    const num = (k, d) => (st[k] !== undefined && st[k] !== '' && Number.isFinite(Number(st[k])) ? Number(st[k]) : d);
+    const nameSize = num('refNameSize', fs * 0.95), valSize = num('refValueSize', fs);
+    const nameBox = on('refNameBox'), valBox = on('refValueBox'), titleBox = on('refTitleBox');
+    const nameH = nameSize * (nameBox ? 1.75 : 1.25);
+    const barH = Math.max(2, num('refBarPx', Math.max(12, (Number(st.refRowH) || 72) * 0.42)));
+    const nameGap = num('refNameGap', 8), nameDx = num('refNameDx', 12), valGap = num('refValueGap', 10);
+    return { nameSize, valSize, nameBox, valBox, titleBox, nameH, barH, nameGap, nameDx, valGap,
+      nameBold: st.refNameBold !== false, valBold: st.refValueBold !== false };
+  }
+
+  function refGeometry(model, st, W) {
+    const fs = Number(st.fontSize) || 12;
+    const lk = refLook(st, fs);
+    const n = model.sections.length;
+    const cols = Math.max(1, Math.min(model.cols || 1, n));
+    const rows = Math.ceil(n / cols);
+    const titleH = st.showTitle && st.title ? st.titleSize * 1.8 : 0;
+    const rowH = Math.max(lk.nameH + lk.nameGap + lk.barH + 12, Number(st.refRowH) || 72);
+    const headH = (Number(st.refTitleSize) || fs * 1.9) * 1.9 + (st.refShowRefValue !== false ? fs * 1.6 : 0) + 8;
+    const ticksH = st.refTicks !== false ? fs * 2 : 6;
+    const maxBars = Math.max(1, ...model.sections.map((s) => s.bars.length));
+    const secH = headH + maxBars * rowH + ticksH + 10;
+    const gap = Number(st.panelGap) || 18;
+    return { fs, lk, cols, rows, titleH, rowH, headH, ticksH, secH, gap, secW: (W - gap * (cols - 1)) / cols, H: titleH + rows * secH + (rows - 1) * gap + 4 };
+  }
+
+  function refValueText(v, mode, st) {
+    if (!Number.isFinite(v)) return 'n/d';
+    const digits = Number.isFinite(Number(st.refDigits)) && st.refDigits !== '' ? Number(st.refDigits) : (mode === 'rel' ? 1 : 3);
+    const sign = v > 0 ? '+' : v < 0 ? '−' : '';
+    const a = Math.abs(v);
+    const t = mode === 'rel' ? fmtNumber(a, 'fixed', digits, st.decimal) + ' %'
+      : st.refFormat === 'sci' ? fmtNumber(a, 'sci', Math.max(1, digits - 1), st.decimal) : fmtNumber(a, 'fixed', digits, st.decimal);
+    return sign + t;
+  }
+
+  function drawRef(root, model, st, box) {
+    const g0 = refGeometry(model, st, box.w);
+    const fs = g0.fs;
+    const font = st.font;
+    if (g0.titleH) root.appendChild(textEl(box.x + box.w / 2, box.y + st.titleSize * 1.2, st.title, { size: st.titleSize, font, color: st.titleColor, anchor: 'middle', weight: 700 }));
+    const lk = g0.lk;
+    const boxed = lk.titleBox;
+    const outline = st.refOutline !== false;
+    const nameSize = lk.nameSize, valSize = lk.valSize;
+    const valStr = (b) => (b.valText !== undefined && b.valText !== '' ? b.valText : refValueText(b.diff, model.mode, st));
+    const lineW = 1.2;
+    const absMax = (s) => Math.max(0, ...s.bars.map((b) => (Number.isFinite(b.diff) ? Math.abs(b.diff) : 0)));
+    const sharedMax = Math.max(0, ...model.sections.map(absMax));
+    const valW = Math.max(...model.sections.flatMap((s) => s.bars.map((b) => textWidth(valStr(b), valSize, font, 700))), 20) + (lk.valBox ? valSize * 1.6 : 4) + lk.valGap;
+    const labelBox = (parent, x, yMid, str, size, anchor, weight, opts) => {
+      const bx0 = opts && opts.boxed !== undefined ? opts.boxed : boxed;
+      const tw = textWidth(str, size, font, weight || 'normal');
+      const padX = bx0 ? size * 0.8 : 0, h = size * 1.75;
+      let x0 = anchor === 'end' ? x - tw - 2 * padX : anchor === 'middle' ? x - tw / 2 - padX : x;
+      // keep the box inside its section
+      if (opts && opts.lo !== undefined) {
+        if (x0 + tw + 2 * padX > opts.hi) x0 = opts.hi - tw - 2 * padX;
+        if (x0 < opts.lo) x0 = opts.lo;
+      }
+      if (bx0) parent.appendChild(S('rect', { x: x0.toFixed(1), y: (yMid - h / 2).toFixed(1), width: (tw + 2 * padX).toFixed(1), height: h.toFixed(1), fill: st.refBoxFill || '#ffffff', stroke: st.refBoxStroke || '#000000', 'stroke-width': (opts && opts.stroke) || 1.2 }));
+      parent.appendChild(textEl(x0 + padX + tw / 2, yMid + size * 0.36, str, { size, font, color: (opts && opts.color) || st.titleColor || '#000000', anchor: 'middle', weight }));
+      return { x0, x1: x0 + tw + 2 * padX, w: tw + 2 * padX };
+    };
+    model.sections.forEach((sec, i) => {
+      const col = i % g0.cols, row = Math.floor(i / g0.cols);
+      const bx = box.x + col * (g0.secW + g0.gap), by = box.y + g0.titleH + row * (g0.secH + g0.gap), bw = g0.secW;
+      const g = S('g');
+      root.appendChild(g);
+      // header: reference case in a box (+ " - item")
+      const suffix = sec.label ? ' - ' + sec.label : '';
+      const tSize0 = Number(st.refTitleSize) || fs * 1.9;
+      const wAt = (z) => textWidth(model.refLabel, z, font, 700) + (boxed ? z * 1.6 : 0) + (suffix ? textWidth(suffix, z, font, 700) + z * 0.3 : 0);
+      // the title shrinks to fit the section (down to the text size)
+      const tSize = Math.max(Math.min(fs, tSize0), Math.min(tSize0, tSize0 * (bw - 8) / Math.max(1, wAt(tSize0))));
+      const hy = by + tSize0 * 0.95;
+      const hx = Math.max(bx + 2, bx + bw / 2 - wAt(tSize) / 2);
+      const hb = labelBox(g, hx, hy, model.refLabel, tSize, 'start', 700, { stroke: 1.5 });
+      if (suffix) g.appendChild(textEl(hb.x1 + tSize * 0.3, hy + tSize * 0.36, suffix, { size: tSize, font, color: sec.color && st.refColorTitle !== false ? sec.color : (st.titleColor || '#000000'), weight: 700 }));
+      let y = by + tSize0 * 1.9 + 4;
+      if (st.refShowRefValue !== false) {
+        g.appendChild(textEl(bx + bw / 2, y + fs * 0.9, 'Valor da referência: ' + (Number.isFinite(sec.refVal) ? fmtNumber(sec.refVal, 'auto', 4, st.decimal) : 'n/d'), { size: fs * 0.95, font, color: st.textColor, anchor: 'middle' }));
+        y += fs * 1.6;
+      }
+      y += 4;
+      const plotTop = y, plotH = g0.secH - (y - by) - g0.ticksH - 10;
+      const cx = bx + bw / 2;
+      const half = Math.max(20, bw / 2 - valW - 14);
+      const M = (st.refShared !== false ? sharedMax : absMax(sec)) || 1;
+      const scale = half / M;
+      // grid (symmetric ticks) and zero line
+      const t = linearTicks(-M, M, Math.max(4, Math.round(bw / 110)), 0);
+      for (const v of t.ticks) {
+        const x = cx + v * scale;
+        if (Math.abs(v) < 1e-15) continue;
+        g.appendChild(S('line', { x1: x.toFixed(1), x2: x.toFixed(1), y1: plotTop, y2: (plotTop + plotH).toFixed(1), stroke: st.gridColor || '#d9d9d9', 'stroke-width': 1 }));
+        if (st.refTicks !== false) g.appendChild(textEl(x, plotTop + plotH + fs * 1.2, (v > 0 ? '+' : v < 0 ? '−' : '') + (model.mode === 'rel' ? fmtNumber(Math.abs(v), 'auto', 3, st.decimal, t.step) + ' %' : fmtNumber(Math.abs(v), 'auto', 3, st.decimal, t.step)), { size: fs * 0.85, font, color: st.textColor, anchor: 'middle' }));
+      }
+      // bars
+      sec.bars.forEach((b, j) => {
+        const ry = plotTop + j * g0.rowH;
+        // name above the bar (gap = refNameGap), bar in the lower part of the row
+        const barH = lk.barH;
+        const barY = ry + g0.rowH - barH - 6;
+        const nameY = barY - lk.nameGap - lk.nameH / 2;
+        const d = Number.isFinite(b.diff) ? b.diff : 0;
+        const x1 = cx + d * scale;
+        const neg = d < 0;
+        if (Number.isFinite(b.diff) && d !== 0) {
+          const r = S('rect', { x: Math.min(cx, x1).toFixed(1), y: barY.toFixed(1), width: Math.abs(x1 - cx).toFixed(1), height: barH.toFixed(1), fill: b.color,
+            stroke: outline ? (st.refOutlineColor || '#1f2d3a') : 'none', 'stroke-width': outline ? 2.5 : 0 });
+          r.appendChild(S('title', null, b.label + ': ' + valStr(b) + ' (valor ' + fmtNumber(b.val, 'auto', 4, st.decimal) + ')'));
+          g.appendChild(r);
+        }
+        const lim = { lo: bx + 2, hi: bx + bw - 2 };
+        labelBox(g, neg ? cx - lk.nameDx : cx + lk.nameDx, nameY, b.label, nameSize, neg ? 'end' : 'start', lk.nameBold ? 700 : null, Object.assign({ boxed: lk.nameBox }, lim));
+        const vx = neg ? Math.min(cx, x1) - lk.valGap : Math.max(cx, x1) + lk.valGap;
+        labelBox(g, vx, barY + barH / 2, valStr(b), valSize, neg ? 'end' : 'start', lk.valBold ? 700 : null, Object.assign({ boxed: lk.valBox }, lim));
+      });
+      g.appendChild(S('line', { x1: cx.toFixed(1), x2: cx.toFixed(1), y1: plotTop, y2: (plotTop + plotH).toFixed(1), stroke: st.refZeroColor || '#000000', 'stroke-width': 3 }));
+      if (st.border === 'panel' || st.refPanelBorder) g.appendChild(S('rect', { x: bx + 0.5, y: by + 0.5, width: bw - 1, height: g0.secH - 1, fill: 'none', stroke: st.borderColor, 'stroke-width': lineW }));
+    });
+  }
+
   function render(model, st) {
     const W = Math.max(200, Number(st.width) || 760);
     let H = Math.max(150, Number(st.height) || 440);
@@ -1439,6 +1578,7 @@
     }
     if (model && model.kind === 'topo' && st.topoAutoHeight !== false) H = Math.max(150, topoHeight(model, st, W));
     if (model && model.kind === 'slots') H = Math.max(150, slotGeometry(model, st, W).H);
+    if (model && model.kind === 'ref') H = Math.max(150, Math.round(refGeometry(model, st, W).H));
     const root = S('svg', { xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}`, 'font-family': st.font });
     root.appendChild(S('rect', { x: 0, y: 0, width: W, height: H, fill: st.bg }));
     if (st.border === 'outer') root.appendChild(S('rect', { x: 0.5, y: 0.5, width: W - 1, height: H - 1, fill: 'none', stroke: st.borderColor }));
@@ -1449,6 +1589,7 @@
     else if (model.kind === 'cores') drawCores(root, model, st, box);
     else if (model.kind === 'topo') drawTopo(root, model, st, box);
     else if (model.kind === 'slots') drawSlots(root, model, st, box);
+    else if (model.kind === 'ref') drawRef(root, model, st, box);
     else if (model.kind === 'panels') {
       const n = model.panels.length;
       const cols = Math.max(1, Math.min(Number(st.panelCols) || 1, n));
@@ -1497,5 +1638,5 @@
     });
   }
 
-  App.figRender = { render, serialize, toPng, defaultStyle, fmtNumber, marker, dashArray, PALETTES, PALETTE_NAMES, MARKERS, MARKER_NAMES, DASHES, FONTS, SLOT_SCALES, PATTERNS, patternFill, contrastColor };
+  App.figRender = { render, refValueText, serialize, toPng, defaultStyle, fmtNumber, marker, dashArray, PALETTES, PALETTE_NAMES, MARKERS, MARKER_NAMES, DASHES, FONTS, SLOT_SCALES, PATTERNS, patternFill, contrastColor };
 })(window.App);

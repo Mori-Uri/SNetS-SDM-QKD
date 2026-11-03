@@ -189,7 +189,7 @@
       if (String(sim.integratedRmlsa).toLowerCase() === 'qrmsta' && (!qkdOn || sim.rmlsaType !== 1)) {
         add('err', 'simulation', '"qrmsta" é um RMLSA integrado do addon QKD: exige network.qkd.enabled = true e rmlsaType = 1.');
       }
-      if (qkdOn && net.qkd.qchGranularity && !['link', 'span'].includes(net.qkd.qchGranularity)) add('err', 'network', 'qkd.qchGranularity deve ser "link" ou "span".');
+      // Parte 50: a granularidade (route, link ou span) é validada acima; a regra antiga só aceitava link e span
       if (qkdOn && net.qkd.wavelengthPolicy && !['fixed', 'grid'].includes(net.qkd.wavelengthPolicy)) add('err', 'network', 'qkd.wavelengthPolicy deve ser "fixed" ou "grid".');
       if (qkdOn && net.qkd.tdmSlots !== undefined && !(Number.isInteger(net.qkd.tdmSlots) && net.qkd.tdmSlots >= 0)) add('err', 'network', 'qkd.tdmSlots deve ser inteiro ≥ 0.');
     }
