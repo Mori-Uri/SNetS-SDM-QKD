@@ -39,7 +39,9 @@ import java.io.Serializable;
  * scattering on quantum channel wavelength-multiplexed with classical channel", Opt. Commun. 284, 691, 2011;
  * [CAI20] C. Cai, Y. Sun, Y. Ji, "Intercore spontaneous Raman scattering impact on quantum key distribution in
  * multicore fiber", New J. Phys. 22, 083020, 2020; [MEHDI24] P. Mehdizadeh et al., IEEE Commun. Lett. 28(3), 2024;
- * [DIBAJ25] M. R. Dibaj et al., JLT 43(1), 2025; [GNPY] perfil g0 em {@link RamanGainProfile}.</p>
+ * [DIBAJ25] M. R. Dibaj et al., JLT 43(1), 2025; [GNPY] perfil g0 em {@link RamanGainProfile}; [CHAPURAN09] T. E.
+ * Chapuran et al., New J. Phys. 11, 105001, 2009 (Tabela 1); [NWEKE05] N. I. Nweke et al., Appl. Phys. Lett. 87,
+ * 174103, 2005; [HOLLENBECK02] D. Hollenbeck, C. D. Cantrell, JOSA B 19(12), 2886, 2002.</p>
  */
 public final class SpontaneousRamanModel implements Serializable {
 
@@ -63,12 +65,58 @@ public final class SpontaneousRamanModel implements Serializable {
 
     private final double scale;
     private final double temperatureK;
+    /** Parte 48: optional empirical correction of the anti-Stokes side (null = NONE, also for old save states). */
+    private final AntiStokesCorrection antiStokesCorrection;
+
+    /**
+     * Parte 48: correction of the anti-Stokes cross-section by measurements.
+     *
+     * <p>{@link #MEASURED} multiplies the anti-Stokes side by a factor interpolated linearly in the frequency offset:
+     * 1 up to 10 THz (where the model already agrees with [ERAERDS10], VMB-2, and with [CHAPURAN09] at 9.9 THz),
+     * 2.3 at 17 THz and 2.2 at 24.7 THz (the measured coefficients of [CHAPURAN09] Table 1, mean of the four SMF-28
+     * spools, are 2.3 and 2.2 times the model), 1.1 at 27.6 THz ([NWEKE05], 1465-1490 nm pump into 1310 nm) and 1
+     * from 30 THz on. The Stokes side is unchanged. It is an empirical correction of measured SMF-28 fibres: the
+     * shape of the gain profile agrees with [HOLLENBECK02] there, so the cause is not identified (fibre dopants or
+     * phonon population); see docs/multibanda/VALIDACAO_LITERATURA.md.</p>
+     */
+    public enum AntiStokesCorrection {
+        NONE, MEASURED;
+
+        /** nenhuma | medida (also none | measured). */
+        public static AntiStokesCorrection parse(String s) {
+            final String v = s == null ? "" : s.trim().toLowerCase(java.util.Locale.ROOT);
+            if (v.isEmpty() || v.equals("nenhuma") || v.equals("none")) return NONE;
+            if (v.equals("medida") || v.equals("measured")) return MEASURED;
+            throw new IllegalArgumentException("antiStokesCorrection must be nenhuma or medida: " + s);
+        }
+    }
+
+    /** Points (offset THz, factor) of {@link AntiStokesCorrection#MEASURED}. */
+    private static final double[][] MEASURED_POINTS = {{10.0, 1.0}, {17.0, 2.3}, {24.7, 2.2}, {27.6, 1.1}, {30.0, 1.0}};
+
+    /** Factor of the anti-Stokes side at {@code offsetThz} (absolute value) for the measured correction. */
+    public static double measuredAntiStokesFactor(double offsetThz) {
+        final double x = Math.abs(offsetThz);
+        final double[][] p = MEASURED_POINTS;
+        if (x <= p[0][0] || x >= p[p.length - 1][0]) return 1.0;
+        for (int i = 1; i < p.length; i++) {
+            if (x <= p[i][0]) {
+                return p[i - 1][1] + (p[i][1] - p[i - 1][1]) * (x - p[i - 1][0]) / (p[i][0] - p[i - 1][0]);
+            }
+        }
+        return 1.0;
+    }
 
     /**
      * @param scale cross-section scale K (use {@link #DEFAULT_SCALE} unless re-fitting to another fibre)
      * @param temperatureK fibre temperature in K
      */
     public SpontaneousRamanModel(double scale, double temperatureK) {
+        this(scale, temperatureK, AntiStokesCorrection.NONE);
+    }
+
+    /** Parte 48: same model with the given anti-Stokes correction. */
+    public SpontaneousRamanModel(double scale, double temperatureK, AntiStokesCorrection antiStokesCorrection) {
         if (!(scale >= 0.0) || Double.isInfinite(scale)) {
             throw new IllegalArgumentException("scale must be finite and >= 0");
         }
@@ -77,11 +125,22 @@ public final class SpontaneousRamanModel implements Serializable {
         }
         this.scale = scale;
         this.temperatureK = temperatureK;
+        this.antiStokesCorrection = antiStokesCorrection == null ? AntiStokesCorrection.NONE : antiStokesCorrection;
     }
 
     /** SSMF at 300 K with the cross-section fitted to [ERAERDS10]. */
     public static SpontaneousRamanModel standard() {
         return new SpontaneousRamanModel(DEFAULT_SCALE, DEFAULT_TEMPERATURE_K);
+    }
+
+    /** Parte 48: anti-Stokes correction in use. */
+    public AntiStokesCorrection getAntiStokesCorrection() {
+        return antiStokesCorrection == null ? AntiStokesCorrection.NONE : antiStokesCorrection;
+    }
+
+    /** Parte 48: same model with another anti-Stokes correction. */
+    public SpontaneousRamanModel withAntiStokesCorrection(AntiStokesCorrection c) {
+        return new SpontaneousRamanModel(scale, temperatureK, c);
     }
 
     /** Cross-section scale K. */
@@ -118,7 +177,12 @@ public final class SpontaneousRamanModel implements Serializable {
             return 0.0;
         }
         final double nTh = 1.0 / Math.expm1(x);
-        return RamanGainProfile.g0(offsetHz) * (offsetHz > 0.0 ? nTh + 1.0 : nTh);
+        if (offsetHz > 0.0) {
+            return RamanGainProfile.g0(offsetHz) * (nTh + 1.0);
+        }
+        final double corr = getAntiStokesCorrection() == AntiStokesCorrection.MEASURED
+                ? measuredAntiStokesFactor(offsetHz / 1e12) : 1.0;
+        return RamanGainProfile.g0(offsetHz) * nTh * corr;
     }
 
     // ------------------------------------------------------------------ effective lengths (km)

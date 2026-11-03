@@ -153,8 +153,10 @@ public final class MultiBandPhysicsVerification {
         ok("VMB-5 [DIBAJ25] SKR(1360 nm, 200 km) ~ 0,354 kbit/s (Fig. 5, mesma ordem; perto do corte): %.3f kbit/s",
                 s200 / 1e3);
         final MultiBandLinkResult withRaman = m.evaluate(1360, 150, coComb());
-        pending(String.format(Locale.ROOT, "VMB-5 com o SpRS do comb C+L a 0 dBm o modelo da %.2f kbit/s a 150 km "
-                + "(p_SpRS %.1e); o artigo indica ruido desprezivel no O-band -> conflito a discutir",
+        System.out.println(String.format(Locale.ROOT, "[INFO] VMB-5 com o SpRS do comb C+L a 0 dBm o modelo da %.2f kbit/s "
+                + "a 150 km (p_SpRS %.1e); o artigo trata o ruido na banda O como desprezivel. Parte 48: medidas de "
+                + "Raman anti-Stokes em 1310 nm com canais em 1460-1550 nm ([NWEKE05], [CHAPURAN09]) mostram que esse "
+                + "ruido existe; a hipotese do artigo e uma simplificacao (ver VALIDACAO_LITERATURA.md).",
                 withRaman.getSecretKeyRateBps() / 1e3, withRaman.getRamanProbabilitySameCore()));
     }
 

@@ -181,7 +181,7 @@
         MBSDM: 'MB-SDM — QCh em outra banda de um núcleo da MCF (SpRS do núcleo e dos vizinhos)' } },
       'multiband.ramanModel': { label: 'Modelo de espalhamento Raman (SpRS)', default: 'fisico', enum: {
         nenhum: 'nenhum — SpRS desprezado (Dibaj et al., JLT 2025, banda O)',
-        artigo: 'artigo — L·e^(−α_c L) e metade dos fótons detectados (Mehdizadeh et al., 2024; Dibaj et al., 2025, eq. 6)',
+        artigo: 'artigo — L·e^(−α_c L) e metade dos fótons detectados (Dibaj et al., JLT 2025, eq. 6; Mehdizadeh et al., 2024, conta todos os fótons: ver VALIDACAO_LITERATURA.md)',
         fisico: 'fisico — comprimento efetivo exato e todos os fótons do filtro detectados (Eraerds et al., 2010)' } },
       'multiband.qchCenterNm': { label: 'λ central do QCh', unit: 'nm', default: 1381.0, help: 'Centro da grade de QChs (wavelengthPolicy "grid") ou λ de todos os QChs ("fixed"). 1260–1460 nm = bandas O e E.' },
       'multiband.hostCoreId': { label: 'Núcleo clássico que divide a fibra/núcleo com o QCh', default: 0, help: 'MB: o núcleo da fibra monomodo. MB-SDM: o núcleo da MCF que carrega o QCh. Ignorado em MF.' },
@@ -193,6 +193,9 @@
         quadratica: 'quadratica — o ajuste do grupo Fibra (só banda C)' } },
       'multiband.waterPeakDbPerKm': { label: 'Pico de OH em 1383 nm', unit: 'dB/km', default: 0.0, help: '0 para fibra G.652.D de baixo pico d’água.' },
       'multiband.temperatureK': { label: 'Temperatura da fibra', unit: 'K', default: 300.0 },
+      'multiband.antiStokesCorrection': { label: 'Correção anti-Stokes do SpRS (Parte 48)', default: 'nenhuma', enum: {
+        nenhuma: 'nenhuma — perfil Raman com o fator de Bose-Einstein (padrão)',
+        medida: 'medida — lado anti-Stokes ajustado às medidas em SMF-28 (Chapuran et al., 2009; Nweke et al., 2005): ×2,2 de 17 a 25 THz da bomba; não muda até 10 THz nem o lado Stokes' } },
       'multiband.nliModel': { label: 'Ruído não linear (NLI) no QCh', default: 'nenhum', enum: {
         nenhum: 'nenhum — sem NLI',
         gn: 'gn — modelo GN (todos os produtos de FWM) dos circuitos do núcleo hospedeiro; só pesa com o QCh perto da banda clássica (banda S/C)' } },

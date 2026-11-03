@@ -30,6 +30,8 @@ import qkd.physical.QKDPhysicalParameters;
  *       resulting photon probability is negligible;</li>
  *   <li>VMB-12e, [MEHDI24] Fig. 5(b): QBER in the S band and at the end of the E band with the physical SpRS
  *       (detected fraction 1): the paper does not use the factor 0.5 of [DIBAJ25] eq. 6;</li>
+ *   <li>VMB-12f (Parte 48): the optional anti-Stokes correction "medida" against [CHAPURAN09] and [NWEKE05], and
+ *       its effect on the E band of [MEHDI24];</li>
  *   <li>pending: the start of the noise at 1392-1450 nm (E band), where the paper has 2 to 5 times more noise than
  *       the Raman profile with the phonon (Bose-Einstein) factor; the cross-section there is outside the measured
  *       window of [ERAERDS10] (1510-1650 nm for a 1550 nm pump) and the paper does not say how it was extended.</li>
@@ -58,6 +60,7 @@ public final class MultiBandLiteratureVerification {
         petersRaman();
         mehdizadehFig3();
         mehdizadehFig5();
+        antiStokesCorrection();
         System.out.println();
         System.out.println("Multi-band literature verification (Parte 46): ALL CHECKS PASSED (" + pending
                 + " item(s) pendente(s), ver acima)");
@@ -277,6 +280,69 @@ public final class MultiBandLiteratureVerification {
         System.out.println("[PENDENTE] VMB-12e inicio do ruido no fim da banda E (QBER modelo x artigo):" + sb
                 + " o artigo tem 2 a 5 vezes mais SpRS a 14-20 THz da borda do comb (1392-1450 nm), fora da janela medida da secao de "
                 + "choque; o artigo nao diz como a estendeu.");
+    }
+
+    // ---------------------------------------------------------------- VMB-12f (Parte 48)
+
+    /**
+     * Anti-Stokes correction "medida": without it the default model is unchanged (factor 1); with it the model follows
+     * the measured anti-Stokes coefficients of [CHAPURAN09] Table 1 and the 1310 nm noise of [NWEKE05], and the E-band
+     * points of [MEHDI24] Fig. 5(b) get closer.
+     */
+    private static void antiStokesCorrection() {
+        final SpontaneousRamanModel std = SpontaneousRamanModel.standard();
+        final SpontaneousRamanModel med = std.withAntiStokesCorrection(SpontaneousRamanModel.AntiStokesCorrection.MEASURED);
+        // unchanged on the Stokes side and near the pump
+        for (double nm : new double[] {1480, 1500, 1520, 1540, 1560, 1580, 1600, 1650}) {
+            check(std.crossSectionPerKmNm(1550, nm) == med.crossSectionPerKmNm(1550, nm),
+                    "VMB-12f correction changes rho at " + nm + " nm");
+        }
+        ok("VMB-12f a correcao nao muda a secao de choque perto da bomba (ate 10 THz) nem no lado Stokes");
+        // [CHAPURAN09] Table 1: beta2 per 0.5 nm (mean of the 4 spools), pump 1550.9 nm
+        final double[][] chap = {{1475, 8.4e-10}, {1425, 1.16e-10}, {1375, 2.6e-11}};
+        for (double[] t : chap) {
+            final double measured = t[1] / 0.5;
+            final double a = std.crossSectionPerKmNm(1550.9, t[0]) / measured;
+            final double b = med.crossSectionPerKmNm(1550.9, t[0]) / measured;
+            check(b > 0.85 && b < 1.15, "VMB-12f Chapuran " + t[0] + " nm: " + b);
+            ok("VMB-12f [CHAPURAN09] anti-Stokes em %.0f nm (bomba 1550,9 nm): modelo/medida %.2f sem correcao, "
+                    + "%.2f com a correcao", t[0], a, b);
+        }
+        // [NWEKE05]: 10 km SMF-28, 6 dBm CW pump, 1.5 nm filter at 1310 nm, photons per 1 ns at Bob's port
+        final FiberAttenuationModel fm = FiberAttenuationModel.g652d();
+        final double[][] nwe = {{1465, 1e-2}, {1490, 1e-3}};
+        for (double[] t : nwe) {
+            final double g = SpontaneousRamanModel.forwardLengthKm(fm.nepersPerKm(t[0]), fm.nepersPerKm(1310), 10);
+            final double ePh = H * C / 1310e-9;
+            final double a = 3.98e-3 * std.crossSectionPerKmNm(t[0], 1310) * 1.5 * g / ePh * 1e-9;
+            final double b = 3.98e-3 * med.crossSectionPerKmNm(t[0], 1310) * 1.5 * g / ePh * 1e-9;
+            check(b / t[1] > 0.5 && b / t[1] < 2.0, "VMB-12f Nweke " + t[0] + ": " + b);
+            ok("VMB-12f [NWEKE05] bomba em %.0f nm -> 1310 nm, 10 km: %.1e fotons/ns sem correcao, %.1e com, medido "
+                    + "~%.0e", t[0], a, b, t[1]);
+        }
+        // [MEHDI24] Fig. 5(b), E band: convention of the paper (L e^{-a_c L}, fraction 1)
+        final QKDPhysicalParameters par = new QKDPhysicalParameters();
+        final List<ClassicalChannel> comb = ClassicalChannel.referenceCLComb(0.0, ClassicalChannel.Direction.CO_PROPAGATING);
+        final MultiBandQkdLinkModel m0 = new MultiBandQkdLinkModel(par, fm, std, MultiBandQkdLinkModel.ForwardForm.EQUAL_LOSS,
+                MultiBandQkdLinkModel.PHYSICAL_DETECTED_FRACTION);
+        final MultiBandQkdLinkModel m1 = new MultiBandQkdLinkModel(par, fm, med, MultiBandQkdLinkModel.ForwardForm.EQUAL_LOSS,
+                MultiBandQkdLinkModel.PHYSICAL_DETECTED_FRACTION);
+        final double[][] edge = {{30, 1430, 0.090}, {30, 1450, 0.125}, {70, 1392, 0.056}, {70, 1430, 0.200}, {70, 1450, 0.245}};
+        double e0 = 0.0;
+        double e1 = 0.0;
+        final StringBuilder sb = new StringBuilder();
+        for (double[] t : edge) {
+            final double q0 = m0.evaluate(t[1], t[0], comb).getQber();
+            final double q1 = m1.evaluate(t[1], t[0], comb).getQber();
+            e0 = Math.max(e0, Math.abs(q0 - t[2]));
+            e1 = Math.max(e1, Math.abs(q1 - t[2]));
+            sb.append(String.format(Locale.ROOT, " %.0f nm/%.0f km: %.3f -> %.3f (artigo %.3f);", t[1], t[0], q0, q1, t[2]));
+        }
+        check(e1 < e0 && e1 <= 0.015, "VMB-12f Mehdizadeh E band: " + e0 + " -> " + e1);
+        ok("VMB-12f [MEHDI24] Fig. 5(b), banda E, QBER sem -> com a correcao:%s erro maximo %.3f -> %.3f", sb, e0, e1);
+        System.out.println(String.format(Locale.ROOT, "[INFO] VMB-12f em 1410 nm a diferenca continua: 30 km %.3f (artigo 0,057), "
+                + "70 km %.3f (artigo 0,140), com a correcao.", m1.evaluate(1410, 30, comb).getQber(),
+                m1.evaluate(1410, 70, comb).getQber()));
     }
 
     // ---------------------------------------------------------------- helpers

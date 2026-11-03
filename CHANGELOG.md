@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [48](#parte-48) | Parte 48 — correção anti-Stokes medida do SpRS (opcional) e launcher 1.20.2 |
 | [47](#parte-47) | Parte 47 — launcher 1.20.1: cabeçalhos fixos e edição em lote |
 | [46](#parte-46) | Parte 46 — validação contra a literatura: FWM de Peters, SpRS medido, NLI de Mehdizadeh reproduzido no GNPy |
 | [45](#parte-45) | Parte 45 — NLI no QCh (N2), verificação MB × MF em rede, custo dos algoritmos, save states, desempenho e launcher 1.20.0 |
@@ -29,6 +30,58 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-48"></a>
+
+## Parte 48 — correção anti-Stokes medida do SpRS (opcional) e launcher 1.20.2
+
+**Nova opção `multiband.antiStokesCorrection`** = `nenhuma` (padrão) | `medida`.
+
+- Com `medida`, o lado anti-Stokes do SpRS (QCh em comprimento de onda menor que o canal clássico) é multiplicado
+  por um fator tirado de medidas em fibra SMF-28:
+  - 1 até 10 THz da bomba;
+  - 2,3 a 17 THz e 2,2 a 24,7 THz (Chapuran et al., 2009, Tabela 1);
+  - 1,1 a 27,6 THz (Nweke et al., 2005);
+  - 1 a partir de 30 THz.
+- O lado Stokes e a região perto da bomba não mudam, então o VMB-2 (Eraerds) continua valendo.
+- Vale para os dois modelos de Raman (`artigo` e `fisico`).
+- É uma correção **empírica**. O perfil de ganho Raman confere com Hollenbeck e Cantrell (2002) nessa faixa, então a
+  causa não está identificada.
+
+**Verificação VMB-12f:**
+
+| Comparação | Sem correção | Com correção |
+|---|---|---|
+| Chapuran, 17 e 24,7 THz (modelo/medida) | 0,43 e 0,45 | 0,98 e 0,99 |
+| Nweke, bomba 1465 nm → 1310 nm, 10 km (medido ~1e-2 fóton/ns) | 7e-3 | 1,5e-2 |
+| Mehdizadeh Fig. 5(b), banda E: erro máximo da QBER | 0,072 | 0,011 |
+
+- A 1410 nm a diferença com o Mehdizadeh continua.
+
+**Efeito no caso M01** (QCh a 1381 nm, canais na banda C):
+
+| Grandeza | `nenhuma` | `medida` |
+|---|---|---|
+| p_SpRS | 3,0e-4 | 6,6e-4 |
+| SKR | 53,4 Mbit/s | 47,7 Mbit/s (−11 %) |
+| QBER | 0,018 | 0,022 |
+
+**Outras mudanças:**
+
+- VMB-5 (ruído na banda O, Dibaj 2025) passou de [PENDENTE] a [INFO]: as medidas a 1310 nm mostram que esse ruído
+  existe.
+- No launcher, a descrição do modelo `artigo` agora diz que ele segue Dibaj 2025, eq. 6.
+
+**Arquivos:**
+
+- Simulador: `SpontaneousRamanModel`, `QKDPhysicalLayerConfig`, `MultiBandLiteratureVerification`,
+  `MultiBandPhysicsVerification` e `SNetS-SDM-QKD-exp.jar`.
+- Launcher: `schema.js`, `LauncherServer.java` e `snets-launcher.jar`.
+
+**Regressão:** com o padrão `nenhuma`, os casos M são iguais à referência `experimental` e os casos Q iguais à
+`main`.
 
 ---
 

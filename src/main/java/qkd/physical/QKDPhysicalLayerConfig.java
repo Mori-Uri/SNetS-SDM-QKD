@@ -78,6 +78,8 @@ public final class QKDPhysicalLayerConfig implements Serializable {
         double waterPeakDbPerKm = 0.0;
         /** Fibre temperature (K) of the Raman phonon population. */
         double temperatureK = 300.0;
+        /** Parte 48: nenhuma or medida (anti-Stokes SpRS corrected by the measurements of [CHAPURAN09]/[NWEKE05]). */
+        String antiStokesCorrection = "nenhuma";
     }
 
     /** Weak-coherent source and quantum-channel width. */
@@ -222,7 +224,8 @@ public final class QKDPhysicalLayerConfig implements Serializable {
                 qkd.multiband.MultiBandSettings.RamanModel.parse(multiband.ramanModel),
                 model,
                 new qkd.multiband.SpontaneousRamanModel(qkd.multiband.SpontaneousRamanModel.DEFAULT_SCALE,
-                        multiband.temperatureK),
+                        multiband.temperatureK, qkd.multiband.SpontaneousRamanModel.AntiStokesCorrection.parse(
+                                multiband.antiStokesCorrection)),
                 multiband.hostCoreId,
                 multiband.classicalBandStartThz * 1e12,
                 multiband.intercoreRaman,
