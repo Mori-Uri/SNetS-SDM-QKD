@@ -220,3 +220,8 @@ tools/regressao/referencias/*/csv/
 /simulations/QKD_Multibanda/**/*.csv
 /simulations/QKD_Multibanda/**/*.txt
 /simulations/QKD_Multibanda/**/savestate/
+# Parte 49 - casos multibanda iniciais (sem os resultados)
+!/simulations/QKD_Multibanda_Parte49/
+/simulations/QKD_Multibanda_Parte49/**/*.csv
+/simulations/QKD_Multibanda_Parte49/**/*.txt
+/simulations/QKD_Multibanda_Parte49/**/savestate/

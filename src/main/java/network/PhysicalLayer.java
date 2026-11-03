@@ -88,6 +88,9 @@ public class PhysicalLayer implements Serializable {
 	private Util util;
 	private Crosstalk crosstalk;
 
+	/** Parte 49: classical QoT per band; null = single-band model (default). */
+	private ClassicalMultiBand multiBand;
+
 	/**
 	 * Creates a new instance of PhysicalLayerConfig
 	 *
@@ -156,7 +159,92 @@ public class PhysicalLayer implements Serializable {
 		this.lowerFrequency = centerFrequency - (slotBandwidth * (totalSlots / 2.0)); // Hz, Half slots are removed because center Frequency = 193.55E+12 is the central frequency of the optical spectrum
 
 		this.crosstalk = new Crosstalk(this, plc);
+
+		this.multiBand = ClassicalMultiBand.of(plc.getMultiBand(), alpha, gamma, D, NF, centerFrequency);
     }
+
+	/** Parte 49: classical per-band QoT model, or null when disabled. */
+	public ClassicalMultiBand getMultiBand() {
+		return multiBand;
+	}
+
+	/** NLI with the fibre parameters of the band of the circuit (Parte 49). */
+	private double getGnliBand(ClassicalMultiBand.Params p, Circuit circuit, Link link, double powerI, double BsI, double Gi, double fI, TreeSet<Circuit> circuitList, Modulation modulation, boolean johannisson) {
+		if (p == null) {
+			return johannisson ? getGnli(circuit, link, powerI, BsI, Gi, fI, circuitList)
+					: getGnli2(circuit, link, powerI, BsI, Gi, fI, circuitList, modulation);
+		}
+		final double a0 = alphaLinear, g0 = gamma, b0 = beta2;
+		try {
+			alphaLinear = p.alphaLinear;
+			gamma = p.gamma;
+			beta2 = p.beta2;
+			return johannisson ? getGnli(circuit, link, powerI, BsI, Gi, fI, circuitList)
+					: getGnli2(circuit, link, powerI, BsI, Gi, fI, circuitList, modulation);
+		} finally {
+			alphaLinear = a0;
+			gamma = g0;
+			beta2 = b0;
+		}
+	}
+
+	/**
+	 * Parte 49: extra span loss (dB, &gt;= or &lt; 0) of the circuit at fi caused by ISRS on this link, for a span of
+	 * spanKm. The WDM band is taken from the edges of the circuits in the fibre; the power is their total launch power.
+	 */
+	private double isrsLossDb(ClassicalMultiBand.Params p, double fi, Circuit circuit, int[] spectrumAssigned, Link link, TreeSet<Circuit> circuitList, double spanKm) {
+		if (multiBand == null || !multiBand.isIsrs() || circuitList == null || spanKm <= 0.0) {
+			return 0.0;
+		}
+		double fMin = Double.POSITIVE_INFINITY, fMax = Double.NEGATIVE_INFINITY, total = 0.0;
+		for (Circuit c : circuitList) {
+			int[] sa = c.equals(circuit) ? spectrumAssigned : c.getSpectrumAssignedByLink(link);
+			if (sa == null) {
+				continue;
+			}
+			fMin = Math.min(fMin, lowerFrequency + slotBandwidth * (sa[0] - 1.0));
+			fMax = Math.max(fMax, lowerFrequency + slotBandwidth * sa[1]);
+			total += getCircuitLaunchPower(c, c.getModulation());
+		}
+		if (!(fMax > fMin)) {
+			return 0.0;
+		}
+		double rho = multiBand.isrsRatio(fi, fMin, fMax, total, p.alphaLinear, spanKm);
+		return -10.0 * Math.log10(rho);
+	}
+
+	/**
+	 * Parte 49: ASE of booster + line + pre-amplifiers of one link with the loss, noise figure and frequency of the
+	 * band of the circuit (plus ISRS). The amplifier state is restored afterwards. Returns {booster, line, pre}.
+	 */
+	private double[] aseBand(ClassicalMultiBand.Params p, double fi, Circuit circuit, int[] spectrumAssigned, Link link, TreeSet<Circuit> circuitList, double totalPower, double lastFiberSegment) {
+		final double[] saved = { boosterAmp.getGain(), boosterAmp.getNoiseFigure(), boosterAmp.getFrequency(),
+				lineAmp.getGain(), lineAmp.getNoiseFigure(), lineAmp.getFrequency(),
+				preAmp.getNoiseFigure(), preAmp.getFrequency() };
+		try {
+			lineAmp.setGain(p.alphaDbPerKm * L + isrsLossDb(p, fi, circuit, spectrumAssigned, link, circuitList, L));
+			preAmp.setGain(p.alphaDbPerKm * lastFiberSegment + isrsLossDb(p, fi, circuit, spectrumAssigned, link, circuitList, lastFiberSegment));
+			boosterAmp.setNoiseFigure(p.noiseFigureDb);
+			lineAmp.setNoiseFigure(p.noiseFigureDb);
+			preAmp.setNoiseFigure(p.noiseFigureDb);
+			boosterAmp.setFrequency(fi);
+			lineAmp.setFrequency(fi);
+			preAmp.setFrequency(fi);
+			return new double[] {
+					boosterAmp.getAseByGain(totalPower, boosterAmp.getGainByType(totalPower, typeOfAmplifierGain)),
+					lineAmp.getAseByGain(totalPower, lineAmp.getGainByType(totalPower, typeOfAmplifierGain)),
+					preAmp.getAseByGain(totalPower, preAmp.getGainByType(totalPower, typeOfAmplifierGain)) };
+		} finally {
+			boosterAmp.setGain(saved[0]);
+			boosterAmp.setNoiseFigure(saved[1]);
+			boosterAmp.setFrequency(saved[2]);
+			lineAmp.setGain(saved[3]);
+			lineAmp.setNoiseFigure(saved[4]);
+			lineAmp.setFrequency(saved[5]);
+			preAmp.setNoiseFigure(saved[6]);
+			preAmp.setFrequency(saved[7]);
+		}
+	}
 
 	/**
 	 * Returns if QoTN check is active or not
@@ -436,6 +524,7 @@ public class PhysicalLayer implements Serializable {
 		double fi = lowerFrequency + (slotBandwidth * (spectrumAssigned[0] - 1.0)) + (Bsi / 2.0); // Central frequency of circuit
 
 		Bsi = modulation.getBandwidthFromBitRate(circuit.getRequiredBitRate()); //Effective circuit bandwidth
+		final ClassicalMultiBand.Params bandParams = multiBand == null ? null : multiBand.at(fi); // Parte 49
 
 		double circuitPowerLinear = getCircuitLaunchPower(circuit, modulation);
 		if (physicalLayerModel == MODEL_JOHANNISSON) { // Model Johannisson
@@ -471,7 +560,10 @@ public class PhysicalLayer implements Serializable {
 			circuitList = getCircuitList(link, core, circuit, testCircuit, addTestCircuit);
 
 			if(activeNLI){
-				if (physicalLayerModel == MODEL_JOHANNISSON) { // Model Johannisson
+				if (bandParams != null) { // Parte 49: fibre parameters of the band of the circuit
+					noiseNli = getGnliBand(bandParams, circuit, link, circuitPowerLinear, Bsi, I, fi, circuitList, modulation, physicalLayerModel == MODEL_JOHANNISSON);
+
+				} else if (physicalLayerModel == MODEL_JOHANNISSON) { // Model Johannisson
 					noiseNli = getGnli(circuit, link, circuitPowerLinear, Bsi, I, fi, circuitList); // Computing the NLI for each polarization mode
 
 				} else { // Model Habibi
@@ -492,9 +584,16 @@ public class PhysicalLayer implements Serializable {
 				preAmp.setGain(alpha * lastFiberSegment);
 
 				// Computing the ASE for each amplifier type
+				if (bandParams != null) { // Parte 49: loss, NF and frequency of the band (+ ISRS)
+					double[] aseB = aseBand(bandParams, fi, circuit, spectrumAssigned, link, circuitList, totalPower, lastFiberSegment);
+					boosterAmpNoiseAse = aseB[0];
+					lineAmpNoiseAse = aseB[1];
+					preAmpNoiseAse = aseB[2];
+				} else {
 				boosterAmpNoiseAse = boosterAmp.getAseByGain(totalPower, boosterAmp.getGainByType(totalPower, typeOfAmplifierGain));
 				lineAmpNoiseAse = lineAmp.getAseByGain(totalPower, lineAmp.getGainByType(totalPower, typeOfAmplifierGain));
 				preAmpNoiseAse = preAmp.getAseByGain(totalPower, preAmp.getGainByType(totalPower, typeOfAmplifierGain));
+				}
 
 				if (physicalLayerModel == MODEL_JOHANNISSON) { // Model Johannisson
 					// Determining the ASE for each polarization mode
@@ -604,6 +703,7 @@ public class PhysicalLayer implements Serializable {
 		double fi = lowerFrequency + (slotBandwidth * (spectrumAssigned[0] - 1.0)) + (Bsi / 2.0); // Central frequency of circuit
 
 		Bsi = modulation.getBandwidthFromBitRate(circuit.getRequiredBitRate()); //Effective circuit bandwidth
+		final ClassicalMultiBand.Params bandParams = multiBand == null ? null : multiBand.at(fi); // Parte 49
 
 		double circuitPowerLinear = this.PowerLinear;
 		if(circuit.getLaunchPowerLinear() != Double.POSITIVE_INFINITY) {
@@ -646,7 +746,10 @@ public class PhysicalLayer implements Serializable {
 			circuitList = getCircuitList(link, core, circuit, testCircuit, addTestCircuit);
 
 			if(activeNLI){
-				if (physicalLayerModel == MODEL_JOHANNISSON) { // Model Johannisson
+				if (bandParams != null) { // Parte 49: fibre parameters of the band of the circuit
+					noiseNli = getGnliBand(bandParams, circuit, link, circuitPowerLinear, Bsi, I, fi, circuitList, modulation, physicalLayerModel == MODEL_JOHANNISSON);
+
+				} else if (physicalLayerModel == MODEL_JOHANNISSON) { // Model Johannisson
 					noiseNli = getGnli(circuit, link, circuitPowerLinear, Bsi, I, fi, circuitList); // Computing the NLI for each polarization mode
 
 				} else { // Model Habibi
@@ -667,9 +770,16 @@ public class PhysicalLayer implements Serializable {
 				preAmp.setGain(alpha * lastFiberSegment);
 
 				// Computing the ASE for each amplifier type
+				if (bandParams != null) { // Parte 49: loss, NF and frequency of the band (+ ISRS)
+					double[] aseB = aseBand(bandParams, fi, circuit, spectrumAssigned, link, circuitList, totalPower, lastFiberSegment);
+					boosterAmpNoiseAse = aseB[0];
+					lineAmpNoiseAse = aseB[1];
+					preAmpNoiseAse = aseB[2];
+				} else {
 				boosterAmpNoiseAse = boosterAmp.getAseByGain(totalPower, boosterAmp.getGainByType(totalPower, typeOfAmplifierGain));
 				lineAmpNoiseAse = lineAmp.getAseByGain(totalPower, lineAmp.getGainByType(totalPower, typeOfAmplifierGain));
 				preAmpNoiseAse = preAmp.getAseByGain(totalPower, preAmp.getGainByType(totalPower, typeOfAmplifierGain));
+				}
 
 				if (physicalLayerModel == MODEL_JOHANNISSON) { // Model Johannisson
 					// Determining the ASE for each polarization mode

@@ -1,0 +1,4 @@
+cenario,P_total_dBm,tilt_ode_gnpy_dB,tilt_triangular_dB,max_abs_diff_dB
+C (4.8 THz),19.82,1.349,1.174,0.106
+C+L (12 THz),23.80,7.808,7.383,0.467
+C+L (12 THz) +3 dB,26.80,15.702,14.731,1.065

@@ -60,6 +60,12 @@ public class PhysicalLayerConfig {
 	private QKDReceiverConfig qkdReceiver = null;
 	/** Optional BB84 decoy-state parameters; absent = reference values of Dibaj et al. (2024). */
 	private QKDPhysicalConfig qkdPhysical = null;
+	/** Parte 49: optional classical QoT per band (absent or enabled=false = unchanged single-band model). */
+	private network.ClassicalMultiBand.Config multiBand = null;
+
+	public network.ClassicalMultiBand.Config getMultiBand() {
+		return multiBand;
+	}
 
 	/** Part 26: contents of the qkdPhysicalLayer case file (not written into physicalLayer). */
 	private transient qkd.physical.QKDPhysicalLayerConfig qkdPhysicalLayer;

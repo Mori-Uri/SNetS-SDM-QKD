@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [49](#parte-49) | Parte 49 — QoT clássica por banda com ISRS, política maxskr do QCh, casos iniciais e launcher 1.20.3 |
 | [48](#parte-48) | Parte 48 — correção anti-Stokes medida do SpRS (opcional) e launcher 1.20.2 |
 | [47](#parte-47) | Parte 47 — launcher 1.20.1: cabeçalhos fixos e edição em lote |
 | [46](#parte-46) | Parte 46 — validação contra a literatura: FWM de Peters, SpRS medido, NLI de Mehdizadeh reproduzido no GNPy |
@@ -30,6 +31,89 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-49"></a>
+
+## Parte 49 — QoT clássica por banda com ISRS, política maxskr do QCh, casos iniciais e launcher 1.20.3
+
+### 1. QoT clássica por banda (opcional, desligada por padrão)
+
+Novo bloco `multiBand` no arquivo `physicalLayer` (classe `network.ClassicalMultiBand`). Com ele, cada circuito usa os valores da sua própria frequência:
+
+- perda G.652.D, ou `fiberLoss` com `attenuationModel: constante`;
+- figura de ruído da banda;
+- energia do fóton h·f;
+- γ ∝ f;
+- β2 a partir de D(λ) = D + S·Δλ.
+
+Também entra o **ISRS**, pela aproximação triangular (Zirngibl 1998; Semrau et al. 2018), como perda extra no ASE de cada span, calculada com os circuitos que estão no enlace.
+
+- Sem o bloco, ou com `enabled: false`, nada muda (regressão C/Q/M idêntica).
+- A mudança do NLI pelo ISRS (GGN) não é modelada.
+- Detalhes em `docs/multibanda/QOT_CLASSICA_POR_BANDA.md`.
+
+### 2. `qchSlotPolicy = maxskr` (granularidade `route`)
+
+- Avalia todas as faixas livres do núcleo QKD na rota e tenta primeiro a de maior SKR mínima.
+- Com `wavelengthPolicy = grid`, isso escolhe o λ do QCh com menos ruído e perda.
+- Teste curto em Linha C+L (800 requisições):
+
+| Política | SKR média de admissão | SKR mínima de admissão |
+|---|---|---|
+| firstfit | 46,8 Mbit/s | 12,6 Mbit/s |
+| maxskr | 54,5 Mbit/s | 50,9 Mbit/s |
+
+- O custo é maior: ~2× o firstfit nesse teste.
+
+### 3. Verificação VMB-13 (`MultiBandClassicalQoTVerification`)
+
+- Bloco ausente ou desligado não muda nada.
+- Em f_ref os parâmetros são os do arquivo.
+- Perda, NF, γ e β2 variam por banda.
+- A média de ρ do ISRS é 1 e a inclinação é 4,34·P·C_r·L_eff·B.
+- A inclinação confere com as equações de Raman acopladas usando o ganho Raman medido do GNPy, com diferença de 5–13 % (`verificacao/QKD_reference/ISRS_GNPy`).
+
+Os verificadores multibanda das Partes 42–48 continuam passando.
+
+### 4. Casos `simulations/QKD_Multibanda_Parte49` (Linha e Losango, 13 casos cada)
+
+| Grupo | Casos | O que compara |
+|---|---|---|
+| A | A0–A4 | MF × MB (1381 nm, `antiStokesCorrection` nenhuma × medida; 1310 nm) × MB-SDM |
+| B | B1–B4 | QoT única × por banda, sem e com ISRS, na banda C e no C+L |
+| C | C1–C4 | firstfit, abne, lowestloss e maxskr no C+L |
+
+- Tamanho inicial: 20 000 requisições, 5 cargas e 5 replicações.
+- Os casos são gerados por `tools/casos/gerar_casos_parte49.py`.
+- Nos casos novos, `classicalBandStartThz` está coerente com a grade da camada física: 191,85 THz na banda C e 184,4 THz no C+L. Nos casos da Parte 43 está 191,3; ver o `LEIA-ME.md` da pasta.
+
+### 5. Launcher 1.20.3
+
+- Grupo **QoT clássica por banda (experimental)** na aba Camada física.
+- Opção `maxskr` em `qkd.qchSlotPolicy`.
+- Ajuda de `classicalBandStartThz` com a regra centerFrequency − slots × 12,5 GHz / 2.
+
+### Arquivos
+
+- **Simulador:**
+  - `network/ClassicalMultiBand` (novo) e `network/PhysicalLayer`;
+  - `simulationControl/parsers/PhysicalLayerConfig` e `NetworkConfig` (javadoc);
+  - `qkd/network/QKDNetworkParameters` e `qkd/capacity/QKDSharedResourceManager`;
+  - `qkd/verification/MultiBandClassicalQoTVerification` (novo);
+  - `simulations/SNetS-SDM-QKD-exp.jar`.
+- **Launcher:** `schema.js`, `LauncherServer.java` e `snets-launcher.jar`.
+- **Documentação e referência:**
+  - `docs/multibanda/QOT_CLASSICA_POR_BANDA.md`;
+  - `verificacao/QKD_reference/ISRS_GNPy/`;
+  - `tools/casos/gerar_casos_parte49.py`.
+- **Configuração:** `.gitignore` (casos da Parte 49 entram sem os resultados).
+
+### Regressão
+
+- Casos C e Q: idênticos à referência `main`.
+- Casos M: idênticos à referência `experimental`.
 
 ---
 
