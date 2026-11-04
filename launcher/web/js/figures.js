@@ -414,7 +414,7 @@
   // ================================================================ templates
 
   // Parte 27: models grouped by subject (optgroups of the "Modelo de gráfico" box); ids are kept, so saved figures still open
-  const TEMPLATE_GROUPS = ['Bloqueio', 'Comparação com um caso de referência', 'Causas de bloqueio', 'Canais QKD bloqueados', 'Núcleos', 'Espectro e utilização', 'Fragmentação', 'Mapas de calor', 'Correlações', 'QKD', 'Custo QKD', 'Outros'];
+  const TEMPLATE_GROUPS = ['Bloqueio', 'Causas de bloqueio', 'Comparação com um caso de referência', 'Núcleos', 'Espectro e utilização', 'Fragmentação', 'Mapas de calor', 'QKD', 'Canais QKD bloqueados', 'Custo QKD', 'Outros', 'Correlações'];
   const TEMPLATES = [
     // ---- Bloqueio
     { id: 'bp', group: 'Bloqueio', name: 'Bloqueio de circuitos × carga', type: 'line', file: 'BlockingProbability', metric: 'Blocking probability', y: 'Probabilidade de Bloqueio de Circuito', x: 'Carga (Erlangs)', xMode: 'erl' },
@@ -469,8 +469,8 @@
       desc: 'Para cada slot de cada núcleo de cada enlace, a fração das tentativas que terminaram bloqueadas. Uma tentativa é a faixa do candidato da requisição (o circuito aceito, ou o candidato que foi bloqueado) em cada enlace da rota. À direita: requisições bloqueadas ÷ requisições que usaram aquele núcleo do enlace, e a porcentagem. Usa o SlotBlocking.csv (Parte 29).' },
     { id: 'slotBlockCauses', group: 'Mapas de calor', name: 'Espectro: causa do bloqueio em cada slot (todas as causas, uma cor cada)', type: 'slotblock', file: 'SlotBlocking', blockMode: 'causes',
       desc: 'Cada slot recebe a cor da causa com mais bloqueios ali (passe o mouse para ver todas). Cinza: houve tentativas e nenhum bloqueio; branco: nenhuma tentativa. Escolha uma causa em "Causa" para ver só ela. Usa o SlotBlocking.csv (Parte 29).' },
-    { id: 'slotBlockQoTO', group: 'Mapas de calor', name: 'Espectro: onde ocorreram os bloqueios por QoTO', type: 'slotblock', file: 'SlotBlocking', blockMode: 'causes', blockCause: 'QoTO',
-      desc: 'Só os bloqueios por QoTO (o novo circuito degradaria a QoT de circuitos ativos), na cor da causa. Troque a causa na seção 2 para ver as outras.' },
+    { id: 'slotBlockQoTO', group: 'Mapas de calor', name: 'Espectro: onde ocorreram os bloqueios das causas escolhidas', type: 'slotblock', file: 'SlotBlocking', blockMode: 'causes', blockCauses: ['QoTO'],
+      desc: 'Só os bloqueios das causas marcadas em "2. Dados" (começa com QoTO), cada uma na sua cor. Marque uma ou várias causas; com todas marcadas é igual ao mapa de todas as causas.' },
     // ---- Correlações
     { id: 'scLinkUtilBlock', group: 'Correlações', name: 'Enlaces: utilização × bloqueio (um ponto por enlace)', type: 'scatter', by: 'Link', xFile: 'SpectrumUtilization', xMetric: 'Utilization Per Link', yFile: 'BlockingDetails', yMetric: 'Link blocking probability', x: 'Utilização do enlace', y: 'Bloqueio do enlace',
       desc: 'Cada ponto é um enlace dirigido; r é o coeficiente de correlação de Pearson e a reta tracejada, o ajuste por mínimos quadrados.' },
@@ -572,7 +572,7 @@
       ref: { path: '', mode: 'abs', order: 'selection', layout: 'cols', colorBy: 'auto', hideZero: true },
       cores: { lp: -1, utilFile: 'SpectrumUtilization', utilMetric: 'Utilization per Core', blockFile: 'BlockingProbability', blockPrefix: 'Blocking probability per core', normBlock: false },
       topo: { lps: [], range: 'shared', block: !!t.topoBlock, blockFile: 'BlockingDetails', blockMetric: 'Link blocking probability', blockClasses: 'split' },
-      slots: { lp: -1, links: [], cores: [], oneWay: false, from: 1, to: 0, order: 'name', caseLayout: 'stack', blockMode: t.blockMode || 'ratio', blockCause: t.blockCause || 'all', onlyBlocked: false, summary: true },
+      slots: { lp: -1, links: [], cores: [], oneWay: false, from: 1, to: 0, order: 'name', caseLayout: 'stack', blockMode: t.blockMode || 'ratio', blockCause: t.blockCause || 'all', blockCauses: (t.blockCauses || []).slice(), onlyBlocked: false, summary: true },
       scatter: { xFile: t.xFile || 'SpectrumUtilization', xMetric: t.xMetric || 'Utilization Per Link', yFile: t.yFile || 'BlockingDetails', yMetric: t.yMetric || 'Link blocking probability',
         by: t.by || 'Link', lp: -1, fx: {}, fy: {}, trend: true, pooled: false },
       labels: Object.assign({}, t.labels || {}), seriesStyle: {}, seriesOrder: [], style,
@@ -677,7 +677,7 @@
   }
 
   /** 1.17.0: bar pattern and value-label overrides of one series (spec.seriesStyle[key]), passed to the renderer. */
-  const EXTRA_KEYS = ['pattern', 'patternColor', 'patternSize', 'patternWidth', 'valShow', 'valColor', 'valBold', 'valBox', 'valBoxFill', 'valBoxStroke', 'valPos'];
+  const EXTRA_KEYS = ['pattern', 'patternColor', 'patternSize', 'patternWidth', 'valShow', 'valColor', 'valBold', 'valBox', 'valBoxFill', 'valBoxStroke', 'valPos', 'valFormat', 'valDigits', 'valBoxInside'];
   function extraStyle(o) {
     const out = {};
     for (const k of EXTRA_KEYS) if (o[k] !== undefined && o[k] !== '' && o[k] !== 'inherit') out[k] = o[k];
@@ -1229,12 +1229,22 @@
     return causeColor(cause) || ['#C00000', '#7030A0', '#00B050', '#0070C0', '#ED7D31', '#FFC000', '#5B9BD5', '#A5A5A5'][i % 8];
   }
 
+  /** 1.18.4: causes shown by the spectrum blocking map (null = all). The old single "blockCause" still works. */
+  function slotChosenCauses(T) {
+    if (Array.isArray(T.blockCauses) && T.blockCauses.length) return T.blockCauses.slice();
+    if (T.blockCause && T.blockCause !== 'all') return [T.blockCause];
+    return null;
+  }
+
   /** Spectrum blocking heat map: blocked ÷ attempts, counts or the cause of each slot (Parte 29). */
   async function buildSlotBlock(spec) {
     const T = spec.slots || (spec.slots = newSpec('slotBlock', []).slots);
     const st = spec.style;
     const mode = T.blockMode || 'ratio';
-    const want = T.blockCause || 'all';
+    const chosen = slotChosenCauses(T);
+    const want = chosen ? 'some' : 'all';
+    const chosenLabel = chosen ? chosen.map((k) => autoLabel(k)).join(' + ') : '';
+    const sumArr = (arrs) => { const ok = arrs.filter(Boolean); if (!ok.length) return null; const out = new Float64Array(ok[0].length); for (const a of ok) for (let i = 0; i < a.length; i++) out[i] += a[i]; return out; };
     const panels = [];
     const missing = [];
     const allCauses = [];
@@ -1256,7 +1266,7 @@
       const from = Math.max(1, Math.min(p.nSlots, Math.round(Number(T.from) || 1)));
       const to = Number(T.to) > 0 ? Math.max(from, Math.min(p.nSlots, Math.round(Number(T.to)))) : p.nSlots;
       const n = to - from + 1;
-      const causes = want === 'all' ? p.causes : p.causes.filter((k) => k === want);
+      const causes = want === 'all' ? p.causes : p.causes.filter((k) => chosen.includes(k));
       const rows = [];
       const netS = cd.files.network || {};
       const qCoreS = App.isPlainObject(netS.qkd) && netS.qkd.enabled ? String(netS.qkd.quantumCoreId) : null;
@@ -1265,9 +1275,9 @@
         const key = lp + '|' + link + '|' + core;
         const att = p.att.get(key);
         if (!att) continue;
-        const blkArr = want === 'all' ? p.blkAll.get(key) : (p.blk.get(want) || new Map()).get(key);
+        const blkArr = want === 'all' ? p.blkAll.get(key) : sumArr(chosen.map((k) => (p.blk.get(k) || new Map()).get(key)));
         const reqA = p.reqAtt.get(key) || 0;
-        const reqB = want === 'all' ? (p.reqBlkAll.get(key) || 0) : ((p.reqBlk.get(want) || new Map()).get(key) || 0);
+        const reqB = want === 'all' ? (p.reqBlkAll.get(key) || 0) : chosen.reduce((a, k) => a + ((p.reqBlk.get(k) || new Map()).get(key) || 0), 0);
         totReq += reqA; totBlk += reqB;
         if (T.onlyBlocked && !reqB) continue;
         const values = new Float64Array(n);
@@ -1307,7 +1317,7 @@
       }
       nSlotsAll = Math.max(nSlotsAll, n);
       const nb = p.noBand.get(lp) || 0;
-      const sub = [lpLabel(cd, lp), p.nReps > 1 ? 'soma de ' + p.nReps + ' replicações' : '', want !== 'all' ? autoLabel(want) : '',
+      const sub = [lpLabel(cd, lp), p.nReps > 1 ? 'soma de ' + p.nReps + ' replicações' : '', want !== 'all' ? chosenLabel : '',
         nb > 0 && want === 'all' ? nb + ' bloqueio' + (nb > 1 ? 's' : '') + ' sem faixa no espectro (fora do mapa)' : '',
         (p.noQch.get(lp) || 0) > 0 && want === 'all' ? p.noQch.get(lp) + ' bloqueio' + (p.noQch.get(lp) > 1 ? 's' : '') + ' QKD sem QCh tentado (fora do núcleo ' + (qCoreS || 'quântico') + ')' : '',
         (p.noPich.get(lp) || 0) > 0 && want === 'all' ? p.noPich.get(lp) + ' bloqueio' + (p.noPich.get(lp) > 1 ? 's' : '') + ' de PICh sem faixa tentada' : ''].filter(Boolean);
@@ -1315,7 +1325,7 @@
     }
     S.slotCauses = allCauses;
     if (!panels.length) return { empty: 'Nenhum caso selecionado tem o arquivo ' + slotBlockFile(spec) + '.csv.' + fileHint(slotBlockFile(spec)), missing };
-    if (!panels.some((x) => x.rows.length)) return { empty: T.onlyBlocked ? 'Nenhum núcleo de enlace selecionado teve bloqueio' + (want !== 'all' ? ' por ' + autoLabel(want) : '') + ' neste ponto de carga.' : 'Nenhum enlace/núcleo selecionado teve tentativas.', missing };
+    if (!panels.some((x) => x.rows.length)) return { empty: T.onlyBlocked ? 'Nenhum núcleo de enlace selecionado teve bloqueio' + (want !== 'all' ? ' por ' + chosenLabel : '') + ' neste ponto de carga.' : 'Nenhum enlace/núcleo selecionado teve tentativas.', missing };
     let min = 0, max = 1;
     if (mode === 'count' || st.slotRange === 'auto') {
       min = mode === 'count' ? 0 : Infinity; max = -Infinity;
@@ -1331,8 +1341,8 @@
     if (mode === 'causes') {
       const used = new Set();
       for (const pn of panels) for (const r of pn.rows) for (const c of r.colors) if (c) used.add(c);
-      model.legendItems = allCauses.filter((k) => want === 'all' || k === want).map((k) => [slotCauseColor(k, allCauses.indexOf(k), st), autoLabel(k)]).filter(([c]) => used.has(c));
-      model.legendItems.push([st.slotNoBlockColor || SLOT_NOBLOCK_COLOR, 'Tentado, sem bloqueio' + (want !== 'all' ? ' por esta causa' : '')], [model.noDataColor, 'Nenhuma tentativa']);
+      model.legendItems = allCauses.filter((k) => want === 'all' || chosen.includes(k)).map((k) => [slotCauseColor(k, allCauses.indexOf(k), st), autoLabel(k)]).filter(([c]) => used.has(c));
+      model.legendItems.push([st.slotNoBlockColor || SLOT_NOBLOCK_COLOR, 'Tentado, sem bloqueio' + (want !== 'all' ? (chosen.length > 1 ? ' por estas causas' : ' por esta causa') : '')], [model.noDataColor, 'Nenhuma tentativa']);
     }
     model.legendTitle = slotBlockLegendTitle(spec, mode);
     return model;
@@ -1668,7 +1678,7 @@
     } else if (m.kind === 'slots' && m.block) {
       add('painel', 'caso e ponto de carga (um mapa por caso); soma das replicações. Bloqueios sem faixa (sem candidato) não têm lugar no espectro e são contados à parte no título.');
       add('enlace / núcleo', 'uma linha do mapa por núcleo de cada enlace direcional escolhido.');
-      add('requisições bloqueadas/feitas', 'quantas requisições tiveram o candidato naquele núcleo daquele enlace (cada requisição conta uma vez por enlace da rota) e quantas delas foram bloqueadas' + (spec.slots.blockCause !== 'all' ? ' pela causa escolhida' : '') + '; ao lado, a porcentagem.');
+      add('requisições bloqueadas/feitas', 'quantas requisições tiveram o candidato naquele núcleo daquele enlace (cada requisição conta uma vez por enlace da rota) e quantas delas foram bloqueadas' + (slotChosenCauses(spec.slots) ? ' pelas causas escolhidas' : '') + '; ao lado, a porcentagem.');
       add('slot N', m.block === 'count' ? 'número de bloqueios cuja faixa incluía o slot N.' : m.block === 'causes' ? 'cor da causa com mais bloqueios no slot N (vazio = sem tentativas). Na tabela: bloqueadas ÷ tentativas.' : 'bloqueios ÷ tentativas cuja faixa incluía o slot N (vazio = sem tentativas). Requisições grandes ocupam mais slots, por isso a média dos slots fica acima da porcentagem por requisição.');
     } else if (m.kind === 'slots') {
       add('painel', 'caso e ponto de carga (um mapa por caso).');
@@ -1746,7 +1756,7 @@
 
   // ================================================================ render page
 
-  let host = null, leftCol = null, previewBox = null, tableBox = null, seriesBox = null, infoBox = null;
+  let host = null, leftCol = null, previewBox = null, tableBox = null, seriesBox = null, infoBox = null, navBox = null;
 
   function render() { return renderInto(document.getElementById('figView'), 'page'); }
 
@@ -1769,6 +1779,7 @@
     S.seriesKeys = '';
     host = clear(container);
     leftCol = el('div.fig-controls');
+    navBox = el('div.fig-nav');
     previewBox = el('div.fig-preview');
     tableBox = el('div.fig-table');
     infoBox = el('div.fig-info');
@@ -1790,7 +1801,23 @@
         el('div.fig-stickybar', toolbar())];
     const reportSec = section('Relatório: várias figuras numa imagem (SVG/PNG/PDF)', false, reportPanel());
     reportSec.classList.add('fig-report');
-    host.append(...head, el('div.fig-layout', leftCol, el('div.fig-right', infoBox, previewBox, tableBox, reportSec)));
+    host.append(...head, el('div.fig-layout', el('div.fig-side', navBox, leftCol), el('div.fig-right', infoBox, previewBox, tableBox, reportSec)));
+    // 1.18.4: the left column starts below the fixed toolbar, whatever its height
+    const barEl = host.querySelector('.fig-stickybar');
+    const sizeSide = () => {
+      if (!barEl || !host.isConnected) return;
+      host.style.setProperty('--fig-bar-h', barEl.offsetHeight + 'px');
+      // height of the left column: the visible part of the scrolling page below the toolbar
+      let sp = host.parentElement;
+      while (sp && sp !== document.body && !/(auto|scroll)/.test(getComputedStyle(sp).overflowY)) sp = sp.parentElement;
+      const viewH = sp && sp !== document.body ? sp.clientHeight : window.innerHeight;
+      const caseH = parseFloat(getComputedStyle(host).getPropertyValue('--case-sticky-h')) || 0;
+      host.style.setProperty('--fig-side-h', Math.max(320, viewH - barEl.offsetHeight - caseH - 70) + 'px');
+    };
+    if (barEl && window.ResizeObserver) new ResizeObserver(sizeSide).observe(barEl);
+    if (!S.sideResize) { S.sideResize = true; window.addEventListener('resize', () => { if (host) { const f = host.querySelector('.fig-stickybar'); if (f) f.dispatchEvent(new Event('fig-size')); } }); }
+    if (barEl) barEl.addEventListener('fig-size', sizeSide);
+    sizeSide();
     await refreshSaved();
     drawControls();
     await refresh();
@@ -1948,18 +1975,101 @@
   function drawControlsInner() {
     clear(leftCol);
     const spec = S.spec;
+    const tag = (d, key, label) => { if (d) { d.dataset.nav = key; d.dataset.navLabel = label; } return d; };
     leftCol.append(
-      section('1. Casos (' + spec.cases.length + ')', true, casesPanel()),
-      section('2. Dados', true, dataPanel()),
-      usesCost(spec) ? section('Pesos do custo', true, costPanel()) : null,
-      (seriesBox = el('div')),
-      section('4. Aparência', false, appearancePanel()),
-      ['line', 'bars'].includes(spec.type) ? section('5. Rótulos dos valores', false, valuesPanel()) : null,
-      spec.type === 'ref' ? section('5. Gráfico de referência', true, refStylePanel()) : null,
-      section('6. Eixos e números', false, axesPanel()),
-      section('7. Linhas de referência', false, refLinesPanel()),
-      section('8. Legenda e título', false, legendPanel()));
+      tag(section('1. Casos (' + spec.cases.length + ')', true, casesPanel()), 'cases', 'Casos'),
+      tag(section('2. Dados', true, dataPanel()), 'data', 'Dados'),
+      usesCost(spec) ? tag(section('Pesos do custo', true, costPanel()), 'cost', 'Custo') : null,
+      (seriesBox = el('div', { 'data-nav': 'series', 'data-nav-label': 'Séries e cores' })),
+      tag(section('4. Aparência', false, appearancePanel()), 'look', 'Aparência'),
+      ['line', 'bars'].includes(spec.type) ? tag(section('5. Rótulos dos valores', false, valuesPanel()), 'values', 'Valores') : null,
+      spec.type === 'ref' ? tag(section('5. Gráfico de referência', true, refStylePanel()), 'ref', 'Referência') : null,
+      tag(section('6. Eixos e números', false, axesPanel()), 'axes', 'Eixos'),
+      tag(section('7. Linhas de referência', false, refLinesPanel()), 'lines', 'Linhas'),
+      tag(section('8. Legenda e título', false, legendPanel()), 'legend', 'Legenda e título'));
     drawSeriesPanel();
+    drawNav();
+  }
+
+  // ---------------------------------------------------------------- 1.18.4: menu of the settings (top of the left column)
+
+  const navNorm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  function navSections() {
+    if (!leftCol) return [];
+    return [...leftCol.children].filter((x) => x.dataset && x.dataset.nav).map((x) => ({
+      key: x.dataset.nav, label: x.dataset.navLabel, box: x, det: x.matches('details') ? x : x.querySelector(':scope > details'),
+    })).filter((x) => x.det);
+  }
+  function navOne() { try { return localStorage.getItem('snets.fig.navOne') === '1'; } catch (e) { return false; } }
+  function goSection(key, target) {
+    const list = navSections();
+    const it = list.find((x) => x.key === key);
+    if (!it) return;
+    if (navOne()) for (const x of list) if (x !== it && x.key !== 'cases' && x.det.open) x.det.open = false;
+    it.det.open = true;
+    let p = target ? target.parentElement : null;
+    while (p && p !== leftCol) { if (p.tagName === 'DETAILS') p.open = true; p = p.parentElement; }
+    requestAnimationFrame(() => {
+      const t = target || it.det;
+      const top = t.getBoundingClientRect().top - leftCol.getBoundingClientRect().top + leftCol.scrollTop - 6;
+      leftCol.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+      if (target) { target.classList.add('fig-flash'); setTimeout(() => target.classList.remove('fig-flash'), 1600); }
+      markNav();
+    });
+  }
+  function markNav() {
+    if (!navBox) return;
+    const open = new Set(navSections().filter((x) => x.det.open).map((x) => x.key));
+    for (const b of navBox.querySelectorAll('[data-go]')) b.classList.toggle('is-open', open.has(b.dataset.go));
+  }
+  function drawNav() {
+    if (!navBox) return;
+    const list = navSections();
+    let search = navBox.querySelector('.fig-nav-search');
+    let results = navBox.querySelector('.fig-nav-results');
+    const keepVal = search ? search.value : '';
+    clear(navBox);
+    const chips = el('div.fig-nav-chips', list.map((x) => el('button.fig-nav-chip', { type: 'button', 'data-go': x.key, title: 'Ir para "' + x.det.querySelector('summary').textContent + '"', on: { click: () => goSection(x.key) } }, x.label)));
+    search = el('input.input.fig-nav-search', { type: 'search', placeholder: 'Procurar um ajuste (ex.: casas decimais, fonte, legenda)…', value: keepVal });
+    results = el('div.fig-nav-results');
+    results.hidden = true;
+    const run = () => {
+      clear(results);
+      const q = navNorm(search.value.trim());
+      if (q.length < 2) { results.hidden = true; return; }
+      const hits = [];
+      for (const sx of navSections()) {
+        for (const f of sx.box.querySelectorAll('.field, label.check, .fig-series-grid label, summary')) {
+          if (f.closest('.fig-nav')) continue;
+          const lab = f.querySelector(':scope > .flabel, :scope > span') || f;
+          const t = lab.textContent.trim();
+          if (!t || !navNorm(t).includes(q)) continue;
+          hits.push({ sx, f, t });
+          if (hits.length >= 14) break;
+        }
+        if (hits.length >= 14) break;
+      }
+      results.hidden = false;
+      if (!hits.length) { results.append(el('div.small.muted', { style: { padding: '6px 8px' } }, 'Nenhum ajuste com "' + search.value.trim() + '".')); return; }
+      for (const h of hits) results.append(el('button.fig-nav-hit', { type: 'button', on: { click: () => { results.hidden = true; goSection(h.sx.key, h.f); } } },
+        el('span', h.t.length > 70 ? h.t.slice(0, 68) + '…' : h.t), el('span.small.muted', h.sx.label)));
+    };
+    search.addEventListener('input', App.debounce(run, 120));
+    search.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const b = results.querySelector('.fig-nav-hit'); if (b) b.click(); } if (e.key === 'Escape') { search.value = ''; results.hidden = true; } });
+    search.addEventListener('focus', () => { if (search.value.trim().length >= 2) run(); });
+    const one = el('input', { type: 'checkbox' });
+    one.checked = navOne();
+    one.addEventListener('change', () => { try { localStorage.setItem('snets.fig.navOne', one.checked ? '1' : '0'); } catch (e) { /* ignore */ } });
+    const all = (v) => () => { for (const x of navSections()) x.det.open = v; markNav(); };
+    navBox.append(chips, el('div.fig-nav-row', el('div.fig-nav-searchwrap', search, results)),
+      el('div.fig-nav-row.fig-nav-opts',
+        el('label.check', one, ' Uma seção por vez'),
+        el('span.fig-nav-sp'),
+        el('button.fig-nav-link', { type: 'button', title: 'Abre todas as seções', on: { click: all(true) } }, 'Abrir todas'),
+        el('span.muted', '·'),
+        el('button.fig-nav-link', { type: 'button', title: 'Fecha todas as seções', on: { click: all(false) } }, 'Fechar todas')));
+    for (const x of list) x.det.addEventListener('toggle', markNav);
+    markNav();
   }
 
   function usesCost(spec) {
@@ -2295,7 +2405,7 @@
     if (isBlock) {
       if (!/^(SlotBlocking|QKDChannelSlotBlocking)$/.test(S.spec.file || '')) S.spec.file = 'SlotBlocking';
       box.append(field('Requisições do mapa', selectInput(S.spec, 'file', [['SlotBlocking', 'Todas, cores por causa (SlotBlocking.csv)'], ['QKDChannelSlotBlocking', 'Só as protegidas por QKD, cores por canal CCh/QCh/PICh (QKDChannelSlotBlocking.csv)']], () => {
-        S.spec.slots.blockCause = 'all'; changedData();
+        S.spec.slots.blockCause = 'all'; S.spec.slots.blockCauses = []; changedData();
       })));
     }
     if (!o.links.length) {
@@ -2305,13 +2415,24 @@
     box.append(field('Ponto de carga', lpSelect(T, 'lp')));
     if (isBlock) {
       const causes = (o.causes || []).slice();
-      if (T.blockCause && T.blockCause !== 'all' && !causes.includes(T.blockCause)) causes.push(T.blockCause);
+      const ch0 = slotChosenCauses(T) || [];
+      for (const k of ch0) if (!causes.includes(k)) causes.push(k);
       box.append(el('div.fields.two',
         field('O que cada slot mostra', selectInput(T, 'blockMode', [['ratio', 'Bloqueadas ÷ tentativas (escala de cores)'], ['count', 'Número de bloqueios (escala de cores)'], ['causes', 'Causa do bloqueio (uma cor por causa)']], () => {
           if (T.blockMode === 'count') S.spec.style.slotRange = 'auto';
           changedData();
-        })),
-        field('Causa', selectInput(T, 'blockCause', [['all', 'Todas as causas']].concat(causes.map((k) => [k, autoLabel(k) + (autoLabel(k) !== k ? ' (' + k + ')' : '')])), () => changedData()))));
+        }))));
+      // 1.18.4: several causes can be marked (none or all marked = all causes)
+      if (causes.length) {
+        const labs = causes.map((k) => autoLabel(k) + (autoLabel(k) !== k ? ' (' + k + ')' : ''));
+        const cur = ch0.length ? causes.filter((k) => ch0.includes(k)) : causes;
+        box.append(groupField('Causas mostradas (' + cur.length + ' de ' + causes.length + ')', metricChecklist(labs, cur.map((k) => labs[causes.indexOf(k)]), (arr) => {
+          const pick = causes.filter((k, i) => arr.includes(labs[i]));
+          T.blockCauses = pick.length === causes.length ? [] : pick;
+          T.blockCause = 'all';
+          changedData();
+        }, true), 'Marque uma ou mais causas: o mapa mostra só onde elas ocorreram, cada uma na sua cor. Todas marcadas = todas as causas.'));
+      }
       box.append(el('div.checks',
         checkInput(T, 'onlyBlocked', 'Só os núcleos de enlace com bloqueio', () => changedData()),
         checkInput(T, 'summary', 'Colunas à direita: bloqueadas/feitas e %', () => changedData())));
@@ -2424,6 +2545,9 @@
     if (!seriesBox) return;
     const keepFocus = focusKeyIn(seriesBox);
     try { App.keepScroll(drawSeriesPanelInner); } finally { restoreFocus(seriesBox, keepFocus); }
+    const d = seriesBox.querySelector(':scope > details');
+    if (d) d.addEventListener('toggle', markNav);
+    markNav();
   }
 
   function drawSeriesPanelInner() {
@@ -2736,6 +2860,10 @@
         field('Painéis por linha', numInput(st, 'panelCols', changedStyle, { min: 1, max: 6 })),
         field('Altura de cada painel (px)', numInput(st, 'panelHeight', changedStyle, { min: 0, max: 2000, step: 10, placeholder: '0 = usa a altura total' })),
         field('Rótulo do painel', textInput(st, 'panelLabel', changedStyle, { placeholder: 'ex.: (a)' }))),
+      el('div.fields.two',
+        field('Cantos das barras arredondados (px)', numInput(st, 'barRadius', changedStyle, { min: 0, max: 30, step: 0.5 })),
+        field('Cor do contorno das barras', colorInput(st, 'barOutlineColor', changedStyle)),
+        field('Espessura do contorno das barras (px)', numInput(st, 'barOutlineWidth', changedStyle, { min: 0.2, max: 8, step: 0.2 }))),
       el('div.checks',
         checkInput(st, 'barOutline', 'Contorno nas barras', changedStyle),
         checkInput(st, 'border', 'Moldura no gráfico', changedStyle)),
@@ -2748,7 +2876,10 @@
 
   const VAL_COLORS = [['auto', 'Automática (texto nas barras, cor da série nas linhas)'], ['text', 'Cor do texto do gráfico'], ['series', 'Cor da série'], ['contrast', 'Contraste com o fundo (preto/branco)'], ['custom', 'Cor escolhida']];
   const VAL_BAR_POS = [['auto', 'Automática (dentro se couber, senão acima)'], ['outsideEnd', 'Acima da barra'], ['insideEnd', 'Dentro, no topo'], ['center', 'Dentro, no centro'], ['insideBase', 'Dentro, na base']];
-  const VAL_STACK = [['center', 'No centro de cada segmento'], ['auto', 'No centro; ao lado se não couber'], ['side', 'Sempre ao lado, com linha guia']];
+  const VAL_STACK = [['auto', 'Automático: dentro se couber, senão ao lado da pilha'], ['autoTop', 'Automático: dentro se couber, senão no topo da pilha'], ['side', 'Todos ao lado da pilha (com linha guia)'], ['top', 'Todos no topo da pilha'], ['center', 'Só dentro (oculta os que não cabem)']];
+  // 1.18.4
+  const VAL_FORMATS = [['axis', 'Igual ao eixo y'], ['auto', 'Automático'], ['fixed', 'Decimal fixo (casas decimais)'], ['sci', 'Científico (1,2E-3)'], ['percent', 'Porcentagem']];
+  const VAL_BOX_INSIDE = [['same', 'Igual à de fora'], ['transparent', 'Transparente (só o contorno)'], ['nobox', 'Sem caixa (só o número)']];
   const VAL_LINE_POS = [['above', 'Acima do ponto'], ['below', 'Abaixo do ponto'], ['right', 'À direita'], ['left', 'À esquerda']];
 
   /** Colour mode select + colour picker; the picker sets a hex colour, the modes are words. */
@@ -2784,12 +2915,20 @@
           : field('Casas decimais', numInput(st, 'lineValueDigits', changedStyle, { min: 0, max: 10 })),
         field('Ocultar valores menores que', textInput(st, 'valMin', changedStyle, { placeholder: 'ex.: 0,001' }), 'Em módulo; vazio = mostra todos.'),
         bars && !stacked ? field('Posição na barra', selectInput(st, 'valPos', VAL_BAR_POS, changedStyle), 'Se não couber dentro, o valor vai para cima da barra.') : null,
-        stacked ? field('Barras empilhadas', selectInput(st, 'valStacked', VAL_STACK, changedStyle), 'Ao lado: o valor fica à direita da pilha, ligado ao segmento por uma linha (bom para segmentos finos).') : null,
+        stacked ? field('Posição dos valores (empilhadas)', selectInput(st, 'valStacked', VAL_STACK, changedStyle), 'Cada série pode ter a sua posição (seção 3, "Padrão e valores").') : null,
         bars ? field('Rotação', selectInput(st, 'valRotate', [['auto', 'Automática (gira se não couber)'], ['0', 'Horizontal'], ['-90', 'Vertical']], changedStyle)) : null,
         !bars ? field('Posição no ponto', selectInput(st, 'valLinePos', VAL_LINE_POS, changedStyle)) : null,
+        field('Formato do número', selectInput(st, 'valFormat', VAL_FORMATS, changedStyle), 'Cada série pode ter formato e casas próprios (seção 3, "Padrão e valores").'),
         field('Caixa', selectInput(st, 'valBox', [['none', 'Sem caixa'], ['box', 'Caixa com fundo']], changedStyle)),
-        field('Fundo da caixa', colorInput(st, 'valBoxFill', changedStyle)),
-        field('Contorno da caixa', colorInput(st, 'valBoxStroke', changedStyle)),
+        groupField('Fundo da caixa', boxColorInput(st, 'valBoxFill', changedStyle, false, '#ffffff'), '"Cor da série" usa a cor do caso ou da causa; o texto fica preto ou branco conforme o fundo.'),
+        groupField('Contorno da caixa', boxColorInput(st, 'valBoxStroke', changedStyle, false, '#7f7f7f')),
+        bars ? field('Caixa dos valores dentro da barra', selectInput(st, 'valBoxInside', VAL_BOX_INSIDE, changedStyle), 'Os valores fora da barra continuam com a caixa.') : null,
+        stacked ? field('Espaço para os valores ao lado da pilha', selectInput(Object.assign(st, { valSideFit: st.valSideAuto === false ? 'off' : (st.valSideFit || 'widen') }), 'valSideFit', [['widen', 'Manter a largura das barras e alargar a imagem'], ['narrow', 'Estreitar as barras'], ['off', 'Não ajustar (pode sobrepor)']], () => { st.valSideAuto = st.valSideFit !== 'off'; changedStyle(); }),
+          '"Alargar a imagem": a largura das barras da seção 4 é mantida e a imagem cresce até o maior valor caber entre uma barra e a vizinha, com a distância escolhida acima.') : null,
+        stacked && st.valSideFit === 'narrow' ? field('Largura mínima da barra ao estreitar (%)', numInput(st, 'valSideMinBar', changedStyle, { min: 5, max: 100, step: 5, placeholder: '25' })) : null,
+        stacked ? field('Espaço acima das pilhas para os valores (%)', numInput(st, 'valHeadroom', changedStyle, { min: 0, max: 200, step: 1 }), 'Aumenta o máximo do eixo y para os valores acima das barras caberem.') : null,
+        stacked ? field('Valores ao lado: distância da barra (px)', numInput(st, 'valSideGap', changedStyle, { min: 0, max: 200, step: 1 })) : null,
+        stacked ? field('Lado dos valores ao lado da pilha', selectInput(Object.assign(st, { valSideWhere: st.valSideWhere === 'left' ? 'left' : 'right' }), 'valSideWhere', [['right', 'À direita da barra'], ['left', 'À esquerda da barra']], changedStyle), 'Os valores ao lado nunca ficam sobre os nomes dos casos (eixo x).') : null,
         field('Opacidade da caixa', numInput(st, 'valBoxOpacity', changedStyle, { min: 0, max: 1, step: 0.05 }))),
       el('div.checks', checkInput(st, 'valBold', 'Negrito', changedStyle)),
       el('p.small.muted', 'Cada série pode ter cor, negrito, caixa, posição própria ou ficar sem valores: botão "Valores" na série (seção 3).'));
@@ -2880,7 +3019,11 @@
           el('label', el('span', 'Tamanho (px)'), numInput(o, 'patternSize', ch, { min: 3, max: 40, step: 1, placeholder: '8' })),
           el('label', el('span', 'Traço (px)'), numInput(o, 'patternWidth', ch, { min: 0, max: 10, step: 0.25, placeholder: 'auto' }))));
     }
-    const posOpts = isBar ? inh('', 'Igual à seção 5').concat(VAL_BAR_POS, [['side', 'Ao lado (empilhadas)']]) : inh('', 'Igual à seção 5').concat(VAL_LINE_POS);
+    // 1.18.4: stacked bars have their own positions (inside the segment or beside the stack)
+    const stackedNow = isBar && S.spec.bars && !!S.spec.bars.stacked;
+    const posOpts = !isBar ? inh('', 'Igual à seção 5').concat(VAL_LINE_POS)
+      : stackedNow ? inh('', 'Igual à seção 5').concat(VAL_STACK)
+        : inh('', 'Igual à seção 5').concat(VAL_BAR_POS);
     box.append(el('div.small.muted', 'Valores desta série'),
       el('div.fig-series-grid',
         el('label', el('span', 'Mostrar'), selectInput(Object.assign(o, { valShow: o.valShow || '' }), 'valShow', [['', 'Sim'], ['hide', 'Não (só esta série)']], ch)),
@@ -2888,12 +3031,29 @@
         el('label', el('span', 'Negrito'), selectInput(Object.assign(o, { valBold: o.valBold || '' }), 'valBold', [['', 'Igual à seção 5'], ['yes', 'Sim'], ['no', 'Não']], ch)),
         el('label', el('span', 'Posição'), selectInput(Object.assign(o, { valPos: o.valPos || '' }), 'valPos', posOpts, ch)),
         el('label', el('span', 'Caixa'), selectInput(Object.assign(o, { valBox: o.valBox || '' }), 'valBox', [['', 'Igual à seção 5'], ['none', 'Sem caixa'], ['box', 'Com caixa']], ch)),
-        el('label', el('span', 'Fundo da caixa'), (() => {
-          const c = el('input.input.color', { type: 'color', value: toHex(o.valBoxFill || S.spec.style.valBoxFill || '#ffffff') });
-          c.addEventListener('input', () => { o.valBoxFill = c.value; ch(); });
-          return c;
-        })())));
+        el('div', el('span.small', 'Fundo da caixa'), boxColorInput(o, 'valBoxFill', ch, true, S.spec.style.valBoxFill || '#ffffff')),
+        el('div', el('span.small', 'Contorno da caixa'), boxColorInput(o, 'valBoxStroke', ch, true, S.spec.style.valBoxStroke || '#7f7f7f')),
+        isBar ? el('label', el('span', 'Caixa dentro da barra'), selectInput(Object.assign(o, { valBoxInside: o.valBoxInside || '' }), 'valBoxInside', [['', 'Igual à seção 5']].concat(VAL_BOX_INSIDE), ch)) : null,
+        el('label', el('span', 'Formato do número'), selectInput(Object.assign(o, { valFormat: o.valFormat || '' }), 'valFormat', [['', 'Igual à seção 5']].concat(VAL_FORMATS.filter((x) => x[0] !== 'axis')), ch)),
+        el('label', el('span', 'Casas decimais'), numInput(o, 'valDigits', ch, { min: 0, max: 12, step: 1, placeholder: 'seção 5' }))));
     return box;
+  }
+
+  /** 1.18.4: colour of a value box: same as section 5, the colour of the series, or a chosen colour. */
+  function boxColorInput(obj, key, onChange, inherit, fallback) {
+    const cur = obj[key];
+    const isHex = /^#/.test(String(cur || ''));
+    const sel = el('select.input', (inherit ? [['', 'Igual à seção 5']] : []).concat([['series', 'Cor da série (do caso ou da causa)'], ['custom', 'Cor escolhida']]).map(([v, l]) => el('option', { value: v }, l)));
+    sel.value = cur === 'series' ? 'series' : isHex ? 'custom' : (inherit ? '' : 'custom');
+    const pick = el('input.input.color', { type: 'color', value: toHex(isHex ? cur : (fallback || '#ffffff')) });
+    pick.hidden = sel.value !== 'custom';
+    sel.addEventListener('change', () => {
+      pick.hidden = sel.value !== 'custom';
+      if (sel.value === '') delete obj[key]; else obj[key] = sel.value === 'custom' ? pick.value : 'series';
+      onChange();
+    });
+    pick.addEventListener('input', () => { obj[key] = pick.value; onChange(); });
+    return el('div.toolbar', { style: { margin: 0, flexWrap: 'nowrap' } }, sel, pick);
   }
 
   /** 1.16.0: bar width (%) as a slider plus a number; stored as barGap = 1 − width. */
@@ -2966,8 +3126,17 @@
         field('Grade', selectInput(st, 'grid', [['y', 'Horizontal'], ['xy', 'Horizontal e vertical'], ['x', 'Vertical'], ['none', 'Sem grade']], changedStyle)),
         field('Traço da grade', selectInput(st, 'gridDash', [['solid', 'Contínuo'], ['dashed', 'Tracejado'], ['dotted', 'Pontilhado']], changedStyle)),
         field('Cor da grade', colorInput(st, 'gridColor', changedStyle)),
-        field('Cor dos eixos', colorInput(st, 'axisColor', changedStyle))),
+        field('Cor dos eixos', colorInput(st, 'axisColor', changedStyle)),
+        field('Espessura dos eixos (px)', numInput(st, 'axisWidth', changedStyle, { min: 0.5, max: 6, step: 0.5 })),
+        field('Tamanho dos títulos dos eixos (px)', numInput(st, 'axisTitleSize', changedStyle, { min: 6, max: 60, step: 0.5, placeholder: 'auto' })),
+        field('Tamanho dos números do eixo y (px)', numInput(st, 'yLabelSize', changedStyle, { min: 6, max: 60, step: 0.5, placeholder: 'auto' })),
+        field('Tamanho dos rótulos do eixo x (px)', numInput(st, 'xLabelSize', changedStyle, { min: 6, max: 60, step: 0.5, placeholder: 'auto' })),
+        field('Cor dos rótulos do eixo x', colorInput(Object.assign(st, { xLabelColor: st.xLabelColor || st.textColor }), 'xLabelColor', changedStyle)),
+        field('Distância dos rótulos x até o eixo (px)', numInput(st, 'xLabelGap', changedStyle, { min: 0, max: 80, step: 1 }))),
       el('div.checks',
+        checkInput(st, 'axisTitleBold', 'Títulos dos eixos em negrito', changedStyle),
+        checkInput(st, 'xLabelBold', 'Rótulos do eixo x em negrito', changedStyle),
+        checkInput(st, 'yAxisLine', 'Linha do eixo y sempre visível', changedStyle),
         checkInput(st, 'yLog', 'Eixo y logarítmico', changedStyle),
         checkInput(st, 'xAsCategories', 'Eixo x com espaçamento uniforme (como no Excel)', changedStyle),
         checkInput(st, 'ticksOut', 'Marcas nos eixos', changedStyle)));
@@ -3110,7 +3279,7 @@
     if (m.kind === 'line' || m.kind === 'bars') return m.series.map((s) => s.key).concat(m.categories ? m.categories.map((c) => c.key) : []);
     if (m.kind === 'panels') return m.panels.map((p) => p.model.series.map((s) => s.key).join(',')).concat(m.items || []);
     if (m.kind === 'cores') return ['cores'];
-    if (m.kind === 'slots') return ['slots'];
+    if (m.kind === 'slots') return ['slots', m.block || '', (m.legendItems || []).map((x) => x[1]).join('|'), (S.slotCauses || []).join('|')];
     if (m.kind === 'topo') return ['topo'];
     if (m.kind === 'ref') return m.sections.map((sx) => 'i:' + sx.item).concat(m.sections[0] ? m.sections[0].bars.map((b) => b.key) : [], [S.spec.ref.colorBy]);
     return [];

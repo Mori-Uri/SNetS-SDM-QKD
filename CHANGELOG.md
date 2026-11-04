@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [51](#parte-51) | Parte 51 — launcher 1.20.5: menu das configurações, mais ajustes nos gráficos e mapa por causas escolhidas |
 | [50](#parte-50) | Parte 50 — launcher 1.20.4: gráfico de comparação com um caso de referência |
 | [49](#parte-49) | Parte 49 — QoT clássica por banda com ISRS, política maxskr do QCh, casos iniciais e launcher 1.20.3 |
 | [48](#parte-48) | Parte 48 — correção anti-Stokes medida do SpRS (opcional) e launcher 1.20.2 |
@@ -32,6 +33,70 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-51"></a>
+
+## Parte 51 — launcher 1.20.5: menu das configurações, mais ajustes nos gráficos e mapa por causas escolhidas
+
+**Organização das configurações (Estúdio de gráficos):**
+
+- Um menu fica no topo da coluna de configurações e não sai do lugar.
+  - Ele tem um botão por seção: Casos, Dados, Séries e cores, Aparência, Valores, Eixos, Linhas, Legenda e título (e Referência ou Custo, quando existem).
+  - Um clique abre a seção e rola a coluna até ela. Os botões das seções abertas ficam destacados.
+- **Procurar um ajuste:** digite parte do nome (ex.: "casas decimais", "fonte", "legenda") e clique no resultado. A seção abre e o campo pisca.
+- **"Uma seção por vez"** (opcional): abrir uma seção fecha as outras. Há também "Abrir todas" e "Fechar todas".
+- A coluna de configurações não tem mais rolagem para os lados, e a altura dela acompanha a janela e a barra de ferramentas.
+
+**Ordem dos grupos de modelos:**
+
+1. Bloqueio
+2. Causas de bloqueio
+3. Comparação com um caso de referência
+4. Núcleos
+5. Espectro e utilização
+6. Fragmentação
+7. Mapas de calor
+8. QKD
+9. Canais QKD bloqueados
+10. Custo QKD
+11. Outros
+12. Correlações
+
+**Mapas de calor do bloqueio:**
+
+- O modelo "onde ocorreram os bloqueios por QoTO" virou **"onde ocorreram os bloqueios das causas escolhidas"**.
+  - Em "2. Dados", uma lista de caixas marca uma ou várias causas.
+  - O mapa mostra só onde elas ocorreram, cada uma na sua cor. Todas marcadas = todas as causas.
+- As cores de cada causa (seção 3) agora sempre aparecem para edição. Antes, a lista de cores podia ficar vazia até o gráfico ser recarregado.
+
+**Rótulos dos valores (barras e linhas):**
+
+- **Formato do número:** igual ao eixo y, automático, decimal fixo, científico ou porcentagem. Cada série (caso ou causa) pode ter formato e casas decimais próprios, em "Padrão e valores" na seção 3.
+- **Fundo e contorno da caixa:** podem usar a **cor da série**, sem digitar o código da cor. Com o fundo na cor da série, o texto fica preto ou branco conforme o fundo.
+- **Caixa dos valores dentro da barra:** igual à de fora, transparente ou sem caixa. Os valores fora da barra mantêm a caixa.
+- **Barras empilhadas, posição dos valores** (seção 5, e por série na seção 3):
+  - Automático: dentro se couber, senão ao lado da pilha;
+  - Automático: dentro se couber, senão no topo da pilha;
+  - Todos ao lado da pilha (com linha guia);
+  - Todos no topo da pilha;
+  - Só dentro (oculta os que não cabem).
+- Os valores ao lado nunca ficam sobre os nomes dos casos. Também dá para escolher o lado (direita ou esquerda), a distância até a barra e o espaço acima das pilhas (em %).
+- **Espaço para os valores ao lado da pilha** (seção 5): "Manter a largura das barras e alargar a imagem" (padrão) mantém a largura das barras da seção 4 e aumenta a imagem até o maior valor caber entre a barra e a vizinha, com a distância escolhida; "Estreitar as barras" mantém a largura da imagem (largura mínima ajustável); "Não ajustar". Os valores de fora das barras são desenhados por cima de todas as barras.
+
+**Eixos e barras:**
+
+- **Eixos:**
+  - tamanho dos títulos dos eixos, dos números do eixo y e dos rótulos do eixo x;
+  - negrito nos títulos e nos rótulos x;
+  - cor e distância dos rótulos x;
+  - espessura dos eixos e linha do eixo y sempre visível.
+- **Barras:** cantos arredondados, e cor e espessura do contorno.
+
+Igual à Parte 51 da main (launcher 1.18.4), trazida para a experimental.
+
+**Arquivos:** `launcher/web/js/figures.js`, `launcher/web/js/figrender.js`, `launcher/web/styles.css`, `launcher/src/launcher/LauncherServer.java` e `launcher/snets-launcher.jar`.
 
 ---
 
