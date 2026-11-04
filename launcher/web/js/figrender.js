@@ -55,6 +55,10 @@
       // 1.17.0: look of the value labels (bars and line points); a series can override them in section 3
       valColor: 'auto', valBold: false, valBox: 'none', valBoxFill: '#ffffff', valBoxStroke: '#7f7f7f', valBoxOpacity: 0.85,
       valPos: 'auto', valStacked: 'center', valRotate: 'auto', valLinePos: 'above', valMin: '',
+      // 1.18.4: number format of the values, box inside the bars, distance of the outside labels
+      valFormat: 'axis', valBoxInside: 'same', valSideGap: 10, valAvoid: true, valSideWhere: 'right', valHeadroom: 12, valSideAuto: true, valSideFit: 'widen', valSideMinBar: 25,
+      xLabelSize: '', yLabelSize: '', axisTitleSize: '', axisTitleBold: true, xLabelBold: false, xLabelColor: '', xLabelGap: 0, axisWidth: 1, yAxisLine: false,
+      barRadius: 0, barOutlineColor: '#000000', barOutlineWidth: 0.6,
       panelCols: 1, panelGap: 18, panelHeight: 0,
       // cores diagram
       coreCols: 2, coreFiber: '#ededed', coreFiberStroke: '#9a9a9a', coreFill: '#ffffff', coreStroke: '#000000',
@@ -242,7 +246,18 @@
       boxStroke: has('valBoxStroke') ? o.valBoxStroke : (st.valBoxStroke || '#7f7f7f'),
       pos: has('valPos') ? o.valPos : (isLine ? (st.valLinePos || 'above') : (st.valPos || 'auto')),
       show: has('valShow') ? o.valShow !== 'hide' : true,
+      // 1.18.4: number format and decimals (series override > section 5 > y axis)
+      format: has('valFormat') ? o.valFormat : (st.valFormat && st.valFormat !== 'axis' ? st.valFormat : (st.yFormat || 'auto')),
+      digits: has('valDigits') && Number.isFinite(Number(o.valDigits)) ? Number(o.valDigits) : null,
+      inside: has('valBoxInside') ? o.valBoxInside : (st.valBoxInside || 'same'),
     };
+  }
+
+  /** 1.18.4: text of a value with the format of its series. */
+  function valueString(v, look, st, defDigits, forceMode) {
+    const mode = forceMode || look.format || 'auto';
+    const d = look.digits !== null && look.digits !== undefined ? look.digits : defDigits;
+    return fmtNumber(v, mode === 'axis' ? 'auto' : mode, d, st.decimal);
   }
 
   function valueHidden(st, v) {
@@ -259,15 +274,20 @@
     const weight = look.bold ? 700 : null;
     const tw = textWidth(str, size, st.font, weight || 'normal');
     const padX = 3, padY = 2;
-    const boxed = look.box === 'box';
-    const under = boxed ? look.boxFill : (o.under || st.plotBg || st.bg);
-    const color = look.color === 'series' ? (o.series || st.textColor) : look.color === 'contrast' ? contrastColor(under)
+    const insideMode = o.inside ? (look.inside || 'same') : 'same';
+    const boxed = look.box === 'box' && insideMode !== 'nobox';
+    const seeThrough = boxed && insideMode === 'transparent';
+    const fillC = look.boxFill === 'series' ? (o.series || '#ffffff') : look.boxFill;
+    const strokeC = look.boxStroke === 'series' ? (o.series || '#7f7f7f') : look.boxStroke;
+    const under = boxed && !seeThrough ? fillC : (o.under || st.plotBg || st.bg);
+    const autoContrast = look.color === 'text' && ((boxed && !seeThrough && look.boxFill === 'series') || (o.inside && (seeThrough || !boxed)));
+    const color = look.color === 'series' ? (o.series || st.textColor) : (look.color === 'contrast' || autoContrast) ? contrastColor(under)
       : look.color === 'text' ? st.textColor : look.color;
     const g = S('g', o.rotate ? { transform: `rotate(${o.rotate} ${x.toFixed(1)} ${y.toFixed(1)})` } : null);
     if (boxed) {
       const x0 = o.anchor === 'middle' ? x - tw / 2 - padX : o.anchor === 'end' ? x - tw - padX : x - padX;
       g.appendChild(S('rect', { x: x0.toFixed(1), y: (y - size * 0.85 - padY).toFixed(1), width: (tw + 2 * padX).toFixed(1), height: (size * 1.1 + 2 * padY).toFixed(1),
-        rx: 2, fill: look.boxFill, 'fill-opacity': st.valBoxOpacity !== undefined && st.valBoxOpacity !== '' ? Number(st.valBoxOpacity) : 0.85, stroke: look.boxStroke, 'stroke-width': 0.6 }));
+        rx: 2, fill: seeThrough ? 'none' : fillC, 'fill-opacity': seeThrough ? null : (st.valBoxOpacity !== undefined && st.valBoxOpacity !== '' ? Number(st.valBoxOpacity) : 0.85), stroke: strokeC, 'stroke-width': 0.6 }));
     }
     g.appendChild(textEl(x, y, str, { size, font: st.font, color, anchor: o.anchor || 'middle', weight }));
     parent.appendChild(g);
@@ -405,6 +425,12 @@
     opts = opts || {};
     const fs = st.fontSize;
     const font = st.font;
+    // 1.18.4: sizes and weights of the axis texts (empty = text size of section 4)
+    const nz = (v, d) => (v !== undefined && v !== '' && Number(v) > 0 ? Number(v) : d);
+    const fsx = nz(st.xLabelSize, fs), fsy = nz(st.yLabelSize, fs), fat = nz(st.axisTitleSize, fs + 0.5);
+    const atW = st.axisTitleBold === false ? null : 600, xlW = st.xLabelBold ? 700 : null;
+    const axW = nz(st.axisWidth, 1);
+    const xlColor = st.xLabelColor || st.textColor;
     let top = box.y + 8, bottom = box.y + box.h - 8, left = box.x + 8, right = box.x + box.w - 10;
 
     // panel label "(a)"
@@ -442,21 +468,21 @@
 
     // y axis
     const yTitle = opts.yTitle !== undefined ? opts.yTitle : st.yTitle;
-    if (yTitle) left += fs * 1.6;
+    if (yTitle) left += fat * 1.55;
     const yInfo = ySpec;
     const yLabels = yInfo.ticks.map((t) => yInfo.fmt(t));
-    const yLabW = Math.max(0, ...yLabels.map((l) => textWidth(l, fs, font)));
+    const yLabW = Math.max(0, ...yLabels.map((l) => textWidth(l, fsy, font)));
     left += yLabW + 8;
 
     // x axis labels height
     const xTitle = opts.xTitle !== undefined ? opts.xTitle : st.xTitle;
-    if (xTitle) bottom -= fs * 1.7;
+    if (xTitle) bottom -= fat * 1.65;
     const rot = Number(st.xLabelRotate) || 0;
     const xLabels = xSpec.type === 'band' ? xSpec.labels : xSpec.ticks.map((t) => xSpec.fmt(t));
-    const xLabMax = Math.max(0, ...xLabels.map((l) => textWidth(l, fs, font)));
-    const xLabH = rot === 0 ? fs * 1.35 : Math.abs(Math.sin(rot * Math.PI / 180)) * xLabMax + fs * 1.1;
-    bottom -= xLabH + 4;
-    if (rot === 0 && xLabels.length) right -= Math.min(20, textWidth(xLabels[xLabels.length - 1], fs, font) / 2);
+    const xLabMax = Math.max(0, ...xLabels.map((l) => textWidth(l, fsx, font, xlW || 'normal')));
+    const xLabH = rot === 0 ? fsx * 1.35 : Math.abs(Math.sin(rot * Math.PI / 180)) * xLabMax + fsx * 1.1;
+    bottom -= xLabH + 4 + (Number(st.xLabelGap) || 0);
+    if (rot === 0 && xLabels.length) right -= Math.min(20, textWidth(xLabels[xLabels.length - 1], fsx, font) / 2);
 
     const plot = { x: left, y: top + 4, w: Math.max(30, right - left), h: Math.max(30, bottom - top - 4) };
     if (st.plotBg && st.plotBg !== st.bg) root.appendChild(S('rect', { x: plot.x, y: plot.y, width: plot.w, height: plot.h, fill: st.plotBg }));
@@ -502,27 +528,28 @@
 
     // axes
     const ax = S('g');
-    ax.appendChild(S('line', { x1: plot.x, x2: plot.x + plot.w, y1: plot.y + plot.h, y2: plot.y + plot.h, stroke: st.axisColor, 'stroke-width': 1 }));
-    if (st.border) ax.appendChild(S('rect', { x: plot.x, y: plot.y, width: plot.w, height: plot.h, fill: 'none', stroke: st.axisColor, 'stroke-width': 1 }));
-    else if (st.grid === 'none' || st.grid === 'x') ax.appendChild(S('line', { x1: plot.x, x2: plot.x, y1: plot.y, y2: plot.y + plot.h, stroke: st.axisColor, 'stroke-width': 1 }));
+    ax.appendChild(S('line', { x1: plot.x, x2: plot.x + plot.w, y1: plot.y + plot.h, y2: plot.y + plot.h, stroke: st.axisColor, 'stroke-width': axW }));
+    if (st.border) ax.appendChild(S('rect', { x: plot.x, y: plot.y, width: plot.w, height: plot.h, fill: 'none', stroke: st.axisColor, 'stroke-width': axW }));
+    else if (st.grid === 'none' || st.grid === 'x' || st.yAxisLine) ax.appendChild(S('line', { x1: plot.x, x2: plot.x, y1: plot.y, y2: plot.y + plot.h, stroke: st.axisColor, 'stroke-width': axW }));
     yInfo.ticks.forEach((t, i) => {
       const y = ys(t);
       if (y < plot.y - 0.5 || y > plot.y + plot.h + 0.5) return;
       if (st.ticksOut) ax.appendChild(S('line', { x1: plot.x - 4, x2: plot.x, y1: y, y2: y, stroke: st.axisColor }));
-      ax.appendChild(textEl(plot.x - 6, y + fs * 0.35, yLabels[i], { size: fs, font, color: st.textColor, anchor: 'end' }));
+      ax.appendChild(textEl(plot.x - 6, y + fsy * 0.35, yLabels[i], { size: fsy, font, color: st.textColor, anchor: 'end' }));
     });
-    const xly = plot.y + plot.h + fs * 1.15 + 2;
+    const xg = Number(st.xLabelGap) || 0;
+    const xly = plot.y + plot.h + fsx * 1.15 + 2 + xg;
     const xlab = (x, label) => {
       if (st.ticksOut) ax.appendChild(S('line', { x1: x, x2: x, y1: plot.y + plot.h, y2: plot.y + plot.h + 4, stroke: st.axisColor }));
-      if (rot === 0) ax.appendChild(textEl(x, xly, label, { size: fs, font, color: st.textColor, anchor: 'middle' }));
-      else ax.appendChild(textEl(x, plot.y + plot.h + 6, label, { size: fs, font, color: st.textColor, anchor: rot < 0 ? 'end' : 'start', transform: `rotate(${rot} ${x.toFixed(1)} ${(plot.y + plot.h + 6).toFixed(1)})`, baseline: 'middle' }));
+      if (rot === 0) ax.appendChild(textEl(x, xly, label, { size: fsx, font, color: xlColor, anchor: 'middle', weight: xlW }));
+      else ax.appendChild(textEl(x, plot.y + plot.h + 6 + xg, label, { size: fsx, font, color: xlColor, weight: xlW, anchor: rot < 0 ? 'end' : 'start', transform: `rotate(${rot} ${x.toFixed(1)} ${(plot.y + plot.h + 6 + xg).toFixed(1)})`, baseline: 'middle' }));
     };
     if (xSpec.type === 'band') xSpec.labels.forEach((l, i) => xlab(xs(i), l));
     else xSpec.ticks.forEach((t, i) => { const x = xs(t); if (x >= plot.x - 0.5 && x <= plot.x + plot.w + 0.5) xlab(x, xLabels[i]); });
-    if (xTitle) ax.appendChild(textEl(plot.x + plot.w / 2, plot.y + plot.h + xLabH + fs * 1.6 + 2, xTitle, { size: fs + 0.5, font, color: st.textColor, anchor: 'middle', weight: 600 }));
+    if (xTitle) ax.appendChild(textEl(plot.x + plot.w / 2, plot.y + plot.h + xLabH + xg + fat * 1.55 + 2, xTitle, { size: fat, font, color: st.textColor, anchor: 'middle', weight: atW }));
     if (yTitle) {
-      const cx = box.x + 8 + fs * 0.9, cy = plot.y + plot.h / 2;
-      ax.appendChild(textEl(cx, cy, yTitle, { size: fs + 0.5, font, color: st.textColor, anchor: 'middle', weight: 600, transform: `rotate(-90 ${cx.toFixed(1)} ${cy.toFixed(1)})` }));
+      const cx = box.x + 8 + fat * 0.85, cy = plot.y + plot.h / 2;
+      ax.appendChild(textEl(cx, cy, yTitle, { size: fat, font, color: st.textColor, anchor: 'middle', weight: atW, transform: `rotate(-90 ${cx.toFixed(1)} ${cy.toFixed(1)})` }));
     }
     root.appendChild(ax);
 
@@ -653,7 +680,7 @@
         for (const p of valid) {
           if (valueHidden(st, p.mean)) continue;
           const px = f.xs(xOf(p)), py = f.ys(p.mean);
-          const txt = fmtNumber(p.mean, st.yFormat === 'auto' ? 'auto' : st.yFormat, Number(st.lineValueDigits), st.decimal);
+          const txt = valueString(p.mean, look, st, Number(st.lineValueDigits));
           const pos = look.pos;
           const at = pos === 'below' ? [px, py + off + vs * 0.85, 'middle'] : pos === 'right' ? [px + off + 2, py + vs * 0.33, 'start']
             : pos === 'left' ? [px - off - 2, py + vs * 0.33, 'end'] : [px, py - off - (look.box === 'box' ? 2 : 0), 'middle'];
@@ -691,6 +718,8 @@
     if (model.stacked) {
       totals = cats.map((c) => series.reduce((a, s) => a + (val(s, c) ? Math.max(0, val(s, c).mean) : 0), 0));
       yvals = model.normalize ? [1] : totals;
+      // 1.18.4: room above the stacks for the value labels (total and labels moved above the bar)
+      if (st.barValues && !model.normalize && totals.length) yvals = yvals.concat([Math.max(...totals) * (1 + (Number(st.valHeadroom) >= 0 && st.valHeadroom !== '' ? Number(st.valHeadroom) : 12) / 100)]);
     } else {
       yvals = series.flatMap((s) => cats.map((c) => val(s, c)).filter(Boolean).map((v) => (showErr && Number.isFinite(v.ci) ? v.mean + v.ci : v.mean)));
     }
@@ -703,21 +732,70 @@
     // 1.17.0: one fill (colour or pattern) per series
     const fills = new Map();
     const fillOf = (s) => { if (!fills.has(s)) fills.set(s, patternFill(root, s.style.color, s.style)); return fills.get(s); };
-    const outline = (s) => (st.barOutline || (s.style.pattern && s.style.pattern !== 'none') ? '#000' : null);
+    const outline = (s) => (st.barOutline || (s.style.pattern && s.style.pattern !== 'none') ? (st.barOutlineColor || '#000') : null);
+    const olW = Number(st.barOutlineWidth) > 0 ? Number(st.barOutlineWidth) : 0.6;
+    const rx = Number(st.barRadius) > 0 ? Number(st.barRadius) : null;
     const bw = f.band.bw;
     const maxPx = App.parseNumber(String(st.barMaxPx));
     let inner = bw * (1 - st.barGap);
     if (maxPx > 0 && model.stacked) inner = Math.min(inner, maxPx);
     const g = S('g');
+    const gLab = S('g'); // 1.18.4: labels outside the bars are drawn over every bar (never hidden by the next bar)
     const y0 = f.ys(ySpec.log ? ySpec.min : Math.max(ySpec.min, 0));
     const fs = st.fontSize;
     const vfs = Number(st.valueSize) > 0 ? Number(st.valueSize) : 0;
+    const STACK_MODES = ['auto', 'autoTop', 'side', 'top', 'center'];
+    // 1.18.4: with labels beside the stacks, the bars get narrower so that the labels fit in the gap to the next bar
+    // valSideFit: 'widen' = keep the bar width of section 4 and widen the image; 'narrow' = narrower bars; 'off'
+    const sideFit = st.valSideAuto === false ? 'off' : (st.valSideFit || 'widen');
+    let needBw = 0;
+    if (model.stacked && st.barValues && sideFit !== 'off') {
+      const lszS = vfs || fs * 0.85;
+      const sideGapS = Number.isFinite(Number(st.valSideGap)) && st.valSideGap !== '' ? Number(st.valSideGap) : 10;
+      const widestSide = (w) => {
+        let wmax = 0;
+        cats.forEach((c, ci) => {
+          const tot = totals[ci] || 1;
+          let acc = 0;
+          for (const s of series) {
+            const v = val(s, c);
+            if (!v || v.mean <= 0) continue;
+            const a = model.normalize ? acc / tot : acc, b = model.normalize ? (acc + v.mean) / tot : acc + v.mean;
+            acc += v.mean;
+            const look = valueLook(st, s.style, false);
+            if (!look.show || valueHidden(st, model.normalize ? v.mean / tot : v.mean)) continue;
+            const ownPos = s.style && s.style.valPos;
+            const mode = STACK_MODES.includes(ownPos) ? ownPos : STACK_MODES.includes(st.valStacked) ? st.valStacked : 'center';
+            if (mode !== 'side' && mode !== 'auto') continue;
+            const txt = valueString(model.normalize ? (v.mean / tot) : v.mean, look, st, model.normalize ? 0 : Number(st.barValueDigits), model.normalize && !(s.style && s.style.valFormat && s.style.valFormat !== 'inherit') ? 'percent' : null);
+            const boxW = look.box === 'box' ? 6 : 0;
+            const tw = textWidth(txt, lszS, st.font, look.bold ? 700 : 'normal') + boxW;
+            const fits = f.ys(a) - f.ys(b) > lszS * 1.15 + (look.box === 'box' && look.inside !== 'nobox' ? 4 : 0) && w >= tw + 2;
+            if (mode === 'side' || !fits) wmax = Math.max(wmax, tw);
+          }
+        });
+        return wmax;
+      };
+      const minInner = bw * (Number(st.valSideMinBar) > 0 ? Number(st.valSideMinBar) / 100 : 0.25);
+      if (sideFit === 'widen') {
+        // space each category needs so that the gap between bars holds the widest label beside a stack
+        const wmax = widestSide(inner);
+        const gapFrac = Math.max(0.03, 1 - inner / bw);
+        if (wmax) needBw = (sideGapS + wmax + 12) / gapFrac;
+      } else for (let it = 0; it < 3; it++) {
+        const wmax = widestSide(inner);
+        if (!wmax) break;
+        const need = bw - sideGapS - wmax - 10;
+        if (need >= inner) break;
+        inner = Math.max(minInner, need);
+      }
+    }
     cats.forEach((c, ci) => {
       const cx = f.xs(ci);
       if (model.stacked) {
         let acc = 0;
         const tot = totals[ci] || 1;
-        const side = [];
+        const side = [], topL = [];
         const lsz = vfs || fs * 0.85;
         for (const s of series) {
           const v = val(s, c);
@@ -726,39 +804,61 @@
           acc += v.mean;
           const ya = f.ys(a), yb = f.ys(b);
           const ol = outline(s);
-          const seg = S('rect', { x: (cx - inner / 2).toFixed(1), y: yb.toFixed(1), width: inner.toFixed(1), height: Math.max(0, ya - yb).toFixed(2), fill: fillOf(s), stroke: ol, 'stroke-width': ol ? 0.6 : null });
+          const seg = S('rect', { x: (cx - inner / 2).toFixed(1), y: yb.toFixed(1), width: inner.toFixed(1), height: Math.max(0, ya - yb).toFixed(2), fill: fillOf(s), stroke: ol, 'stroke-width': ol ? olW : null, rx });
           seg.appendChild(tip(c.label + ' · ' + s.name, v, st, model.normalize ? v.mean / tot : null));
           g.appendChild(seg);
           const look = valueLook(st, s.style, false);
           if (!st.barValues || !look.show || valueHidden(st, model.normalize ? v.mean / tot : v.mean)) continue;
-          const txt = fmtNumber(model.normalize ? (v.mean / tot) : v.mean, model.normalize ? 'percent' : st.yFormat === 'auto' ? 'auto' : st.yFormat, model.normalize ? 0 : Number(st.barValueDigits), st.decimal);
-          // stacked bars: the series' own position (side/center/auto) wins; otherwise the stacked mode of section 5
+          const txt = valueString(model.normalize ? (v.mean / tot) : v.mean, look, st, model.normalize ? 0 : Number(st.barValueDigits), model.normalize && !(s.style && s.style.valFormat && s.style.valFormat !== 'inherit') ? 'percent' : null);
+          // 1.18.4: position of the labels of stacked bars. The series' own choice (section 3) wins over section 5.
+          //   auto     = inside when it fits, otherwise beside the stack
+          //   autoTop  = inside when it fits, otherwise in a column on top of the stack
+          //   side/top = every label of the series beside / on top (forced)
+          //   center   = inside only (labels that do not fit are hidden)
+          const MODES = ['auto', 'autoTop', 'side', 'top', 'center'];
           const ownPos = s.style && s.style.valPos;
-          const mode = ['side', 'center', 'auto'].includes(ownPos) ? ownPos : ['side', 'center', 'auto'].includes(st.valStacked) ? st.valStacked : 'center';
-          const fitsIn = ya - yb > lsz * 1.15 && inner >= textWidth(txt, lsz, st.font) + 2;
-          if ((mode === 'center' && ya - yb > lsz * 1.1) || ((mode === 'auto' || mode === 'center') && fitsIn && mode !== 'side')) {
-            valueText(g, cx, (ya + yb) / 2 + lsz * 0.35, txt, look, st, { size: lsz, anchor: 'middle', under: s.style.color, series: s.style.color });
-          } else if (mode === 'side' || mode === 'auto') {
-            side.push({ y: (ya + yb) / 2, txt, look, color: s.style.color });
-          }
+          const mode = MODES.includes(ownPos) ? ownPos : MODES.includes(st.valStacked) ? st.valStacked : 'center';
+          const twIn = textWidth(txt, lsz, st.font, look.bold ? 700 : 'normal') + (look.box === 'box' && look.inside !== 'nobox' ? 6 : 0);
+          const fitsIn = ya - yb > lsz * 1.15 + (look.box === 'box' && look.inside !== 'nobox' ? 4 : 0) && inner >= twIn + 2;
+          const item = { y: (ya + yb) / 2, txt, look, color: s.style.color };
+          if (mode === 'side') side.push(item);
+          else if (mode === 'top') topL.push(item);
+          else if (fitsIn) valueText(g, cx, (ya + yb) / 2 + lsz * 0.35, txt, look, st, { size: lsz, anchor: 'middle', under: s.style.color, series: s.style.color, inside: true });
+          else if (mode === 'auto') side.push(item);
+          else if (mode === 'autoTop') topL.push(item);
         }
-        // labels that do not fit inside: to the right of the bar, pushed apart, with a leader line
+        const boxPadAll = [...side, ...topL].some((q) => q.look.box === 'box') ? 4 : 0;
+        const gapY = lsz * 1.25 + boxPadAll;
+        // labels beside the stack: pushed apart, never below the base of the bars (category names) nor above the plot
         if (side.length) {
           side.sort((p, q) => p.y - q.y);
-          const gapY = lsz * 1.25;
           const ys = side.map((q) => q.y);
           for (let k = 1; k < ys.length; k++) ys[k] = Math.max(ys[k], ys[k - 1] + gapY);
-          const over = ys[ys.length - 1] - Math.max(...side.map((q) => q.y)) ;
-          if (over > 0) for (let k = 0; k < ys.length; k++) ys[k] -= Math.min(over, ys[k] - (k ? ys[k - 1] + gapY : -Infinity)) * 0;
-          const x0 = cx + inner / 2, xl = x0 + 10;
+          const maxY = y0 - lsz * 0.55 - boxPadAll / 2, minY = f.plot.y + lsz * 0.6;
+          if (ys[ys.length - 1] > maxY) { ys[ys.length - 1] = maxY; for (let k = ys.length - 2; k >= 0; k--) ys[k] = Math.min(ys[k], ys[k + 1] - gapY); }
+          if (ys[0] < minY) { ys[0] = minY; for (let k = 1; k < ys.length; k++) ys[k] = Math.max(ys[k], ys[k - 1] + gapY); }
+          const sideGap = Number.isFinite(Number(st.valSideGap)) && st.valSideGap !== '' ? Number(st.valSideGap) : 10;
+          const leftSide = st.valSideWhere === 'left';
+          const x0 = leftSide ? cx - inner / 2 : cx + inner / 2, xl = leftSide ? x0 - sideGap : x0 + sideGap;
           side.forEach((q, k) => {
-            g.appendChild(S('polyline', { points: `${x0.toFixed(1)},${q.y.toFixed(1)} ${(x0 + 4).toFixed(1)},${ys[k].toFixed(1)} ${(xl - 2).toFixed(1)},${ys[k].toFixed(1)}`, fill: 'none', stroke: q.look.color === 'series' ? q.color : '#7f7f7f', 'stroke-width': 0.7 }));
-            valueText(g, xl, ys[k] + lsz * 0.35, q.txt, q.look, st, { size: lsz, anchor: 'start', series: q.color });
+            gLab.appendChild(S('polyline', { points: `${x0.toFixed(1)},${q.y.toFixed(1)} ${(x0 + (leftSide ? -4 : 4)).toFixed(1)},${ys[k].toFixed(1)} ${(xl + (leftSide ? 2 : -2)).toFixed(1)},${ys[k].toFixed(1)}`, fill: 'none', stroke: q.look.color === 'series' ? q.color : '#7f7f7f', 'stroke-width': 0.7 }));
+            valueText(gLab, xl, ys[k] + lsz * 0.35, q.txt, q.look, st, { size: lsz, anchor: leftSide ? 'end' : 'start', series: q.color });
           });
+        }
+        // labels on top of the stack: a column above the total, the lowest segment closest to the bar
+        if (topL.length) {
+          topL.sort((p, q) => q.y - p.y);
+          let yy = f.ys(model.normalize ? 1 : totals[ci]) - 6 - (st.barValues && !model.normalize ? lsz * 1.35 + 4 : 0);
+          const topNeed = yy - (topL.length - 1) * gapY - lsz;
+          if (topNeed < f.plot.y) yy += f.plot.y - topNeed;
+          for (const q of topL) {
+            valueText(gLab, cx, yy, q.txt, q.look, st, { size: lsz, anchor: 'middle', series: q.color });
+            yy -= gapY;
+          }
         }
         if (st.barValues && !model.normalize) {
           const look = valueLook(st, null, false);
-          valueText(g, cx, f.ys(totals[ci]) - 4 - (look.box === 'box' ? 2 : 0), fmtNumber(totals[ci], st.yFormat === 'auto' ? 'auto' : st.yFormat, Number(st.barValueDigits), st.decimal), look, st, { size: vfs || fs * 0.85, anchor: 'middle' });
+          valueText(g, cx, f.ys(totals[ci]) - 4 - (look.box === 'box' ? 2 : 0), valueString(totals[ci], look, st, Number(st.barValueDigits)), look, st, { size: vfs || fs * 0.85, anchor: 'middle' });
         }
       } else {
         const n = series.length;
@@ -772,7 +872,7 @@
           const x = cx - groupW / 2 + si * (w + gap);
           const y = f.ys(ySpec.log ? Math.max(v.mean, ySpec.min) : v.mean);
           const ol = outline(s);
-          const rect = S('rect', { x: x.toFixed(2), y: Math.min(y, y0).toFixed(2), width: Math.max(0.5, w).toFixed(2), height: Math.abs(y0 - y).toFixed(2), fill: fillOf(s), stroke: ol, 'stroke-width': ol ? 0.6 : null });
+          const rect = S('rect', { x: x.toFixed(2), y: Math.min(y, y0).toFixed(2), width: Math.max(0.5, w).toFixed(2), height: Math.abs(y0 - y).toFixed(2), fill: fillOf(s), stroke: ol, 'stroke-width': ol ? olW : null, rx });
           rect.appendChild(tip(c.label + ' · ' + s.name, v, st));
           g.appendChild(rect);
           if (showErr && Number.isFinite(v.ci) && v.ci > 0) {
@@ -786,7 +886,7 @@
           }
           const look = valueLook(st, s.style, false);
           if (st.barValues && look.show && !valueHidden(st, v.mean)) {
-            const lbl = fmtNumber(v.mean, st.yFormat === 'auto' ? 'auto' : st.yFormat, Number(st.barValueDigits), st.decimal);
+            const lbl = valueString(v.mean, look, st, Number(st.barValueDigits));
             const lsz = vfs || fs * 0.8;
             const tw = textWidth(lbl, lsz, st.font, look.bold ? 700 : 'normal') + (look.box === 'box' ? 6 : 0);
             const top = Math.min(y, y0), h = Math.abs(y0 - y), tx = x + w / 2;
@@ -798,10 +898,10 @@
               const under = s.style.color;
               if (rot) {
                 const ty = pos === 'insideBase' ? y0 - 4 : pos === 'center' ? top + h / 2 + tw / 2 : top + 4 + tw;
-                valueText(g, tx + lsz * 0.35, ty, lbl, look, st, { size: lsz, anchor: 'start', rotate: -90, under, series: s.style.color });
+                valueText(g, tx + lsz * 0.35, ty, lbl, look, st, { size: lsz, anchor: 'start', rotate: -90, under, series: s.style.color, inside: true });
               } else {
                 const ty = pos === 'insideBase' ? y0 - 5 : pos === 'center' ? top + h / 2 + lsz * 0.35 : top + lsz * 1.05;
-                valueText(g, tx, ty, lbl, look, st, { size: lsz, anchor: 'middle', under, series: s.style.color });
+                valueText(g, tx, ty, lbl, look, st, { size: lsz, anchor: 'middle', under, series: s.style.color, inside: true });
               }
             } else if (w >= fs * 0.6 || rot) {
               const ty = top - 4 - (look.box === 'box' ? 2 : 0);
@@ -812,8 +912,10 @@
       }
     });
     root.appendChild(g);
+    root.appendChild(gLab);
     drawRefLines(root, f, stLocal, null);
     f.finish();
+    f.needBw = needBw > bw + 0.5 ? needBw : 0;
     return f;
   }
 
@@ -1585,7 +1687,15 @@
     const box = { x: 0, y: 0, w: W, h: H };
     if (!model) return root;
     if (model.kind === 'line') drawLine(root, model, st, box);
-    else if (model.kind === 'bars') drawBars(root, model, st, box);
+    else if (model.kind === 'bars') {
+      const f = drawBars(root, model, st, box);
+      // 1.18.4: labels beside the stacks need more room between the bars: the image gets wider (once)
+      if (f && f.needBw && !st.__widened) {
+        const n = Math.max(1, model.categories.length);
+        const W2 = Math.min(Math.round(W * 4), Math.ceil(W + n * (f.needBw - f.band.bw)) + 4);
+        if (W2 > W) return render(model, Object.assign({}, st, { width: W2, __widened: true }));
+      }
+    }
     else if (model.kind === 'cores') drawCores(root, model, st, box);
     else if (model.kind === 'topo') drawTopo(root, model, st, box);
     else if (model.kind === 'slots') drawSlots(root, model, st, box);
