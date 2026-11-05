@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [52](#parte-52) | Parte 52 — save states ligados por padrão, cancelar sem perder o progresso, continuar execuções interrompidas (launcher 1.20.6) |
 | [51](#parte-51) | Parte 51 — launcher 1.20.5: menu das configurações, mais ajustes nos gráficos e mapa por causas escolhidas |
 | [50](#parte-50) | Parte 50 — launcher 1.20.4: gráfico de comparação com um caso de referência |
 | [49](#parte-49) | Parte 49 — QoT clássica por banda com ISRS, política maxskr do QCh, casos iniciais e launcher 1.20.3 |
@@ -33,6 +34,62 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-52"></a>
+
+## Parte 52 — save states ligados por padrão, cancelar sem perder o progresso, continuar execuções interrompidas (launcher 1.20.6)
+
+Só na branch experimental: os save states (Parte 45) não existem no simulador da main.
+
+### Simulador
+
+- **Save states ligados por padrão:** sem o grupo `saveState` no arquivo `simulation`, eles ficam ligados e gravam a cada 10 min. `"enabled": false` desliga.
+- **Parada com gravação:** o simulador para depois de gravar o estado de cada simulação, entre dois eventos, quando:
+  - aparece o arquivo `savestate/STOP` (o launcher o cria ao cancelar);
+  - o usuário aperta Ctrl+C;
+  - a janela de console é fechada ou o processo recebe um pedido normal de término.
+
+  O processo termina com o código 3 e não grava resultados. As simulações que ainda não tinham começado ficam para a continuação.
+- **Queda de energia:** não dá para avisar o simulador. Vale o último estado gravado, de no máximo um intervalo antes (10 min por padrão).
+- **`savestate/progresso.json`:** resumo para o launcher, com as simulações concluídas, em andamento (com as requisições já processadas) e sem início, a data da última gravação, os arquivos do caso e o JAR.
+- **Hash do estado:** passa a incluir o JAR do simulador. Um estado gravado por outra versão do JAR não é retomado.
+- **Fim do caso:** quando o caso termina e os resultados são gravados, a pasta `savestate` é apagada. `"keepAfterFinish": true` a mantém.
+- **Verificação:**
+  - Q01 cancelado com o arquivo STOP e depois continuado: CSVs iguais aos de uma execução sem interrupção. O ConsumedEnergy muda só na última casa decimal, como já acontece entre execuções normais.
+  - Q01 interrompido com Ctrl+C e continuado: também igual.
+  - Regressão C/Q/M idêntica.
+
+### Launcher 1.20.6
+
+- **Cancelar:** pede ao simulador que grave e pare (o arquivo STOP). O processo só é encerrado à força se não parar em 120 s. A execução aparece como "interrompida · progresso salvo".
+- **Fechar o launcher:** pede o mesmo a todas as execuções e espera até 30 s.
+- **Lista de casos:** um caso com execução interrompida mostra `⏸ 42 %` (parte das requisições já feita).
+- **Caso aberto:** uma faixa sob o título mostra "Execução interrompida", o que foi gravado e os botões **Continuar execução**, **Detalhes** e **Descartar progresso**. Ela também distingue a interrupção sem aviso (queda de energia ou processo encerrado).
+- **Aba Executar:**
+  - um painel mostra cada simulação (carga × replicação) concluída (✓), em andamento (% das requisições) ou sem início;
+  - um aviso aparece se os arquivos do caso ou o JAR mudaram, porque nesse caso o progresso seria ignorado;
+  - o botão principal vira **Continuar execução**, e **Executar do zero** descarta o progresso, com confirmação.
+- **Execuções:**
+  - a seção **Interrompidas** lista todos os casos com progresso salvo que não estão rodando. Entram os cancelados numa fila ou execução paralela e os parados por queda de energia em outra sessão;
+  - cada caso tem uma caixa de seleção, e há **todas**;
+  - **Continuar selecionadas** roda em fila ou em paralelo, e **Descartar o progresso** apaga o progresso das selecionadas;
+  - cada execução cancelada com progresso salvo tem o botão **Continuar**.
+- **Vários casos:** os casos com execução interrompida continuam de onde pararam, ou começam do zero se a caixa "Começar do zero" estiver marcada.
+- **Aba Simulação:** o grupo Save states tem textos novos e a opção "Manter a pasta savestate depois que o caso termina".
+
+### Arquivos
+
+- **Simulador:**
+  - `simulator/SaveStateStore.java`, `EventMachine.java` e `Simulator.java`;
+  - `simulationControl/SimulationManagement.java` e `parsers/SimulationConfig.java`;
+  - `simulations/SNetS-SDM-QKD-exp.jar`.
+- **Launcher:**
+  - `Runner.java`, `Workspace.java` e `LauncherServer.java`;
+  - `app.js`, `run.js`, `api.js`, `schema.js`, `index.html` e `styles.css`;
+  - `snets-launcher.jar`.
+- **Documentação:** `docs/SAVE_STATES_CUSTO_DESEMPENHO.md`.
 
 ---
 

@@ -27,20 +27,25 @@ public class SimulationConfig {
     private int loadPoints;
     private int replications;
     private Metrics activeMetrics;
-    /** Parte 45: save states (simulator.SaveStateStore); null = off. */
+    /** Parte 45: save states (simulator.SaveStateStore). Parte 52: null = on, with the defaults below. */
     private SaveState saveState;
 
-    /** Parte 45: "saveState": { "enabled": true, "intervalMinutes": 10 }. */
+    /**
+     * Parte 45: "saveState": { "enabled": true, "intervalMinutes": 10 }. Parte 52: "keepAfterFinish": false
+     * (the folder savestate is deleted when the whole case finishes and the results are written).
+     */
     public static class SaveState implements Serializable {
         private static final long serialVersionUID = 1L;
         private boolean enabled = true;
         private double intervalMinutes = 10.0;
+        private boolean keepAfterFinish = false;
 
         public boolean isEnabled() { return enabled; }
         public double getIntervalMinutes() { return intervalMinutes; }
+        public boolean isKeepAfterFinish() { return keepAfterFinish; }
     }
 
-    /** Parte 45: save-state options, or null when absent. */
+    /** Parte 45: save-state options, or null when absent (Parte 52: absent = on with the defaults). */
     public SaveState getSaveState() { return saveState; }
     private String regeneratorAssignment;
     private int networkType;

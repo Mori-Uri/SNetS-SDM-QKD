@@ -84,6 +84,106 @@
       st.tree = await App.api.tree();
     } catch (e) { App.toast(e.message, 'err'); return; }
     drawTree();
+    App.drawSavedBanner();
+  };
+
+  // ------------------------------------------------------------------ Parte 52: interrupted executions
+
+  /**
+   * Progress saved by the simulator for a case (savestate/progresso.json), or null. "active" = running or queued in
+   * this launcher; "crashed" = the file still says running but no process of this launcher runs it (power cut,
+   * process killed); "changed" = case files modified after the interruption (the progress would be ignored).
+   */
+  App.savedInfo = function (path) {
+    const n = App.allCases(true).find((c) => c.path === path);
+    if (!n || !n.savedProgress) return null;
+    let p;
+    try { p = JSON.parse(n.savedProgress); } catch (e) { return null; }
+    if (!p || p.status === 'finished') return null;
+    const active = App.run && App.run.isActive ? App.run.isActive(path) : false;
+    const cur = n.savedInputs || {}, rec = p.inputFiles || {};
+    const changed = Object.keys(rec).filter((k) => cur[k] === undefined || Math.abs(Number(cur[k]) - Number(rec[k])) > 2000)
+      .concat(Object.keys(cur).filter((k) => rec[k] === undefined));
+    const sims = Array.isArray(p.simulations) ? p.simulations : [];
+    const finished = sims.filter((x) => x.state === 'finished').length;
+    const partial = sims.filter((x) => x.state === 'partial').length;
+    const total = Number(p.totalSimulations) || sims.length;
+    return {
+      path, p, active, total, finished, partial, pending: Math.max(0, total - finished - partial),
+      fraction: Number(p.fraction) || 0, updated: Number(p.updated) || 0, changed,
+      crashed: p.status === 'running' || p.status === 'stopping', jar: p.simulatorJar || '',
+    };
+  };
+  /** Cases with an interrupted execution (not running now). */
+  App.savedCases = () => App.allCases(true).map((c) => App.savedInfo(c.path)).filter((x) => x && !x.active);
+  /** Jar of this launcher that wrote the saved states (the launcher runs a copy named name_size_date.jar). */
+  App.savedJar = function (info) {
+    const jars = (st.info && st.info.jars) || [];
+    const name = (info && info.jar) || '';
+    const m = /^(.*)_(\d+)_(\d+)\.jar$/i.exec(name);
+    const base = m ? m[1] + '.jar' : name;
+    const exact = jars.find((j) => j.name === base && (!m || Number(j.size) === Number(m[2])));
+    if (exact) return { jar: exact, same: true };
+    const byName = jars.find((j) => j.name === base);
+    return { jar: byName || null, same: false };
+  };
+  App.savedText = function (s) {
+    const parts = [s.finished + ' de ' + s.total + ' simulações concluídas'];
+    if (s.partial) parts.push(s.partial + ' em andamento');
+    if (s.pending) parts.push(s.pending + ' sem início');
+    return parts.join(', ') + ' · ' + App.fmtNum(s.fraction * 100, 1) + ' % das requisições · gravado em ' + App.fmtDate(s.updated);
+  };
+  /** Continues the interrupted executions of these cases (one now, several in a queue or in parallel). */
+  App.resumeCases = async function (paths, mode) {
+    const settings = (st.info && st.info.settings) || {};
+    const groups = new Map();
+    for (const p of paths) {
+      const sj = App.savedJar(App.savedInfo(p));
+      const jar = (sj.jar && sj.jar.path) || App.run.defaultJar();
+      if (!groups.has(jar)) groups.set(jar, []);
+      groups.get(jar).push(p);
+    }
+    let n = 0;
+    for (const [jar, list] of groups) {
+      if (list.length === 1 && mode !== 'parallel') {
+        await App.api.run(list[0], jar, settings.jvmArgs || '', 0, !!settings.runConsole, 'resume');
+      } else {
+        await App.api.batch(list, mode === 'parallel' ? 'parallel' : 'sequential', jar, settings.jvmArgs || '', 0, !!settings.runConsole, 'resume');
+      }
+      n += list.length;
+    }
+    App.toast(n === 1 ? 'Execução retomada.' : n + ' execuções retomadas' + (mode === 'parallel' ? ' em paralelo.' : ' em fila.'), 'ok');
+    await App.run.pollList();
+    App.drawSavedBanner();
+    drawTree();
+  };
+  App.discardSavedCase = async function (path, ask) {
+    if (ask !== false && !window.confirm('Descartar o progresso salvo de ' + App.caseNameOf(path) + '? A próxima execução começa do zero.')) return false;
+    await App.api.discardSaved(path);
+    await App.loadTree();
+    return true;
+  };
+  /** Banner of the open case under its title: interrupted execution, with "Continuar" and "Descartar". */
+  App.drawSavedBanner = function () {
+    const box = document.getElementById('caseSaved');
+    if (!box) return;
+    const s = st.casePath && !st.bulk ? App.savedInfo(st.casePath) : null;
+    if (!s || s.active) { box.hidden = true; clear(box); return; }
+    clear(box);
+    box.hidden = false;
+    const sj = App.savedJar(s);
+    const warn = [];
+    if (s.changed.length) warn.push('Arquivos do caso mudaram depois da interrupção (' + s.changed.slice(0, 4).join(', ') + '): o simulador vai ignorar o progresso e começar do zero.');
+    if (!sj.same) warn.push(sj.jar ? 'O JAR ' + sj.jar.name + ' mudou depois da interrupção: o progresso será ignorado.' : 'O JAR que gravou o progresso (' + s.jar + ') não foi encontrado: o progresso será ignorado.');
+    box.append(el('div.saved-ico', '⏸'),
+      el('div.saved-main',
+        el('div.saved-title', s.crashed ? 'Execução interrompida sem aviso (queda de energia ou processo encerrado)' : 'Execução interrompida'),
+        el('div.small', App.savedText(s)),
+        warn.length ? el('div.small.saved-warn', warn.join(' ')) : null),
+      el('div.saved-btns',
+        el('button.btn.small.primary', { type: 'button', on: { click: () => App.resumeCases([s.path]).catch((e) => App.toast(e.message, 'err')) } }, 'Continuar execução'),
+        el('button.btn.small', { type: 'button', on: { click: () => App.selectTab('run') } }, 'Detalhes'),
+        el('button.btn.small.ghost', { type: 'button', on: { click: () => App.discardSavedCase(s.path).catch((e) => App.toast(e.message, 'err')) } }, 'Descartar progresso')));
   };
 
   /** Cases of the simulations folder; with includeVerification, also those of the verification folder (Parte 27). */
@@ -129,6 +229,13 @@
         sel ? el('input.tree-cb', { type: 'checkbox', checked: marked, tabIndex: -1 }) : el('span.tw', ''),
         caseIcon(),
         el('span.label', n.name),
+        (() => {
+          // Parte 52: interrupted execution with saved progress
+          if (!n.savedProgress) return null;
+          const s = App.savedInfo(n.path);
+          if (!s || s.active) return null;
+          return el('span.badge.badge-saved', { title: 'Execução interrompida: ' + App.savedText(s) }, '⏸ ' + App.fmtNum(s.fraction * 100, 0) + ' %');
+        })(),
         n.csvCount ? el('span.badge', n.csvCount + ' csv') : null);
         return item;
       }
@@ -242,6 +349,7 @@
     if (!st.bulk && st.tab === 'bulk') st.tab = 'overview';
     drawTabs();
     App.qkdcase.drawModeBar();
+    App.drawSavedBanner();
     App.refreshDirty();
     App.renderTab();
     try { localStorage.setItem('snets.lastCase', path); } catch (e) { /* ignore */ }

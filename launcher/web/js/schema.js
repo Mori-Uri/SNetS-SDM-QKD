@@ -27,7 +27,7 @@
       },
       { title: 'QKD', keys: ['qkdProtectedRequestProbability', 'qkdProtectionRandomSeed', 'qkdKeyDemand', 'qkdWarmupFraction', 'qkdExactRequestCount'] },
       // 1.20.0 (Parte 45)
-      { title: 'Save states (experimental)', desc: 'Grava o estado de cada simulação (carga × replicação) em savestate/ a cada intervalo e ao terminar. Rodando o caso de novo, as simulações concluídas não são refeitas e as interrompidas continuam do ponto salvo, com os mesmos resultados. O estado é ignorado se algum arquivo de entrada mudar (exceto threads). Apague a pasta savestate quando não precisar mais.', keys: ['saveState'] },
+      { title: 'Save states (experimental)', desc: 'Ligados por padrão (Parte 52), mesmo sem este grupo no arquivo. O simulador grava o estado de cada simulação (carga × replicação) em savestate/ a cada intervalo, ao terminar e ao ser cancelado (botão Cancelar, Ctrl+C ou fechar a janela de console). Uma queda de energia não pode ser avisada: vale o último estado gravado. "Continuar execução" (no caso ou em Execuções) roda o caso de novo: as simulações concluídas não são refeitas e as interrompidas continuam do ponto salvo, com os mesmos resultados. O estado é ignorado se algum arquivo de entrada mudar (exceto threads) ou se o JAR for outro. A pasta savestate é apagada quando o caso termina.', keys: ['saveState'] },
     ],
     fields: {
       requests: { label: 'Requisições por replicação', type: 'int', min: 1 },
@@ -54,9 +54,10 @@
       'qkdKeyDemand.updateIntervalsMicroseconds': { label: 'Intervalos de renovação da chave', unit: 'µs', help: 'Lista separada por vírgulas; cada requisição protegida sorteia um deles com igual probabilidade.' },
       'qkdKeyDemand.randomSeed': { label: 'Semente da demanda de chave', type: 'int' },
       qkdWarmupFraction: { label: 'Warm-up das métricas QKD', type: 'prob', default: 0.1, help: 'Fração das chegadas de cada replicação descartada nas estatísticas QKD (padrão 0,1, a mesma regra das métricas clássicas do SNetS). Use 0 em estudos semiestáticos.' },
-      saveState: { label: 'Save states', default: { enabled: true, intervalMinutes: 10 } },
-      'saveState.enabled': { label: 'Gravar e retomar save states', default: true },
-      'saveState.intervalMinutes': { label: 'Intervalo entre gravações', unit: 'min', default: 10, help: 'Cada gravação serializa a simulação inteira (rede, circuitos, eventos pendentes); em redes grandes leva de frações de segundo a poucos segundos.' },
+      saveState: { label: 'Save states', default: { enabled: true, intervalMinutes: 10, keepAfterFinish: false } },
+      'saveState.enabled': { label: 'Gravar e retomar save states', default: true, help: 'Desligado: cancelar ou uma queda de energia perdem a execução inteira.' },
+      'saveState.keepAfterFinish': { label: 'Manter a pasta savestate depois que o caso termina', default: false, help: 'Normalmente ela é apagada quando os resultados são gravados.' },
+      'saveState.intervalMinutes': { label: 'Intervalo entre gravações', unit: 'min', default: 10, help: 'Cada gravação serializa a simulação inteira (rede, circuitos, eventos pendentes); em redes grandes leva de frações de segundo a poucos segundos. É o máximo que se perde numa queda de energia.' },
       qkdExactRequestCount: { label: 'Número exato de requisições', default: false, help: 'Processa exatamente "requests" chegadas por replicação. Sem isso o SNetS processa requests + (nº de geradores) chegadas, pois cada gerador já tem uma chegada agendada quando a geração para.' },
     },
   };

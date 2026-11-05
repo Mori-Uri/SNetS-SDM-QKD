@@ -13,6 +13,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -42,12 +47,262 @@ import simulator.eventListeners.ArriveRequestForConexionListener;
  * </ul>
  * <p>The random generators, the event list and the counters are restored exactly, so a resumed experiment gives the
  * same results as an uninterrupted one (checked by the regression test). The cost metric (AlgorithmCost) only
- * counts the part run after the last resume. The folder {@code savestate} is not deleted automatically.</p>
+ * counts the part run after the last resume.</p>
+ *
+ * <p>Parte 52:</p>
+ * <ul>
+ *   <li>save states are on by default (no {@code saveState} block = on, every 10 min); {@code "enabled": false}
+ *       turns them off;</li>
+ *   <li>stop on request: the file {@code savestate/STOP} (written by the launcher when "Cancelar" is pressed),
+ *       Ctrl+C or closing the console make every simulation save its state between two events and stop; the
+ *       process ends with exit code 3 and writes no results. A power cut cannot be caught: the last periodic save
+ *       is kept;</li>
+ *   <li>{@code savestate/progresso.json} tells the launcher what is saved (finished, partial or pending
+ *       simulations, requests already processed);</li>
+ *   <li>the inputs hash also covers the simulator jar, so a state of another build is not resumed;</li>
+ *   <li>when the whole case finishes and the results are written, the folder {@code savestate} is deleted
+ *       ({@code "keepAfterFinish": true} keeps it).</li>
+ * </ul>
  */
 public final class SaveStateStore {
 
     /** Folder of the states inside the case folder. */
     public static final String FOLDER = "savestate";
+    /** Parte 52: progress summary read by the launcher. */
+    public static final String PROGRESS_FILE = "progresso.json";
+    /** Parte 52: stop request written by the launcher. */
+    public static final String STOP_FILE = "STOP";
+    /** Parte 52: exit code of a run stopped on request (the progress is saved). */
+    public static final int EXIT_STOPPED = 3;
+
+    // ------------------------------------------------------------------ Parte 52: stop on request
+
+    /** Thrown between two events when a stop was requested (after the state is saved). */
+    public static final class Stopped extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        public Stopped() {
+            super("stop requested");
+        }
+
+        public Stopped(String msg) {
+            super(msg);
+        }
+    }
+
+    private static volatile boolean stopRequested;
+    private static volatile boolean exitHandled;
+    private static final AtomicInteger ACTIVE = new AtomicInteger();
+    private static volatile SaveStateStore current;
+    private static boolean hookInstalled;
+
+    public static boolean isStopRequested() {
+        return stopRequested;
+    }
+
+    /** Asks every running simulation to save and stop between two events. */
+    public static void requestStop(String why) {
+        if (!stopRequested) {
+            stopRequested = true;
+            System.out.println("[snets] parada solicitada (" + why + "): gravando o estado das simulacoes...");
+            System.out.flush();
+        }
+    }
+
+    /** The process is ending on its own terms (results written, or the stop already handled). */
+    public static void markExitHandled() {
+        exitHandled = true;
+    }
+
+    static void enter() {
+        ACTIVE.incrementAndGet();
+    }
+
+    static void leave() {
+        ACTIVE.decrementAndGet();
+    }
+
+    private static synchronized void installHook() {
+        if (hookInstalled) return;
+        hookInstalled = true;
+        // Ctrl+C, closing the console window, a normal kill: save and stop the running simulations (a few seconds)
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+            @Override
+            public void run() {
+                if (exitHandled || ACTIVE.get() == 0) return;
+                requestStop("encerramento do processo");
+                final long limit = System.currentTimeMillis() + 25000L;
+                while (ACTIVE.get() > 0 && System.currentTimeMillis() < limit) {
+                    try {
+                        Thread.sleep(100L);
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                }
+                final SaveStateStore s = current;
+                if (s != null) s.writeProgress("stopped");
+            }
+        }, "snets-savestate-hook"));
+    }
+
+    private void startWatcher() {
+        final File stop = new File(dir, STOP_FILE);
+        if (stop.isFile() && !stop.delete()) {
+            System.out.println("Nao foi possivel apagar " + stop + " (pedido de parada antigo)");
+        }
+        final Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (!stopRequested) {
+                    if (stop.isFile()) {
+                        requestStop("pedido do launcher");
+                        return;
+                    }
+                    try {
+                        Thread.sleep(500L);
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                }
+            }
+        }, "snets-savestate-stop");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    // ------------------------------------------------------------------ Parte 52: progress summary
+
+    private final Map<String, Map<String, Object>> progress = new TreeMap<String, Map<String, Object>>();
+    private int totalSimulations;
+    private double requestsPerSimulation;
+    private final Map<String, Object> inputFiles = new LinkedHashMap<String, Object>();
+    private boolean keepAfterFinish;
+    private long startedAt;
+
+    private static String key(int loadPoint, int replication) {
+        return "lp" + loadPoint + "_rep" + replication;
+    }
+
+    /** Called before the simulations start: every simulation is pending until a state is loaded or saved. */
+    public synchronized void begin(List<List<Simulation>> simulations, double requests) {
+        totalSimulations = 0;
+        for (List<Simulation> lp : simulations) {
+            for (Simulation s : lp) {
+                totalSimulations++;
+                final String k = key(s.getLoadPoint(), s.getReplication());
+                if (!progress.containsKey(k)) {
+                    final Map<String, Object> e = new LinkedHashMap<String, Object>();
+                    e.put("loadPoint", s.getLoadPoint());
+                    e.put("replication", s.getReplication());
+                    e.put("state", "pending");
+                    e.put("requests", 0.0);
+                    progress.put(k, e);
+                }
+            }
+        }
+        requestsPerSimulation = requests;
+        startedAt = System.currentTimeMillis();
+        current = this;
+        installHook();
+        startWatcher();
+        writeProgress("running");
+    }
+
+    private synchronized void record(int loadPoint, int replication, boolean finished, double requests) {
+        final Map<String, Object> e = new LinkedHashMap<String, Object>();
+        e.put("loadPoint", loadPoint);
+        e.put("replication", replication);
+        e.put("state", finished ? "finished" : "partial");
+        e.put("requests", requests);
+        e.put("savedAt", System.currentTimeMillis());
+        progress.put(key(loadPoint, replication), e);
+    }
+
+    /** Writes savestate/progresso.json (status: running, stopped or finished). */
+    public synchronized void writeProgress(String status) {
+        try {
+            if (!dir.isDirectory() && !dir.mkdirs()) return;
+            int finished = 0, partial = 0;
+            double reqs = 0.0;
+            for (Map<String, Object> e : progress.values()) {
+                final Object st = e.get("state");
+                if ("finished".equals(st)) finished++;
+                else if ("partial".equals(st)) partial++;
+                final Object r = e.get("requests");
+                if (r instanceof Number) reqs += "finished".equals(st) ? requestsPerSimulation : ((Number) r).doubleValue();
+            }
+            final Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("version", 1);
+            m.put("status", status);
+            m.put("updated", System.currentTimeMillis());
+            m.put("started", startedAt);
+            m.put("totalSimulations", totalSimulations);
+            m.put("finishedSimulations", finished);
+            m.put("partialSimulations", partial);
+            m.put("requestsPerSimulation", requestsPerSimulation);
+            m.put("fraction", totalSimulations > 0 && requestsPerSimulation > 0
+                    ? Math.min(1.0, reqs / (totalSimulations * requestsPerSimulation)) : 0.0);
+            m.put("intervalMinutes", intervalNanos / 60e9);
+            m.put("inputHash", inputHash);
+            m.put("simulatorJar", simulatorJarName());
+            m.put("simulatorBuild", simulatorBuild().length() > 12 ? simulatorBuild().substring(0, 12) : simulatorBuild());
+            m.put("inputFiles", inputFiles);
+            m.put("simulations", new java.util.ArrayList<Object>(progress.values()));
+            final File tmp = new File(dir, PROGRESS_FILE + ".tmp");
+            Files.write(tmp.toPath(), new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(m)
+                    .getBytes(StandardCharsets.UTF_8));
+            Files.move(tmp.toPath(), new File(dir, PROGRESS_FILE).toPath(), StandardCopyOption.REPLACE_EXISTING);
+        } catch (Throwable e) {
+            System.out.println("Nao foi possivel gravar " + PROGRESS_FILE + ": " + e);
+        }
+    }
+
+    private volatile boolean caseFinished;
+
+    /**
+     * Every simulation of the case finished. The results are written by Main after this call, so the states are
+     * deleted when the process ends, and only if the result files were written during this run.
+     */
+    public void caseFinished() {
+        caseFinished = true;
+        exitHandled = true;
+        writeProgress("finished");
+        final SaveStateStore self = this;
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final File caseDir = dir.getParentFile();
+                final File[] res = caseDir == null ? null : caseDir.listFiles();
+                boolean written = false;
+                if (res != null) {
+                    for (File f : res) {
+                        if (f.isFile() && f.getName().endsWith("_BlockingProbability.csv") && f.lastModified() >= startedAt - 2000L) written = true;
+                    }
+                }
+                if (written) self.finishCase();
+            }
+        }, "snets-savestate-clean"));
+    }
+
+    /** The case finished and its results are written: the states are deleted (or kept, keepAfterFinish). */
+    public synchronized void finishCase() {
+        exitHandled = true;
+        if (keepAfterFinish) {
+            writeProgress("finished");
+            return;
+        }
+        final File[] files = dir.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                if (f.isFile() && !f.delete()) System.out.println("Nao foi possivel apagar " + f);
+            }
+        }
+        if (dir.isDirectory() && !dir.delete()) System.out.println("Nao foi possivel apagar " + dir);
+    }
+
+    public File getDir() {
+        return dir;
+    }
 
     /** Contents of one state file. */
     public static final class State implements Serializable {
@@ -84,15 +339,26 @@ public final class SaveStateStore {
         this.intervalNanos = intervalNanos;
     }
 
-    /** Store of a simulation request, or {@code null} when save states are off. */
+    /** Store of a simulation request, or {@code null} when save states are off (Parte 52: on by default). */
     public static SaveStateStore forRequest(SimulationRequest sr) {
         final simulationControl.parsers.SimulationConfig.SaveState cfg = sr.getSimulationConfig().getSaveState();
-        if (cfg == null || !cfg.isEnabled()) {
+        if (cfg != null && !cfg.isEnabled()) {
             return null;
         }
         final File caseDir = new File(sr.getPath(), sr.getName());
-        final long interval = (long) (Math.max(0.0, cfg.getIntervalMinutes()) * 60e9);
-        return new SaveStateStore(new File(caseDir, FOLDER), inputHash(sr), interval);
+        final double minutes = cfg == null ? 10.0 : cfg.getIntervalMinutes();
+        final long interval = (long) (Math.max(0.0, minutes) * 60e9);
+        final SaveStateStore st = new SaveStateStore(new File(caseDir, FOLDER), inputHash(sr), interval);
+        st.keepAfterFinish = cfg != null && cfg.isKeepAfterFinish();
+        final File[] files = caseDir.listFiles();
+        if (files != null) {
+            java.util.Arrays.sort(files);
+            for (File f : files) {
+                final String n = f.getName().toLowerCase();
+                if (f.isFile() && !n.endsWith(".csv") && !n.endsWith(".txt")) st.inputFiles.put(f.getName(), f.lastModified());
+            }
+        }
+        return st;
     }
 
     public long getIntervalNanos() {
@@ -169,6 +435,7 @@ public final class SaveStateStore {
                 return null;
             }
             ensureCircuitCounter(s.circuitCounter);
+            record(loadPoint, replication, s.finished, s.simulation.getMeasurements().getNumGeneratedReq());
             return s;
         } catch (Throwable e) {
             System.out.println("Save state " + f.getName() + " ignorado: " + e);
@@ -223,6 +490,9 @@ public final class SaveStateStore {
                 out.writeObject(s);
             }
             Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            record(simulation.getLoadPoint(), simulation.getReplication(), finished,
+                    simulation.getMeasurements().getNumGeneratedReq());
+            writeProgress(stopRequested ? "stopping" : "running");
         } catch (Throwable e) {
             System.out.println("Nao foi possivel gravar o save state " + target.getName() + ": " + e);
         }
@@ -248,6 +518,7 @@ public final class SaveStateStore {
             o.remove("saveState");
         }
         sb.append(gson.toJson(sim));
+        sb.append('|').append(simulatorBuild()); // Parte 52: a state of another build of the simulator is not resumed
         try {
             final byte[] d = MessageDigest.getInstance("SHA-256").digest(sb.toString().getBytes(StandardCharsets.UTF_8));
             final StringBuilder hex = new StringBuilder();
@@ -256,6 +527,40 @@ public final class SaveStateStore {
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    /** Parte 52: file name of the simulator jar (the launcher runs a copy named name_size_date.jar). */
+    static String simulatorJarName() {
+        try {
+            return new File(SaveStateStore.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getName();
+        } catch (Throwable e) {
+            return "";
+        }
+    }
+
+    private static String buildHash;
+
+    /** Parte 52: SHA-256 of the simulator jar (empty when running from a classes folder). */
+    static synchronized String simulatorBuild() {
+        if (buildHash != null) return buildHash;
+        buildHash = "";
+        try {
+            final File jar = new File(SaveStateStore.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            if (jar.isFile()) {
+                final MessageDigest md = MessageDigest.getInstance("SHA-256");
+                try (java.io.InputStream in = new BufferedInputStream(new FileInputStream(jar))) {
+                    final byte[] buf = new byte[1 << 16];
+                    int n;
+                    while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
+                }
+                final StringBuilder hex = new StringBuilder();
+                for (byte x : md.digest()) hex.append(String.format("%02x", x));
+                buildHash = hex.toString();
+            }
+        } catch (Throwable e) {
+            buildHash = "";
+        }
+        return buildHash;
     }
 
     /** Current value of the global circuit-id counter (network.Circuit.quantity). */

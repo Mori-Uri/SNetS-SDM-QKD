@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
  */
 public final class LauncherServer {
 
-    static final String VERSION = "1.20.5";
+    static final String VERSION = "1.20.6";
 
     private final Settings settings;
     private final Workspace workspace;
@@ -262,7 +262,14 @@ public final class LauncherServer {
                 String jvm = q.containsKey("jvmArgs") ? q.get("jvmArgs") : settings.get("jvmArgs", "");
                 int threads = q.containsKey("threads") && !q.get("threads").isEmpty() ? Integer.parseInt(q.get("threads")) : 0;
                 boolean console = q.containsKey("console") ? "true".equals(q.get("console")) : settings.runConsole();
+                // Parte 52: fresh = discard the saved progress first; otherwise a saved execution continues
+                if ("1".equals(q.get("fresh")) && !runner.isActive(required(q, "path"))) {
+                    workspace.discardSaved(required(q, "path"));
+                }
                 Runner.Run r = runner.start(required(q, "path"), required(q, "jar"), jvm, threads, console);
+                if ("1".equals(q.get("resume"))) {
+                    r.resumed = true;
+                }
                 return r.summary();
             }
             case "/api/run/batch": {
@@ -279,13 +286,26 @@ public final class LauncherServer {
                 String jvm = q.containsKey("jvmArgs") ? q.get("jvmArgs") : settings.get("jvmArgs", "");
                 int threads = q.containsKey("threads") && !q.get("threads").isEmpty() ? Integer.parseInt(q.get("threads")) : 0;
                 boolean console = q.containsKey("console") ? "true".equals(q.get("console")) : settings.runConsole();
+                if ("1".equals(q.get("fresh"))) {
+                    for (String c : cases) {
+                        if (!runner.isActive(c)) {
+                            workspace.discardSaved(c);
+                        }
+                    }
+                }
+                List<Object> started;
                 if ("parallel".equals(q.get("mode"))) {
                     if (threads <= 0) {
                         threads = Runtime.getRuntime().availableProcessors();
                     }
-                    return runner.startParallel(cases, required(q, "jar"), jvm, threads, console);
+                    started = runner.startParallel(cases, required(q, "jar"), jvm, threads, console);
+                } else {
+                    started = runner.enqueueCases(cases, required(q, "jar"), jvm, threads, console);
                 }
-                return runner.enqueueCases(cases, required(q, "jar"), jvm, threads, console);
+                if ("1".equals(q.get("resume"))) {
+                    runner.markResumed(started);
+                }
+                return started;
             }
             case "/api/queue": {
                 requirePost(post);
@@ -383,6 +403,16 @@ public final class LauncherServer {
                 requirePost(post);
                 runner.cancel(required(q, "id"));
                 return ok();
+            }
+            case "/api/savestate/discard": {
+                requirePost(post);
+                String p = required(q, "path");
+                if (runner.isActive(p)) {
+                    throw new IllegalStateException("O caso " + p + " está em execução ou na fila.");
+                }
+                Map<String, Object> m = ok();
+                m.put("removed", workspace.discardSaved(p));
+                return m;
             }
             case "/api/open-folder": {
                 requirePost(post);

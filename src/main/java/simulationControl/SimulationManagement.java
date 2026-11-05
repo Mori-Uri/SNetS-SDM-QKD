@@ -37,6 +37,13 @@ public class SimulationManagement {
     private List<List<Simulation>> simulations;
     private volatile int done;
     private volatile int failed;
+    /** Parte 52: simulations stopped by a stop request (saved for the resume). */
+    private volatile int stopped;
+    /** Parte 52: save states of the last run (null = off). */
+    private simulator.SaveStateStore saveStates;
+
+    /** Parte 52: save states of the last run, or null. */
+    public simulator.SaveStateStore getSaveStates() { return saveStates; }
     private int numOfSimulations;
     private List<List<Measurements>> mainMeasuremens;
 
@@ -152,8 +159,11 @@ public class SimulationManagement {
                 simulationRequest.getSimulationConfig().getThreads());
         done = 0;
         failed = 0;
-        // Parte 45: save states (simulation.saveState); null = off
+        stopped = 0;
+        // Parte 45: save states (simulation.saveState). Parte 52: on unless "enabled": false
         final simulator.SaveStateStore saveStates = simulator.SaveStateStore.forRequest(simulationRequest);
+        this.saveStates = saveStates;
+        if (saveStates != null) saveStates.begin(simulations, simulationRequest.getSimulationConfig().getRequests());
 
         for (List<Simulation> loadPoint : simulations) {
             for (int index = 0; index < loadPoint.size(); index++) {
@@ -178,6 +188,14 @@ public class SimulationManagement {
                 executor.execute(new Runnable() {
                     @Override
                     public void run() {
+                        // Parte 52: a stop was requested before this simulation started: it is left for the resume
+                        if (simulator.SaveStateStore.isStopRequested()) {
+                            synchronized (SimulationManagement.this) {
+                                stopped++;
+                                done++;
+                            }
+                            return;
+                        }
                         try {
                             Simulator simulator = new Simulator(replication);
                             simulator.setSaveStates(saveStates);
@@ -197,6 +215,11 @@ public class SimulationManagement {
                             }
                             simulationProgressListener.onSimulationProgressUpdate(
                                     ((double) finished) / ((double) numOfSimulations));
+                        } catch (simulator.SaveStateStore.Stopped st) {
+                            synchronized (SimulationManagement.this) {
+                                stopped++;
+                                done++;
+                            }
                         } catch (Throwable ex) {
                             ex.printStackTrace();
                             /*
@@ -222,6 +245,19 @@ public class SimulationManagement {
         }
 
         executor.shutdown();
+        if (stopped > 0) {
+            // Parte 52: stopped on request (launcher, Ctrl+C): the progress stays in savestate/, no results are
+            // written and the process ends with exit code 3
+            if (saveStates != null) saveStates.writeProgress("stopped");
+            System.out.println("[snets] execucao interrompida: " + stopped + " de " + numOfSimulations
+                    + " simulacoes paradas" + (saveStates != null ? "; progresso salvo em " + saveStates.getDir()
+                    : " (save states desligados: nada foi salvo)"));
+            System.out.println("[snets] rode o mesmo caso de novo para continuar de onde parou.");
+            System.out.flush();
+            simulator.SaveStateStore.markExitHandled();
+            if (!Boolean.getBoolean("snets.noExitOnStop")) System.exit(simulator.SaveStateStore.EXIT_STOPPED);
+            throw new simulator.SaveStateStore.Stopped(stopped + " of " + numOfSimulations + " simulations stopped");
+        }
         if (failed > 0) {
             throw new IllegalStateException(failed + " of " + numOfSimulations
                     + " simulations failed; see the stack traces above. No results were saved.");
@@ -245,6 +281,8 @@ public class SimulationManagement {
         }
         blockingSnapshotsCache = null;
         simulationRequest.setResult(finalResult);
+        // Parte 52: every simulation finished; the save states are deleted when the results are on disk
+        if (saveStates != null) saveStates.caseFinished();
         simulationProgressListener.onSimulationFinished();
     }
 

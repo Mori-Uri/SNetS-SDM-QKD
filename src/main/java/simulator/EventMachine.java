@@ -68,6 +68,11 @@ public class EventMachine implements Serializable {
             Event e = eventList.firstElement();
             eventList.removeElementAt(0);
             e.listener().execute(e);
+            // Parte 52: stop requested (launcher "Cancelar", Ctrl+C, closing the console): save and stop here
+            if (SaveStateStore.isStopRequested()) {
+                if (checkpointHook != null) checkpointHook.run();
+                throw new SaveStateStore.Stopped();
+            }
             if (checkpointHook != null && System.nanoTime() - lastCheckpointNanos >= checkpointIntervalNanos) {
                 checkpointHook.run();
                 lastCheckpointNanos = System.nanoTime();

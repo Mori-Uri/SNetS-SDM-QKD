@@ -39,8 +39,13 @@ public class Simulator {
         arriveRequest = new ArriveRequestForConexionListener(this.getEventMachine(), simulation);
         this.scheduleFirstEvents();
         installCheckpoint();
-        this.eMachine.executeEvents();
-        saveFinished();
+        SaveStateStore.enter();
+        try {
+            this.eMachine.executeEvents();
+            saveFinished();
+        } finally {
+            SaveStateStore.leave();
+        }
         return this.simulation.getMeasurements();
     }
 
@@ -60,8 +65,13 @@ public class Simulator {
         eMachine = state.eventMachine;
         arriveRequest = state.arriveListener;
         installCheckpoint();
-        this.eMachine.executeEvents();
-        saveFinished();
+        SaveStateStore.enter();
+        try {
+            this.eMachine.executeEvents();
+            saveFinished();
+        } finally {
+            SaveStateStore.leave();
+        }
         return this.simulation.getMeasurements();
     }
 
