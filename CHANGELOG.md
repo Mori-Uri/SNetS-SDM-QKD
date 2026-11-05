@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [53](#parte-53) | Parte 53 — documentação das mudanças de desempenho e save states, verificação contra outras versões |
 | [52](#parte-52) | Parte 52 — save states ligados por padrão, cancelar sem perder o progresso, continuar execuções interrompidas (launcher 1.20.6) |
 | [51](#parte-51) | Parte 51 — launcher 1.20.5: menu das configurações, mais ajustes nos gráficos e mapa por causas escolhidas |
 | [50](#parte-50) | Parte 50 — launcher 1.20.4: gráfico de comparação com um caso de referência |
@@ -34,6 +35,38 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-53"></a>
+
+## Parte 53 — documentação das mudanças de desempenho e save states, verificação contra outras versões
+
+Só documentação: nenhum código do simulador ou do launcher mudou.
+
+### Documento novo
+
+`docs/MUDANCAS_DESEMPENHO_E_SAVE_STATES.md` registra, para revisão no laboratório:
+
+- cada mudança de desempenho, com o código antes e depois e o motivo de o resultado não mudar;
+- a métrica `AlgorithmCost`;
+- o funcionamento dos save states e do cancelar e continuar;
+- as verificações abaixo e onde ainda dá para ganhar tempo.
+
+### Verificações
+
+- **Experimental × main, casos completos do laboratório:**
+  - Teste_Ex_QKD: 18 CSVs idênticos;
+  - Teste_EX: idênticos, exceto o efeito do sorteio sem semente do `spcsav2` no núcleo do circuito bloqueado (bloqueio por núcleo, causa fragmentação × outros e fragmentação externa, cargas 6–7).
+- **Execução cancelada e continuada (Classico_CANCEL) × contínua:** igual, com a mesma ressalva do `spcsav2`.
+- **SBRC26 (código do Alexandre, só com a semente injetada) × main × experimental:**
+  - casos: Teste_EX e NSFNet CPSD, EPA, IMPA e CPA (`prmscav3`);
+  - resultado: todos idênticos.
+- **SNetS-SMD_XT (Rayline) × SBRC26:** Teste_EX e NSFNet CPSD idênticos.
+- **Perfil (JFR) e protótipo fora do repositório:**
+  - memória do `arcsinh` no NLI e cache das faixas livres;
+  - −21 % no clássico e −14 % no QKD;
+  - CSVs idênticos.
 
 ---
 

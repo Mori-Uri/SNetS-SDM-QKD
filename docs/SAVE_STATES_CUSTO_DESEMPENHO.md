@@ -97,3 +97,5 @@ Mudanças, todas com o mesmo resultado bit a bit:
 
 **Ganho.** No caso Q01 (QKD, metro de 8 nós, todas as métricas ligadas, 1 thread), o tempo caiu de 25,8 s para
 19,9 s (−23 %). O ganho é maior com mais valores de c na fragmentação relativa e com mais eventos pendentes.
+
+Descrição detalhada de cada mudança, verificações contra outras versões e próximos ganhos de desempenho: `docs/MUDANCAS_DESEMPENHO_E_SAVE_STATES.md` (Parte 53).
