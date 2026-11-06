@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [54](#parte-54) | Parte 54 — otimizações de desempenho sem mudança nos resultados (clássico e QKD) |
 | [53](#parte-53) | Parte 53 — documentação das mudanças de desempenho e save states, verificação contra outras versões |
 | [52](#parte-52) | Parte 52 — save states ligados por padrão, cancelar sem perder o progresso, continuar execuções interrompidas (launcher 1.20.6) |
 | [51](#parte-51) | Parte 51 — launcher 1.20.5: menu das configurações, mais ajustes nos gráficos e mapa por causas escolhidas |
@@ -35,6 +36,66 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-54"></a>
+
+## Parte 54 — otimizações de desempenho sem mudança nos resultados (clássico e QKD)
+
+Só na branch experimental. As propostas da análise da Parte 53 foram todas implementadas. Cada valor reaproveitado é o mesmo que o código original calcularia, então os resultados não mudam bit a bit. A descrição completa está em `docs/MUDANCAS_DESEMPENHO_E_SAVE_STATES.md`, seção 11.
+
+### Simulador
+
+- **QoT:**
+  - memória do `arcsinh` no NLI;
+  - termos de ruído (NLI, ASE e XT) por enlace guardados no circuito enquanto o enlace e o circuito não mudam;
+  - lista ordenada dos circuitos de cada núcleo mantida pelo núcleo, sem montar um `TreeSet` novo a cada avaliação.
+- **Espectro:** as faixas livres de cada núcleo ficam guardadas até o espectro mudar.
+- **Rastreamento de mudanças:**
+  - versão por enlace;
+  - circuitos na rede avisam quando mudam espectro, núcleo, modulação, potência, rota ou requisições;
+  - lista de requisições rastreada.
+  - Circuitos translúcidos desligam os caches que dependem disso.
+- **Métricas:**
+  - o consumo de energia é calculado só quando a métrica `ConsumedEnergy` lê o valor;
+  - `GroomingStatistics` conta as requisições sem montar um `HashSet` a cada observação.
+- **Execução:** com mais de uma thread, as cargas mais altas começam primeiro.
+- **QKD:**
+  - a atualização das sessões pula as que o circuito alocado ou liberado não pode afetar (núcleo não adjacente ou sem sobreposição de slots). Só sem multibanda, e só quando esse circuito é a única mudança desde a última atualização;
+  - os interferentes de um QCh são listados uma vez por enlace, não uma vez por *span*;
+  - os enlaces de cada sessão ficam guardados na sessão.
+- **Interruptores:**
+  - `-Dsnets.verifyPerf=true` compara cada valor dos caches com o cálculo original;
+  - `-Dsnets.noPerfCache=true` desliga os caches;
+  - `-Dsnets.perfStats=true` mostra o aproveitamento.
+
+### Verificação
+
+- **Modo de verificação (`-Dsnets.verifyPerf=true`), 17 casos de regressão:** nenhuma diferença entre os caches e o cálculo original.
+- **Regressão normal:**
+  - casos C e Q idênticos ou equivalentes à referência `main`;
+  - casos M idênticos ou equivalentes à `experimental`;
+  - os 17 casos idênticos ou equivalentes à Parte 52 (`p52base`).
+- **Teste_EX e Teste_Ex_QKD reduzidos:** mesmos valores da Parte 52.
+- **Save states:** Q01 e C01 parados e continuados, com resultado igual.
+- **Tempo:**
+
+| Caso | Antes | Agora | Redução |
+|---|---|---|---|
+| Teste_EX reduzido | 258 s | 148 s | −43 % |
+| Teste_Ex_QKD reduzido | 202 s | 111 s | −45 % |
+| Casos de regressão | — | — | −13 % a −59 % |
+
+### Arquivos
+
+- **Simulador:**
+  - novos: `simulator/PerfChecks.java`, `network/QotLinkCache.java`, `network/PhysicalStateChanges.java` e `network/TrackedRequestList.java`;
+  - alterados: `network/Circuit.java`, `Core.java`, `Link.java`, `Spectrum.java`, `PhysicalLayer.java`, `Crosstalk.java` e `Mesh.java`;
+  - alterados: `measurement/GroomingStatistics.java`, `request/RequestForConnection.java` e `simulationControl/SimulationManagement.java`;
+  - alterados: `qkd/control/QKDExistingSessionImpactEvaluator.java`, `QKDActiveConnection.java` e `qkd/physical/QKDPhysicalLayer.java`;
+  - `simulations/SNetS-SDM-QKD-exp.jar`.
+- **Documentação:** `docs/MUDANCAS_DESEMPENHO_E_SAVE_STATES.md` (seção 11).
 
 ---
 

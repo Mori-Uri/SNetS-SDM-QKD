@@ -289,7 +289,7 @@ public final class QKDPhysicalLayer implements java.io.Serializable {
         }
 
         final List<InterfererReference> interferers =
-                collectInterferers(link, adjacentCores, additionalClassicalCircuit);
+                collectInterferersCached(link, quantumCoreId, adjacentCores, additionalClassicalCircuit);
 
         int overlappingCircuits = 0;
         double totalPowerW = 0.0;
@@ -350,6 +350,53 @@ public final class QKDPhysicalLayer implements java.io.Serializable {
                 overlappingCircuits,
                 contributions,
                 totalPowerW);
+    }
+
+    /*
+     * Parte 54 (desempenho): a QKD channel is evaluated once per span, and a link has several spans, so the same list
+     * of interferers (circuits of the cores adjacent to the QKD core) was built again for each span. Without a
+     * candidate circuit the list is kept per (link, QKD core) and reused while the link version
+     * (Link.getPhysicalVersion, changed whenever a circuit enters or leaves a core of the link) is the same. The list
+     * only holds the circuits; their spectrum and power are read when the XT is computed, as before.
+     */
+    private transient java.util.IdentityHashMap<Link, java.util.HashMap<Integer, Object[]>> interfererCache;
+
+    private List<InterfererReference> collectInterferersCached(Link link, int quantumCoreId,
+            List<Core> adjacentCores, Circuit additionalClassicalCircuit) {
+        if (additionalClassicalCircuit != null || !simulator.PerfChecks.ENABLED) {
+            return collectInterferers(link, adjacentCores, additionalClassicalCircuit);
+        }
+        if (interfererCache == null) {
+            interfererCache = new java.util.IdentityHashMap<Link, java.util.HashMap<Integer, Object[]>>();
+        }
+        final long version = link.getPhysicalVersion();
+        java.util.HashMap<Integer, Object[]> perCore = interfererCache.get(link);
+        if (perCore == null) {
+            perCore = new java.util.HashMap<Integer, Object[]>();
+            interfererCache.put(link, perCore);
+        }
+        final Object[] e = perCore.get(Integer.valueOf(quantumCoreId));
+        if (e != null && ((Long) e[0]).longValue() == version && e[2] == adjacentCores) {
+            @SuppressWarnings("unchecked")
+            final List<InterfererReference> cached = (List<InterfererReference>) e[3];
+            if (simulator.PerfChecks.STATS) simulator.PerfChecks.count(simulator.PerfChecks.INTERF_HIT);
+            if (simulator.PerfChecks.VERIFY) {
+                final List<InterfererReference> fresh = collectInterferers(link, adjacentCores, null);
+                boolean same = fresh.size() == cached.size();
+                for (int k = 0; same && k < fresh.size(); k++) {
+                    same = fresh.get(k).circuit == cached.get(k).circuit && fresh.get(k).coreId == cached.get(k).coreId;
+                }
+                if (!same) throw new IllegalStateException("snets.verifyPerf: cache de interferentes do QCh difere");
+            }
+            return cached;
+        }
+        if (simulator.PerfChecks.STATS) simulator.PerfChecks.count(simulator.PerfChecks.INTERF_MISS);
+        final List<InterfererReference> list = collectInterferers(link, adjacentCores, null);
+        if (link.getPhysicalVersion() == version) {
+            perCore.put(Integer.valueOf(quantumCoreId), new Object[] { Long.valueOf(version),
+                    Integer.valueOf(quantumCoreId), adjacentCores, java.util.Collections.unmodifiableList(list) });
+        }
+        return list;
     }
 
     private static List<InterfererReference> collectInterferers(

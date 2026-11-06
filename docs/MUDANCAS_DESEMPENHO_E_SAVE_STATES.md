@@ -35,6 +35,7 @@ Nos arquivos de QoT, crosstalk e RMLSA conferidos linha a linha (`PhysicalLayer`
 | 45 | experimental | Métrica `AlgorithmCost` (custo de cada algoritmo) | nenhum; desligada por padrão |
 | 45 | experimental | Save states periódicos e retomada | nenhum (retomada = execução contínua) |
 | 52 | experimental | Save states ligados por padrão, cancelar sem perder, continuar | nenhum |
+| 54 | experimental | Caches da QoT, do espectro e do QKD, cálculo do consumo só na leitura, ordem das simulações (seção 11) | nenhum (bit a bit; conferido por um modo de verificação) |
 
 ## 3. Desempenho do caminho clássico (Parte 45, experimental)
 
@@ -414,7 +415,9 @@ Por isso duas execuções do mesmo caso com `spcsav2`, mesmo na mesma versão, d
 
 Corrigir isso exige dar uma semente a esse `Random`, o que muda os valores dessas três métricas em relação às execuções antigas. É uma decisão pendente do usuário.
 
-## 9. Onde ainda dá para ganhar tempo (análise de novembro de 2026)
+## 9. Onde ainda dá para ganhar tempo (análise de novembro de 2026, antes da Parte 54)
+
+Esta seção é a análise que motivou a Parte 54. Todas as propostas das seções 9.2 e 9.3 foram implementadas; a seção 11 descreve como ficaram e o ganho medido.
 
 ### 9.1 Perfil atual
 
@@ -452,7 +455,7 @@ As duas versões rodaram ao mesmo tempo na mesma máquina, uma por núcleo, com 
 | Teste_EX reduzido (10 000 req. × 8 × 2) | 255,5 s | 202,9 s | −21 % | 14 idênticos |
 | Teste_Ex_QKD reduzido (10 000 req. × 8 × 1) | 232,8 s | 200,6 s | −14 % | 18 idênticos |
 
-### 9.3 Propostas sem mudança nos resultados (ainda não implementadas)
+### 9.3 Propostas sem mudança nos resultados (implementadas na Parte 54)
 
 | # | Proposta | Alvo no perfil | Ganho esperado | Cuidado |
 |---|---|---|---|---|
@@ -479,3 +482,180 @@ As duas versões rodaram ao mesmo tempo na mesma máquina, uma por núcleo, com 
 2. Compare os CSVs casando as linhas pela chave (métrica, carga, taxa, origem, destino) e as colunas de replicação, com tolerância relativa de 1e-9.
 3. Com `spcsav2`, ignore as três métricas da seção 8.5.
 4. Para medir tempo, use `threads = 1` e a métrica `AlgorithmCost`, ou rode as duas versões ao mesmo tempo na mesma máquina.
+
+## 11. Parte 54: as otimizações implementadas
+
+Todas as propostas da seção 9 foram implementadas na branch experimental. O princípio é o mesmo da Parte 45: nenhuma conta muda. As mudanças:
+
+- evitam refazer contas cujo resultado já se conhece (caches);
+- evitam montar de novo estruturas que não mudaram;
+- deixam de lado avaliações que não podem mudar nada.
+
+Cada valor reaproveitado é exatamente o que o código original calcularia, com as mesmas entradas e as somas na mesma ordem.
+
+### 11.1 Interruptores (propriedades do Java)
+
+| Opção | Efeito |
+|---|---|
+| (nenhuma) | caches ligados (padrão) |
+| `-Dsnets.verifyPerf=true` | modo de verificação: todo valor servido por um cache também é calculado do jeito original e comparado bit a bit; a primeira diferença para a simulação com `IllegalStateException`. É lento, para testes. |
+| `-Dsnets.noPerfCache=true` | desliga os caches da Parte 54 (caminho original) |
+| `-Dsnets.perfStats=true` | no fim, mostra quantas vezes cada cache foi aproveitado |
+
+Exemplo, no console: `java -Dsnets.verifyPerf=true -jar SNetS-SDM-QKD-exp.jar MeuCaso`.
+
+A classe `simulator/PerfChecks.java` concentra esses interruptores.
+
+### 11.2 Mudanças no caminho clássico
+
+**a) Memória do `arcsinh`** (`network/PhysicalLayer.java`)
+
+O NLI do modelo GN (`getGnli2`) calcula dois `arcsinh` para cada par de circuitos no enlace, e o `arcsinh` usa `Math.log1p`, que no Java é feito em software (`StrictMath`). O argumento só depende das larguras dos dois circuitos e da distância entre eles, e como a grade de slots é fixa os mesmos valores se repetem: no Teste_EX reduzido, 1,08 bilhão de chamadas para 39 mil argumentos diferentes.
+
+O `arcsinh` original virou `arcsinhCompute`, e `arcsinh` agora procura o resultado numa tabela por thread (65 536 posições, endereçamento aberto), indexada pelos bits exatos do argumento. Se não encontrar, calcula e guarda. Mesma função com o mesmo argumento dá o mesmo resultado.
+
+**b) Cache das faixas livres** (`network/Spectrum.java`)
+
+`getFreeSpectrumBands(guardBand)` percorria o `TreeSet` de faixas livres e consultava dois `HashMap` de bandas de guarda a cada chamada. Agora:
+
+- o `Spectrum` tem um contador de versão, incrementado em `useSpectrum` e `freeSpectrum`, os únicos métodos que mudam as faixas;
+- o último resultado fica guardado com a versão e a banda de guarda;
+- enquanto nada muda, o método devolve uma cópia nova, com arrays novos como antes, então quem recebe a lista ainda pode alterá-la.
+
+O cálculo original virou `computeFreeSpectrumBands`. Aproveitamento medido: 96–98 %.
+
+**c) Lista ordenada dos circuitos de cada núcleo** (`Core`, `PhysicalLayer.getCircuitList` e `Crosstalk`)
+
+A QoT e o crosstalk percorrem os circuitos de um núcleo em ordem de id e, para isso, montavam um `TreeSet` novo a partir do `HashSet` do núcleo a cada avaliação.
+
+- O `Core` passou a manter esse conjunto ordenado (`getSortedCircuitList`), atualizado em `addCircuit` e `removeCircuit`.
+- Quando o circuito avaliado e o circuito de teste não mudam o conjunto, o próprio conjunto do núcleo é usado, só para leitura.
+- Quando mudam, uma cópia é alterada exatamente como antes.
+
+O auxiliar `Crosstalk.circuitsWithTest` faz o mesmo para os núcleos adjacentes.
+
+**d) Rastreamento de mudanças no estado físico** (`Link`, `Core`, `Circuit`, `TrackedRequestList` e `PhysicalStateChanges`)
+
+É a base dos caches (e) e (j):
+
+- `Link` ganhou uma versão (`getPhysicalVersion`), incrementada por `touch()`.
+- Um núcleo chama `touch()` do seu enlace quando entra ou sai um circuito e quando o espectro muda.
+- Um circuito que está na rede (contador `coreLists`, mantido pelo `Core`) chama `touch()` em todos os enlaces da rota quando muda: espectro, núcleo, modulação, potência, rota, banda de guarda ou requisições (`physicalChange`).
+- A lista de requisições do circuito passou a ser uma `TrackedRequestList`, um `ArrayList` que avisa os circuitos que a usam quando muda. Alguns algoritmos de grooming alteram a lista direto (`getRequests().add`), e isso também é rastreado.
+- `PhysicalStateChanges` conta, por thread (uma simulação roda numa só thread), as mudanças de circuitos já na rede e as entradas e saídas das listas dos núcleos.
+- **Proteção:** circuitos translúcidos alteram mapas por enlace sem passar por métodos rastreáveis, e uma lista de requisições de outro tipo também não é rastreável. Se algum desses aparecer, os caches (e) e (j-1) se desligam no processo inteiro (`PhysicalStateChanges.isUntracked`).
+
+**e) QoT por enlace** (`PhysicalLayer.computeSNRSegment`, `linkNoiseTerms` e `QotLinkCache`)
+
+O laço de `computeSNRSegment` soma, enlace por enlace, os termos de NLI, ASE e XT. Esse corpo do laço virou `linkNoiseTerms`, com as mesmas contas. Os três termos de cada enlace ficam guardados no circuito (`QotLinkCache`). Eles são reaproveitados enquanto forem iguais:
+
+- a versão do enlace;
+- o núcleo, o espectro, a modulação, a potência, a largura de banda, a densidade espectral de potência e a frequência central do circuito (comparados bit a bit);
+- a camada física usada.
+
+Termos calculados com o circuito de teste naquele enlace nunca são guardados. Os termos são somados na mesma ordem dos enlaces, então o SNR sai idêntico.
+
+Um efeito colateral do original é mantido: o pré-amplificador fica com o ganho do último enlace avaliado.
+
+Aproveitamento medido: 7–12 % nas redes pequenas dos testes. É maior em rotas longas, porque só os enlaces compartilhados com o circuito novo mudam.
+
+**f) Consumo de energia calculado na leitura** (`network/Mesh.java`)
+
+`computesPowerConsmption` recalculava o consumo da rede inteira a cada alocação e liberação, mas só a métrica `ConsumedEnergy` lê esses totais. Agora a chamada só marca os totais como desatualizados, e eles são calculados quando lidos, a partir do mesmo estado da rede: toda mudança de estado chama esse método antes da próxima leitura. No modo de verificação, os totais também são calculados na hora da mudança e comparados na leitura. Sem a métrica `ConsumedEnergy`, o custo cai a zero.
+
+**g) `GroomingStatistics`**
+
+Para contar as requisições ativas distintas, a métrica montava um `HashSet` com as requisições de todos os circuitos a cada observação. Agora cada requisição recebe uma marca (`markCounted`) com o número da observação, e a contagem é a mesma. O modo de verificação compara com o `HashSet`.
+
+**h) Ordem das simulações** (`SimulationManagement`)
+
+Com mais de uma thread, as simulações das cargas mais altas, que são as mais lentas, começam primeiro. Assim o fim da execução não fica com poucas simulações longas e threads paradas. Com uma thread, a ordem original é mantida.
+
+Cada simulação é independente e tem a própria semente, então os resultados não mudam. Os ids dos circuitos são globais e se intercalam entre threads, o que já acontecia com várias threads. Isso só muda a ordem das linhas "por par" e a última casa decimal do `ConsumedEnergy.csv`, como entre duas execuções da versão anterior com várias threads.
+
+**i) `Link.getCore`**
+
+Os núcleos ficam guardados na posição igual ao id. Agora a busca vai direto a essa posição e só percorre a lista se o id não bater. Devolve o mesmo núcleo.
+
+### 11.3 Mudanças no caminho QKD
+
+**j-1) Atualização só das sessões que o circuito pode afetar** (`QKDExistingSessionImpactEvaluator.refreshActiveSessions`)
+
+Sem multibanda, o único ruído clássico num QCh é o XT intercore (`QKDPhysicalLayer.evaluateInternal`). Um circuito clássico só soma XT a um QCh num enlace em que:
+
+- usa um núcleo adjacente ao núcleo QKD;
+- ocupa slots que se sobrepõem aos do QCh.
+
+Quando o circuito alocado ou liberado não cumpre essas condições para nenhum canal de uma sessão, uma nova avaliação daria os mesmos números, e a sessão mantém o resultado guardado.
+
+Isso só é usado quando o circuito alocado ou liberado é a única mudança desde a última atualização, o que é conferido com os contadores de (d):
+
+- nenhum circuito na rede foi alterado (realocação, expansão de espectro, potência);
+- as listas dos núcleos mudaram exatamente uma vez por enlace do circuito.
+
+Fora disso, a atualização é a da Parte 24. Com `multiband`, o SpRS soma todos os circuitos do núcleo hospedeiro e dos adjacentes, então o filtro não é usado. No modo de verificação, as sessões que seriam puladas são avaliadas e comparadas bit a bit.
+
+**j-2) Interferentes uma vez por enlace** (`QKDPhysicalLayer.collectInterferersCached`)
+
+Um QCh é avaliado *span* a *span*, e um enlace tem vários *spans*, então a mesma lista de interferentes (circuitos dos núcleos adjacentes ao núcleo QKD) era montada de novo para cada um. Sem circuito candidato, a lista agora é guardada por (enlace, núcleo QKD) e reaproveitada enquanto a versão do enlace for a mesma. A lista só guarda os circuitos: espectro e potência continuam lidos na hora do cálculo do XT.
+
+**j-3) Enlaces de cada sessão** (`QKDActiveConnection.getChannelLinks`)
+
+Para saber se uma sessão usa um enlace que mudou, o código percorria as alocações e os canais compartilhados de cada sessão e consultava um conjunto com *hash*. Uma sessão e seus canais não mudam depois de criados, então a lista dos enlaces é montada uma vez e comparada por identidade. O modo de verificação compara com o teste original.
+
+**j-4) Ordem dos testes na proteção das sessões** (`candidateCanAffect`)
+
+Os três testes (sobreposição de slots, enlace na rota e núcleo adjacente) são os mesmos, mas o mais barato, a sobreposição, agora vem primeiro.
+
+### 11.4 Verificação
+
+1. **Modo de verificação nos 17 casos do teste de regressão** (`tools/regressao`, casos C, Q e M, 4 threads), com `-Dsnets.verifyPerf=true`:
+   - todo valor servido por um cache foi recalculado e comparado bit a bit, sem nenhuma diferença;
+   - as sessões QKD puladas também foram reavaliadas, sem nenhuma diferença;
+   - os CSVs saíram iguais aos da versão anterior.
+2. **Teste de regressão normal** (sem o modo de verificação), em todos os casos idênticos ou equivalentes:
+   - contra a referência `main` (casos C e Q);
+   - contra a referência `experimental` (casos M);
+   - contra uma referência nova gerada com o JAR da Parte 52 (`p52base`, os 17 casos).
+
+   "Equivalente" é a regra de sempre: as mesmas linhas em outra ordem, ou o `ConsumedEnergy.csv` com diferença abaixo de 1e-12 entre threads. O M01 continua com os três CSVs ignorados por causa do sorteio sem semente do `spcsav2` (seção 8.5), com o bloqueio total igual.
+3. **Teste_EX e Teste_Ex_QKD reduzidos** (10 000 requisições × 8 cargas, 1 thread): todos os CSVs com os mesmos valores da versão anterior. Só a ordem das linhas "por par" muda, como entre duas execuções da versão anterior.
+4. **Save states:** Q01 e C01 foram parados pelo arquivo STOP no meio (código 3) e continuados. Os CSVs saíram iguais aos da referência.
+5. **Bytecode:** o JAR final foi compilado de novo depois da última troca de comentários, e as classes são idênticas às do JAR testado.
+
+Aproveitamento dos caches (`-Dsnets.perfStats=true`, casos reduzidos):
+
+| Cache | Teste_EX | Teste_Ex_QKD |
+|---|---|---|
+| `arcsinh` | 1,08 bilhão aproveitados / 39 mil calculados | 609 milhões / 39 mil |
+| faixas livres | 96,8 % | 96,4 % |
+| QoT por enlace | 12,4 % | 11,2 % |
+| sessões QKD puladas | — | 26,3 milhões puladas / 8 reavaliadas |
+
+
+### 11.5 Ganho medido
+
+Cada versão foi rodada nas mesmas condições: a versão anterior e a nova ao mesmo tempo, ou o teste de regressão com 2 casos em paralelo.
+
+| Caso | Parte 52 | Parte 54 | Redução |
+|---|---|---|---|
+| Teste_EX reduzido (10 000 × 8 × 2, 1 thread) | 258 s | 148 s | −43 % |
+| Teste_Ex_QKD reduzido (10 000 × 8 × 1, 1 thread) | 202 s | 111–119 s | −41 a −45 % |
+| C01 metro clássico | 30,5 s | 23,7 s | −22 % |
+| C03 USA, IMPA | 222,6 s | 192,8 s | −13 % |
+| C05 NSFNet, `prmscav3` | 374,3 s | 264,8 s | −29 % |
+| Q01 | 34,6 s | 21,4 s | −38 % |
+| Q04 rotas alternativas | 34,5 s | 14,0 s | −59 % |
+| Q07 `prmscav3` + APAmem | 128,0 s | 83,5 s | −35 % |
+| Q08 granularidade `route` | 71,1 s | 42,5 s | −40 % |
+| M01 multibanda | 63,2 s | 41,6 s | −34 % |
+| M02 MB-SDM | 96,6 s | 64,7 s | −33 % |
+
+Somando com a Parte 45, o Teste_EX reduzido passou de 397 s na `main` para 148 s na experimental, cerca de 2,7 vezes mais rápido.
+
+No perfil do caso QKD depois da Parte 54, os maiores consumidores restantes são:
+
+- a iteração dos `TreeSet` de circuitos dentro do NLI e do XT, que poderia virar um array ordenado;
+- o consumo de energia lido pela métrica `ConsumedEnergy` a cada requisição;
+- a proteção das sessões ativas (`evaluateCandidate`), que ainda percorre todas as sessões.
+

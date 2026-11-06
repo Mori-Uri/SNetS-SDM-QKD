@@ -63,7 +63,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 */
 	public Circuit() {
 		this.id = quantity++;
-		this.requests = new ArrayList<>();
+		this.requests = new TrackedRequestList(this); // Parte 54
 
 		this.QoT = true; // Assuming that a request always starts with admissible QoT
 		this.QoTForOther = true; // Assuming that it is admissible for the other requirements
@@ -125,7 +125,9 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 * @param route the route to set
 	 */
 	public void setRoute(Route route) {
+		physicalChange(); // Parte 54: links of the old route
 		this.route = route;
+		physicalChange(); // Parte 54: links of the new route
 	}
 
 	/**
@@ -191,6 +193,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 			throw new UnsupportedOperationException();
 		}
 		spectrumAssigned = sa;
+		physicalChange(); // Parte 54
 	}
 
 	/**
@@ -209,6 +212,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 */
 	public void setModulation(Modulation modulation) {
 		this.modulation = modulation;
+		physicalChange(); // Parte 54
 	}
 
 	/**
@@ -218,6 +222,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 */
 	public void addRequest(RequestForConnection rfc) {
 		requests.add(rfc);
+		physicalChange(); // Parte 54 (also when the list is not a TrackedRequestList)
 	}
 
 	/**
@@ -227,6 +232,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 */
 	public void removeRequest(RequestForConnection rfc) {
 		requests.remove(rfc);
+		physicalChange(); // Parte 54
 	}
 
 	/**
@@ -245,6 +251,13 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
      */
     public void setRequests(List<RequestForConnection> requests) {
     	this.requests = requests;
+    	// Parte 54: a shared list tells this circuit too when it changes; any other list cannot be tracked
+    	if (requests instanceof TrackedRequestList) {
+    		((TrackedRequestList) requests).addOwner(this);
+    	} else if (requests != null) {
+    		PhysicalStateChanges.markUntracked();
+    	}
+    	physicalChange();
     }
 
 	/**
@@ -462,7 +475,9 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 * @param launchPowerLinear double
 	 */
 	public void setLaunchPowerLinear(double launchPowerLinear) {
+		final boolean same = Double.doubleToRawLongBits(this.launchPowerLinear) == Double.doubleToRawLongBits(launchPowerLinear);
 		this.launchPowerLinear = launchPowerLinear;
+		if (!same) physicalChange(); // Parte 54
 	}
 
 	/**
@@ -484,6 +499,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 */
 	public void setGuardBand(int guardBand) {
 		this.guardBand = guardBand;
+		physicalChange(); // Parte 54
 	}
 
 	/**
@@ -511,6 +527,48 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 */
 	public void setIndexCore(int indexCore) {
 		this.indexCore = indexCore;
+		physicalChange(); // Parte 54
+	}
+
+	/*
+	 * Parte 54 (desempenho): number of core circuit lists that contain this circuit (it is in the network while > 0).
+	 * When a circuit in the network changes its spectrum, core, modulation, power, route or requests, the links of its
+	 * route are marked as changed (Link.touch) and the global change counter moves. The QoT cache of PhysicalLayer and
+	 * the QKD session refresh rely on this to never reuse a value computed before the change.
+	 */
+	protected int coreLists;
+
+	/** Parte 54: QoT terms per link (see QotLinkCache); not saved in save states. */
+	transient QotLinkCache.Entry[] qotCache;
+
+	/** Parte 54: called by Core when this circuit enters a core circuit list. */
+	void enteredCoreList() {
+		coreLists++;
+		if (this instanceof TranslucentCircuit) {
+			PhysicalStateChanges.markUntracked();
+		}
+	}
+
+	/** Parte 54: called by Core when this circuit leaves a core circuit list. */
+	void leftCoreList() {
+		if (coreLists > 0) coreLists--;
+	}
+
+	/** Parte 54: true while the circuit is in the circuit list of some core. */
+	public boolean isInNetwork() {
+		return coreLists > 0;
+	}
+
+	/** Parte 54: a physical parameter of this circuit changed (see coreLists). */
+	protected void physicalChange() {
+		if (coreLists > 0) {
+			PhysicalStateChanges.mutated();
+			if (route != null && route.getLinkList() != null) {
+				for (Link link : route.getLinkList()) {
+					link.touch();
+				}
+			}
+		}
 	}
 
 	/**
@@ -700,7 +758,13 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 */
 	@Override
 	public Circuit clone() throws CloneNotSupportedException {
-		return (Circuit) super.clone();
+		final Circuit c = (Circuit) super.clone();
+		c.coreLists = 0; // Parte 54: the copy is not in any core list
+		c.qotCache = null;
+		if (c.requests instanceof TrackedRequestList) {
+			((TrackedRequestList) c.requests).addOwner(c); // Parte 54: the copy shares the list
+		}
+		return c;
 	}
 
 	/**

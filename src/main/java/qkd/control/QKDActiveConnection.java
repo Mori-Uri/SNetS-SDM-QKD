@@ -24,6 +24,40 @@ public final class QKDActiveConnection implements Serializable {
     private final Route classicalRoute;
     private final QKDSession qkdSession;
     private QKDRoutePhysicalResult physicalResult;
+
+    /**
+     * Parte 54: the links of the QKD channels of this session (allocations and shared channels), without repetition.
+     * The session and its channels do not change after it is created, so the list is built once.
+     */
+    private transient network.Link[] channelLinks;
+
+    /** Parte 54: see {@link #channelLinks}. */
+    public network.Link[] getChannelLinks() {
+        network.Link[] l = channelLinks;
+        if (l == null) {
+            final java.util.List<network.Link> links = new java.util.ArrayList<network.Link>();
+            for (qkd.resource.QKDChannelAllocation a : qkdSession.getAllocations()) {
+                addOnce(links, a.getLink());
+            }
+            if (qkdSession.isSharedCapacityManaged()) {
+                for (qkd.capacity.QKDLinkCapacityReservation lr : qkdSession.getCapacityReservations()) {
+                    for (qkd.capacity.QKDChannelShare share : lr.getShares()) {
+                        addOnce(links, share.getChannel().getLink());
+                    }
+                }
+            }
+            l = links.toArray(new network.Link[0]);
+            channelLinks = l;
+        }
+        return l;
+    }
+
+    private static void addOnce(java.util.List<network.Link> links, network.Link link) {
+        for (network.Link x : links) {
+            if (x == link) return;
+        }
+        links.add(link);
+    }
     /** Part 23: route actually used by the QCh (classical route or an alternative). */
     private Route qkdRoute;
     private boolean alternativeRoute;

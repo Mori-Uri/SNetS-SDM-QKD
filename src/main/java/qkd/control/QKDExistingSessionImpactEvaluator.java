@@ -142,14 +142,42 @@ public final class QKDExistingSessionImpactEvaluator implements java.io.Serializ
             changedLinks.addAll(changed.getRoute().getLinkList());
         }
         java.util.Map<Long, QKDLinkChannelPhysicalResult> evaluated = new java.util.HashMap<Long, QKDLinkChannelPhysicalResult>();
+        // Parte 54 (desempenho): see changeCanAffect. Only when the changed circuit is the only change since the last
+        // refresh: no circuit in the network was changed (reallocation, spectrum expansion, power) and the core lists
+        // changed exactly once per link of the changed circuit (its own allocation or release).
+        final boolean filter = changedLinks != null && simulator.PerfChecks.ENABLED && refreshSynced
+                && mesh.getQkdPhysicalParameters().getMultiband() == null
+                && !network.PhysicalStateChanges.isUntracked()
+                && lastRefreshMutations == network.PhysicalStateChanges.mutations()
+                && network.PhysicalStateChanges.memberships() - lastRefreshMemberships
+                        == changed.getRoute().getLinkList().size()
+                && changed.getSpectrumAssigned() != null;
         int refreshed = 0;
+        final Link[] changedArray = changedLinks == null ? null
+                : changed.getRoute().getLinkList().toArray(new Link[0]);
         for (QKDActiveConnection connection : registry.snapshot()) {
             if (connection == null || !connection.isActive()) {
                 continue;
             }
-            if (changedLinks != null && !touches(connection, changedLinks)) {
+            if (changedLinks != null && !touchesChanged(connection, changedLinks, changedArray)) {
                 refreshed++;
                 continue;
+            }
+            final boolean skip = filter && !changeCanAffect(connection, changed);
+            if (simulator.PerfChecks.STATS) {
+                simulator.PerfChecks.count(skip ? simulator.PerfChecks.REFRESH_SKIP : simulator.PerfChecks.REFRESH_DONE);
+            }
+            if (skip) {
+                if (!simulator.PerfChecks.VERIFY) {
+                    refreshed++;
+                    continue;
+                }
+                if (verifySkipped == null) {
+                    verifySkipped = new ArrayList<QKDActiveConnection>();
+                    verifyBefore = new java.util.IdentityHashMap<QKDActiveConnection, QKDRoutePhysicalResult>();
+                }
+                verifySkipped.add(connection);
+                verifyBefore.put(connection, connection.getPhysicalResult());
             }
 
             if (connection.getQkdSession().isSharedCapacityManaged()) {
@@ -169,8 +197,80 @@ public final class QKDExistingSessionImpactEvaluator implements java.io.Serializ
             }
             refreshed++;
         }
+        if (verifySkipped != null && !verifySkipped.isEmpty()) {
+            verifySkippedSessions();
+        }
+        lastRefreshMutations = network.PhysicalStateChanges.mutations();
+        lastRefreshMemberships = network.PhysicalStateChanges.memberships();
+        refreshSynced = true;
         return refreshed;
     }
+
+    /*
+     * Parte 54 (desempenho): without multiband, the classical noise in a QKD channel is only the intercore XT, and a
+     * classical circuit adds XT to a channel only on a link where it uses a core adjacent to the QKD core and slots
+     * that overlap the channel (QKDPhysicalLayer.evaluateInternal). When the circuit that was allocated or released
+     * does not meet these conditions for any channel of a session, a new evaluation of that session would give the
+     * same numbers, so the stored result is kept. This is used only when the circuit is the only change since the last
+     * refresh (see lastRefreshMutations); with -Dsnets.verifyPerf=true the skipped sessions are evaluated anyway and
+     * compared bit for bit.
+     */
+    private transient long lastRefreshMutations;
+    private transient long lastRefreshMemberships;
+    private transient boolean refreshSynced;
+    private transient List<QKDActiveConnection> verifySkipped;
+
+    private boolean changeCanAffect(QKDActiveConnection connection, Circuit changed) {
+        final int core = qkd.metrics.BlockingDetailRecorder.rawCore(changed);
+        final int[] band = changed.getSpectrumAssigned();
+        for (QKDChannelAllocation allocation : connection.getQkdSession().getAllocations()) {
+            if (channelCanBeAffected(allocation, changed, core, band)) return true;
+        }
+        if (connection.getQkdSession().isSharedCapacityManaged()) {
+            for (QKDLinkCapacityReservation lr : connection.getQkdSession().getCapacityReservations()) {
+                for (QKDChannelShare share : lr.getShares()) {
+                    if (channelCanBeAffected(share.getChannel().getAllocation(), changed, core, band)) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean channelCanBeAffected(QKDChannelAllocation allocation, Circuit changed, int core, int[] band) {
+        if (allocation == null) return true;
+        if (QKDPhysicalLayer.numberOfOverlappingSlots(allocation.getSpectrumBand(), band) <= 0) return false;
+        final Link link = allocation.getLink();
+        if (link == null || !routeContainsLinkByIdentity(changed, link)) return false;
+        return isCoreAdjacentToQkdCore(link, allocation.getQuantumCoreId(), core);
+    }
+
+    /** Parte 54 (-Dsnets.verifyPerf=true): the skipped sessions were refreshed anyway; their results must not change. */
+    private void verifySkippedSessions() {
+        try {
+            for (QKDActiveConnection connection : verifySkipped) {
+                final QKDRoutePhysicalResult now = connection.getPhysicalResult();
+                final QKDRoutePhysicalResult before = verifyBefore.get(connection);
+                if (before == null) continue;
+                if (before.getSpanResults().size() != now.getSpanResults().size()) {
+                    throw new IllegalStateException("snets.verifyPerf: sessao QKD pulada mudou (numero de spans)");
+                }
+                for (int k = 0; k < now.getSpanResults().size(); k++) {
+                    final QKDSpanPhysicalResult a = before.getSpanResults().get(k);
+                    final QKDSpanPhysicalResult b = now.getSpanResults().get(k);
+                    simulator.PerfChecks.same(a.getCrosstalkPowerW(), b.getCrosstalkPowerW(), "XT de sessao QKD pulada");
+                    simulator.PerfChecks.same(a.getTotalBackgroundProbability(), b.getTotalBackgroundProbability(),
+                            "p_b de sessao QKD pulada");
+                    simulator.PerfChecks.same(a.getSecretKeyRateBps(), b.getSecretKeyRateBps(), "SKR de sessao QKD pulada");
+                    simulator.PerfChecks.same(a.getQber(), b.getQber(), "QBER de sessao QKD pulada");
+                }
+            }
+        } finally {
+            verifySkipped.clear();
+            verifyBefore.clear();
+        }
+    }
+
+    private transient java.util.IdentityHashMap<QKDActiveConnection, QKDRoutePhysicalResult> verifyBefore;
 
     private SharedProjection projectSharedSession(QKDActiveConnection connection, Circuit candidate) {
         List<qkd.physical.QKDSpanPhysicalResult> representativeSpans =
@@ -201,6 +301,29 @@ public final class QKDExistingSessionImpactEvaluator implements java.io.Serializ
                 connection.getQkdSession().getRoutePlan(), representativeSpans);
         return new SharedProjection(snapshot, viable,
                 minProjectedCapacity == Double.POSITIVE_INFINITY ? 0.0 : minProjectedCapacity);
+    }
+
+    private static boolean touchesChanged(QKDActiveConnection connection, java.util.Set<Link> changedLinks,
+            Link[] changedArray) {
+        if (!simulator.PerfChecks.ENABLED) {
+            return touches(connection, changedLinks);
+        }
+        final boolean fast = touchesFast(connection, changedArray);
+        if (simulator.PerfChecks.VERIFY && fast != touches(connection, changedLinks)) {
+            throw new IllegalStateException("snets.verifyPerf: enlaces da sessao QKD diferem");
+        }
+        return fast;
+    }
+
+    /** Parte 54: same answer as touches, from the links of the session kept in the connection (no hashing). */
+    private static boolean touchesFast(QKDActiveConnection connection, Link[] links) {
+        final Link[] mine = connection.getChannelLinks();
+        for (int i = 0; i < mine.length; i++) {
+            for (int j = 0; j < links.length; j++) {
+                if (mine[i] == links[j]) return true;
+            }
+        }
+        return false;
     }
 
     /** True when the session has a QKD channel on one of the given links. */
@@ -270,6 +393,14 @@ public final class QKDExistingSessionImpactEvaluator implements java.io.Serializ
 
         for (QKDChannelAllocation allocation
                 : connection.getQkdSession().getAllocations()) {
+
+            // Parte 54 (desempenho): the cheapest test first (spectral overlap); the three tests are the same as
+            // before and all must hold, so the answer does not change.
+            if (QKDPhysicalLayer.numberOfOverlappingSlots(
+                    allocation.getSpectrumBand(),
+                    candidate.getSpectrumAssigned()) <= 0) {
+                continue;
+            }
 
             Link qkdLink = allocation.getLink();
             if (!routeContainsLinkByIdentity(candidate, qkdLink)) {

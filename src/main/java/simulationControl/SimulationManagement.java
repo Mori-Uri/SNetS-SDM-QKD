@@ -165,7 +165,15 @@ public class SimulationManagement {
         this.saveStates = saveStates;
         if (saveStates != null) saveStates.begin(simulations, simulationRequest.getSimulationConfig().getRequests());
 
-        for (List<Simulation> loadPoint : simulations) {
+        // Parte 54 (desempenho): with more than one thread, the simulations of the highest load points (the slowest)
+        // are started first, so the last ones to finish are short and the threads are not left idle at the end of the
+        // run. Each simulation is independent and keeps its own seed, so the results do not change. With one thread
+        // the original order is kept.
+        final List<List<Simulation>> order = new java.util.ArrayList<List<Simulation>>(simulations);
+        if (simulationRequest.getSimulationConfig().getThreads() > 1 && simulator.PerfChecks.ENABLED) {
+            java.util.Collections.reverse(order);
+        }
+        for (List<Simulation> loadPoint : order) {
             for (int index = 0; index < loadPoint.size(); index++) {
                 final simulator.SaveStateStore.State state = saveStates == null ? null
                         : saveStates.load(loadPoint.get(index).getLoadPoint(), loadPoint.get(index).getReplication(),

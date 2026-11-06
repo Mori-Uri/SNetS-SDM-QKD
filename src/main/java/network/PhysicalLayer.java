@@ -551,11 +551,55 @@ public class PhysicalLayer implements Serializable {
 		double lastFiberSegment = 0.0;
 		double Pxt = 0.0;
 
+		// Parte 54 (desempenho): the noise that each link adds to the circuit (NLI, ASE and XT terms) is kept in the
+		// circuit and reused while the link and the circuit did not change (QotLinkCache). The terms are added in the
+		// same order as before, so the SNR is the same bit for bit.
+		final boolean useQotCache = simulator.PerfChecks.ENABLED && !(circuit instanceof TranslucentCircuit)
+				&& !PhysicalStateChanges.isUntracked();
+		final double[] terms = useQotCache ? new double[3] : null;
+
 		for(int i = sourceNodeIndex; i < destinationNodeIndex; i++){
 			sourceNode = route.getNode(i);
 			destinationNode = route.getNode(i + 1);
 			link = sourceNode.getOxc().linkTo(destinationNode.getOxc());
 			Nl = getNumberOfLineAmplifiers(link.getDistance());
+
+			if (useQotCache) {
+				// the test circuit only matters on the links it uses: there the terms are always computed
+				final boolean storable = testCircuit == null || !testCircuit.getRoute().containThisLink(link);
+				final QotLinkCache.Entry hit = storable
+						? QotLinkCache.find(circuit, this, link, core, spectrumAssigned, modulation, circuitPowerLinear, Bsi, I, fi)
+						: null;
+				if (simulator.PerfChecks.STATS) {
+					simulator.PerfChecks.count(hit != null ? simulator.PerfChecks.QOT_HIT : simulator.PerfChecks.QOT_MISS);
+				}
+				if (hit != null && !simulator.PerfChecks.VERIFY) {
+					if (activeASE && bandParams == null) {
+						// side effect of the original code: the pre-amplifier keeps the gain of the last link evaluated
+						preAmp.setGain(alpha * (link.getDistance() - (Nl * L)));
+					}
+					if (activeNLI) Inli = Inli + hit.nli;
+					if (activeASE) Iase = Iase + hit.ase;
+					if (activeXT && XTModel == XT_TOGETHER) Ixt = Ixt + hit.xt;
+					continue;
+				}
+				final long version = link.getPhysicalVersion();
+				linkNoiseTerms(terms, circuit, link, Nl, core, spectrumAssigned, modulation, circuitPowerLinear, Bsi, I, fi,
+						bandParams, testCircuit, addTestCircuit);
+				if (hit != null) {
+					simulator.PerfChecks.same(hit.nli, terms[0], "NLI do enlace");
+					simulator.PerfChecks.same(hit.ase, terms[1], "ASE do enlace");
+					simulator.PerfChecks.same(hit.xt, terms[2], "XT do enlace");
+				}
+				if (storable && link.getPhysicalVersion() == version) {
+					QotLinkCache.store(circuit, this, link, version, core, spectrumAssigned, modulation, circuitPowerLinear,
+							Bsi, I, fi, terms);
+				}
+				if (activeNLI) Inli = Inli + terms[0];
+				if (activeASE) Iase = Iase + terms[1];
+				if (activeXT && XTModel == XT_TOGETHER) Ixt = Ixt + terms[2];
+				continue;
+			}
 
 			circuitList = getCircuitList(link, core, circuit, testCircuit, addTestCircuit);
 
@@ -694,6 +738,86 @@ public class PhysicalLayer implements Serializable {
 	 * @param addTestCircuit boolean - To add the test circuit to the circuit list
 	 * @return double - SNR (linear)
 	 */
+	/**
+	 * Parte 54: the terms that one link adds to the noise of a circuit, computed exactly as in the loop of
+	 * computeSNRSegment: terms[0] is added to Inli, terms[1] to Iase and terms[2] to Ixt (each only when the
+	 * corresponding effect is active).
+	 */
+	private void linkNoiseTerms(double[] terms, Circuit circuit, Link link, double Nl, int core, int spectrumAssigned[],
+			Modulation modulation, double circuitPowerLinear, double Bsi, double I, double fi,
+			ClassicalMultiBand.Params bandParams, Circuit testCircuit, boolean addTestCircuit) {
+		double noiseNli = 0.0;
+		double totalPower = 0.0;
+		double boosterAmpNoiseAse = 0.0;
+		double preAmpNoiseAse = 0.0;
+		double lineAmpNoiseAse = 0.0;
+		double lastFiberSegment = 0.0;
+		double Pxt = 0.0;
+		terms[0] = 0.0;
+		terms[1] = 0.0;
+		terms[2] = 0.0;
+
+		final TreeSet<Circuit> circuitList = getCircuitList(link, core, circuit, testCircuit, addTestCircuit);
+
+		if(activeNLI){
+			if (bandParams != null) { // Parte 49: fibre parameters of the band of the circuit
+				noiseNli = getGnliBand(bandParams, circuit, link, circuitPowerLinear, Bsi, I, fi, circuitList, modulation, physicalLayerModel == MODEL_JOHANNISSON);
+
+			} else if (physicalLayerModel == MODEL_JOHANNISSON) { // Model Johannisson
+				noiseNli = getGnli(circuit, link, circuitPowerLinear, Bsi, I, fi, circuitList); // Computing the NLI for each polarization mode
+
+			} else { // Model Habibi
+				noiseNli = getGnli2(circuit, link, circuitPowerLinear, Bsi, I, fi, circuitList, modulation); // Computing the NLI for both polarization modes
+			}
+
+			noiseNli = (Nl + 1.0) * noiseNli; // Ns + 1 corresponds to the line amplifiers span more the preamplifier span
+			terms[0] = noiseNli;
+		}
+
+		if(activeASE){
+			if(typeOfAmplifierGain == AMP_GAIN_SATURATED){
+				totalPower = getTotalPowerInTheLink(circuitList);
+			}
+
+			// Computing the last span amplifier gain
+			lastFiberSegment = link.getDistance() - (Nl * L);
+			preAmp.setGain(alpha * lastFiberSegment);
+
+			// Computing the ASE for each amplifier type
+			if (bandParams != null) { // Parte 49: loss, NF and frequency of the band (+ ISRS)
+				double[] aseB = aseBand(bandParams, fi, circuit, spectrumAssigned, link, circuitList, totalPower, lastFiberSegment);
+				boosterAmpNoiseAse = aseB[0];
+				lineAmpNoiseAse = aseB[1];
+				preAmpNoiseAse = aseB[2];
+			} else {
+			boosterAmpNoiseAse = boosterAmp.getAseByGain(totalPower, boosterAmp.getGainByType(totalPower, typeOfAmplifierGain));
+			lineAmpNoiseAse = lineAmp.getAseByGain(totalPower, lineAmp.getGainByType(totalPower, typeOfAmplifierGain));
+			preAmpNoiseAse = preAmp.getAseByGain(totalPower, preAmp.getGainByType(totalPower, typeOfAmplifierGain));
+			}
+
+			if (physicalLayerModel == MODEL_JOHANNISSON) { // Model Johannisson
+				// Determining the ASE for each polarization mode
+				boosterAmpNoiseAse = boosterAmpNoiseAse / polarizationModes;
+				lineAmpNoiseAse = lineAmpNoiseAse / polarizationModes;
+				preAmpNoiseAse = preAmpNoiseAse / polarizationModes;
+			}
+
+			lineAmpNoiseAse = Nl * lineAmpNoiseAse; // Computing ASE for all line amplifier spans
+
+			terms[1] = (boosterAmpNoiseAse + lineAmpNoiseAse + preAmpNoiseAse);
+		}
+
+		if (activeXT && XTModel == XT_TOGETHER) {
+			Pxt = crosstalk.calculateCrosstalkPowerInLink(circuit, link, core, spectrumAssigned, testCircuit, addTestCircuit);
+
+			if (physicalLayerModel == MODEL_JOHANNISSON) {
+				Pxt = Pxt / polarizationModes;
+			}
+
+			terms[2] = (Pxt / Bsi); // Convert to power spectral density
+		}
+	}
+
 	public double computeSNRSegment2(Circuit circuit, Route route, int sourceNodeIndex, int destinationNodeIndex, Modulation modulation, int core, int spectrumAssigned[], Circuit testCircuit, boolean addTestCircuit){
 
 		//double numSlotsRequired = spectrumAssigned[1] - spectrumAssigned[0] + 1; // Number of slots required
@@ -871,11 +995,17 @@ public class PhysicalLayer implements Serializable {
 	 * @return TreeSet<Circuit>
 	 */
 	private TreeSet<Circuit> getCircuitList(Link link, int core, Circuit circuit, Circuit testCircuit, boolean addTestCircuit){
-		TreeSet<Circuit> circuitList = new TreeSet<Circuit>();
-
-		for (Circuit circtuiTemp : link.getCore(core).getCircuitList()) {
-			circuitList.add(circtuiTemp);
+		// Parte 54 (desempenho): when neither the circuit nor the test circuit changes the set of circuits of the core,
+		// the ordered set kept by the core is returned as it is (callers only read it). Otherwise a copy is changed
+		// exactly as before.
+		final TreeSet<Circuit> base = link.getCore(core).getSortedCircuitList();
+		if (simulator.PerfChecks.ENABLED && base.contains(circuit)
+				&& (testCircuit == null || !testCircuit.getRoute().containThisLink(link)
+						|| addTestCircuit == base.contains(testCircuit))) {
+			return base;
 		}
+
+		TreeSet<Circuit> circuitList = new TreeSet<Circuit>(base);
 
 		if(!circuitList.contains(circuit)){
 			circuitList.add(circuit);
@@ -1142,6 +1272,53 @@ public class PhysicalLayer implements Serializable {
 	 * @return double
 	 */
 	public static double arcsinh(double x){
+		if (!simulator.PerfChecks.ENABLED) return arcsinhCompute(x);
+		// Parte 54 (desempenho): the arguments of arcsinh in the GN model depend only on the bandwidths of two circuits
+		// and on the distance between them, so the same values come back millions of times. They are kept in a small
+		// table per thread, keyed by the exact bits of x. Same function, same input: the same result, bit for bit.
+		final ArcsinhMemo m = ARCSINH_MEMO.get();
+		final long bits = Double.doubleToRawLongBits(x);
+		int h = (int) (bits ^ (bits >>> 32));
+		h ^= (h >>> 16);
+		h *= 0x45d9f3b;
+		h ^= (h >>> 16);
+		int i = h & ArcsinhMemo.MASK;
+		for (int probe = 0; probe < 8; probe++, i = (i + 1) & ArcsinhMemo.MASK) {
+			if (!m.used[i]) {
+				if (simulator.PerfChecks.STATS) simulator.PerfChecks.count(simulator.PerfChecks.ARCSINH_MISS);
+				final double v = arcsinhCompute(x);
+				m.keys[i] = bits;
+				m.vals[i] = v;
+				m.used[i] = true;
+				return v;
+			}
+			if (m.keys[i] == bits) {
+				if (simulator.PerfChecks.STATS) simulator.PerfChecks.count(simulator.PerfChecks.ARCSINH_HIT);
+				if (simulator.PerfChecks.VERIFY) simulator.PerfChecks.same(m.vals[i], arcsinhCompute(x), "arcsinh");
+				return m.vals[i];
+			}
+		}
+		return arcsinhCompute(x);
+	}
+
+	/** Parte 54: open-addressing table of arcsinh values (one per thread). */
+	private static final class ArcsinhMemo {
+		static final int SIZE = 1 << 16;
+		static final int MASK = SIZE - 1;
+		final long[] keys = new long[SIZE];
+		final double[] vals = new double[SIZE];
+		final boolean[] used = new boolean[SIZE];
+	}
+
+	private static final ThreadLocal<ArcsinhMemo> ARCSINH_MEMO = new ThreadLocal<ArcsinhMemo>() {
+		@Override
+		protected ArcsinhMemo initialValue() {
+			return new ArcsinhMemo();
+		}
+	};
+
+	/** The original arcsinh (Parte 54: called through the memo table above). */
+	private static double arcsinhCompute(double x){
 		// Casos especiais
 	    if (Double.isNaN(x)) return Double.NaN;
 	    if (x == Double.POSITIVE_INFINITY) return Double.POSITIVE_INFINITY;

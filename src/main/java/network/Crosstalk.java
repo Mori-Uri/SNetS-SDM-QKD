@@ -658,19 +658,7 @@ public class Crosstalk implements Serializable {
 		ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCore());
 		for(Core core : adjacentsCores) {
 
-			TreeSet<Circuit> adjacentCircuitList = new TreeSet<Circuit>();
-			for (Circuit circtuiTemp : core.getCircuitList()) {
-				adjacentCircuitList.add(circtuiTemp);
-			}
-
-			if(testCircuit != null && link.getCore(testCircuit.getIndexCore()) == core && testCircuit.getRoute().getLinkList().contains(link)) {
-				if(!adjacentCircuitList.contains(testCircuit) && addTestCircuit) {
-					adjacentCircuitList.add(testCircuit);
-				}
-				if(adjacentCircuitList.contains(testCircuit) && !addTestCircuit) {
-					adjacentCircuitList.remove(testCircuit);
-				}
-			}
+			final TreeSet<Circuit> adjacentCircuitList = circuitsWithTest(core, link, testCircuit, addTestCircuit); // Parte 54
 
 			Pxt = calculatePxt(circuit, circuit.getSpectrumAssigned(), link, adjacentCircuitList);
 
@@ -700,19 +688,7 @@ public class Crosstalk implements Serializable {
 		ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCore());
 		for(Core core : adjacentsCores) {
 
-			TreeSet<Circuit> adjacentCircuitList = new TreeSet<Circuit>();
-			for (Circuit circtuiTemp : core.getCircuitList()) {
-				adjacentCircuitList.add(circtuiTemp);
-			}
-
-			if(testCircuit != null && link.getCore(testCircuit.getIndexCore()) == core && testCircuit.getRoute().getLinkList().contains(link)) {
-				if(!adjacentCircuitList.contains(testCircuit) && addTestCircuit) {
-					adjacentCircuitList.add(testCircuit);
-				}
-				if(adjacentCircuitList.contains(testCircuit) && !addTestCircuit) {
-					adjacentCircuitList.remove(testCircuit);
-				}
-			}
+			final TreeSet<Circuit> adjacentCircuitList = circuitsWithTest(core, link, testCircuit, addTestCircuit); // Parte 54
 
 			Pxt = calculatePxt(circuit, circuit.getSpectrumAssigned(), link, adjacentCircuitList);
 
@@ -743,18 +719,7 @@ public class Crosstalk implements Serializable {
 
 	    for (Core adjacentCore : adjacentCores) {
 
-	        TreeSet<Circuit> adjacentCircuitList = new TreeSet<>();
-
-	        adjacentCircuitList.addAll(adjacentCore.getCircuitList());
-
-	        if (testCircuit != null && link.getCore(testCircuit.getIndexCore()) == adjacentCore && testCircuit.getRoute().getLinkList().contains(link)) {
-
-	            if (addTestCircuit) {
-	                adjacentCircuitList.add(testCircuit);
-	            } else {
-	                adjacentCircuitList.remove(testCircuit);
-	            }
-	        }
+	        final TreeSet<Circuit> adjacentCircuitList = circuitsWithTest(adjacentCore, link, testCircuit, addTestCircuit); // Parte 54
 
 	        pxtInLink += calculatePxt(circuit, spectrumAssigned, link, adjacentCircuitList);
 	    }
@@ -771,6 +736,27 @@ public class Crosstalk implements Serializable {
 	 * @param adjacentCircuitList TreeSet<Circuit>
 	 * @return double
 	 */
+	/**
+	 * Parte 54 (desempenho): the circuits of {@code core} in id order, with the test circuit added or removed as the
+	 * original code did (only when the test circuit uses this core on this link). When nothing changes, the ordered
+	 * set kept by the core is returned as it is; callers only read it.
+	 */
+	private static TreeSet<Circuit> circuitsWithTest(Core core, Link link, Circuit testCircuit, boolean addTestCircuit) {
+		final TreeSet<Circuit> base = core.getSortedCircuitList();
+		final boolean testHere = testCircuit != null && link.getCore(testCircuit.getIndexCore()) == core
+				&& testCircuit.getRoute().getLinkList().contains(link);
+		if (!testHere || addTestCircuit == base.contains(testCircuit)) {
+			return simulator.PerfChecks.ENABLED ? base : new TreeSet<Circuit>(base);
+		}
+		final TreeSet<Circuit> copy = new TreeSet<Circuit>(base);
+		if (addTestCircuit) {
+			copy.add(testCircuit);
+		} else {
+			copy.remove(testCircuit);
+		}
+		return copy;
+	}
+
 	private double calculatePxt(Circuit circuit, int[] spectrumAssigned, Link link, TreeSet<Circuit> adjacentCircuitList) {
 		double nsoij = 0.0; // number of overlapping slots between i and j
 		double nsj = 0.0; // number of slots of the connection j

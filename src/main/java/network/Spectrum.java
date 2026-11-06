@@ -68,6 +68,7 @@ public class Spectrum implements Serializable {
 	 * @return boolean
 	 */
 	public boolean useSpectrum(int spectrumBand[], int guardBand) throws Exception {
+		freeBandsVersion++; // Parte 54: invalidates the cache of getFreeSpectrumBands
 
 		if (spectrumBand[0] > spectrumBand[1]){
 			throw new Exception("Invalid spectrum band");
@@ -131,6 +132,7 @@ public class Spectrum implements Serializable {
 	 * @param spectrumBand int[]
 	 */
 	public void freeSpectrum(int spectrumBand[], int guardBand) throws Exception {
+		freeBandsVersion++; // Parte 54: invalidates the cache of getFreeSpectrumBands
 
 		if(spectrumBand[0] > spectrumBand[1]){
 			throw new Exception("Invalid spectrum band");
@@ -312,7 +314,51 @@ public class Spectrum implements Serializable {
 	 * @param guardBand
 	 * @return List<int[]>
 	 */
+	/*
+	 * Parte 54 (desempenho): the free bands of a spectrum are asked many times between two changes (RMSA, QoT,
+	 * metrics). The last result is kept, with the version of the spectrum and the guard band it was computed for, and
+	 * a copy is returned while nothing changed. useSpectrum and freeSpectrum change the version. The copy has new
+	 * arrays, as before, so callers can still change the list they receive.
+	 */
+	private transient int freeBandsVersion;
+	private transient int cachedBandsVersion;
+	private transient int cachedBandsGuardBand;
+	private transient int[][] cachedBands;
+
 	public List<int[]> getFreeSpectrumBands(int guardBand){
+		if (!simulator.PerfChecks.ENABLED) {
+			return computeFreeSpectrumBands(guardBand);
+		}
+		if (cachedBands != null && cachedBandsVersion == freeBandsVersion && cachedBandsGuardBand == guardBand) {
+			if (simulator.PerfChecks.STATS) simulator.PerfChecks.count(simulator.PerfChecks.BANDS_HIT);
+			final ArrayList<int[]> copy = new ArrayList<>(cachedBands.length);
+			for (int[] b : cachedBands) {
+				copy.add(new int[] {b[0], b[1]});
+			}
+			if (simulator.PerfChecks.VERIFY) {
+				final List<int[]> fresh = computeFreeSpectrumBands(guardBand);
+				boolean same = fresh.size() == copy.size();
+				for (int k = 0; same && k < fresh.size(); k++) {
+					same = fresh.get(k)[0] == copy.get(k)[0] && fresh.get(k)[1] == copy.get(k)[1];
+				}
+				if (!same) throw new IllegalStateException("snets.verifyPerf: cache de faixas livres difere");
+			}
+			return copy;
+		}
+		if (simulator.PerfChecks.STATS) simulator.PerfChecks.count(simulator.PerfChecks.BANDS_MISS);
+		final List<int[]> computed = computeFreeSpectrumBands(guardBand);
+		final int[][] c = new int[computed.size()][];
+		for (int k = 0; k < c.length; k++) {
+			c[k] = new int[] {computed.get(k)[0], computed.get(k)[1]};
+		}
+		cachedBands = c;
+		cachedBandsVersion = freeBandsVersion;
+		cachedBandsGuardBand = guardBand;
+		return computed;
+	}
+
+	/** The original getFreeSpectrumBands(guardBand) (Parte 54: called through the cache above). */
+	private List<int[]> computeFreeSpectrumBands(int guardBand){
 		ArrayList<int[]> res = new ArrayList<>();
 
 		int numDownGB;

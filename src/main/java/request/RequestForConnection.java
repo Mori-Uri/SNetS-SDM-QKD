@@ -38,6 +38,18 @@ public class RequestForConnection implements Serializable {
      */
     protected QKDKeyDemand qkdKeyDemand;
 
+    /** Parte 54: stamp of the last GroomingStatistics observation that counted this request (distinct count). */
+    private transient int countStamp;
+
+    /** Parte 54: true the first time this request is seen with {@code stamp}. */
+    public boolean markCounted(int stamp) {
+        if (countStamp == stamp) {
+            return false;
+        }
+        countStamp = stamp;
+        return true;
+    }
+
     public RequestForConnection() {
         circuit = new ArrayList<Circuit>();
         protectionType = RequestProtectionType.CLASSICAL;

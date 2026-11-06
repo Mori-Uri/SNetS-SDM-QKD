@@ -81,6 +81,7 @@ public class Link implements Serializable {
                     slotSpectrumBand,
                     coreConfig.isQkdReserved());
             core.setDisabled(coreConfig.isDisabled());
+            core.setOwner(this); // Parte 54
 
             /*
              * The original SNetS stores a core at the list index equal to its
@@ -101,12 +102,38 @@ public class Link implements Serializable {
     }
 
     public Core getCore(int id) {
+        // Parte 54 (desempenho): the cores are stored at the index equal to their id (see startCores), so the core is
+        // found directly; the loop below is kept for any other layout and returns the same core.
+        if (id >= 0 && id < cores.size()) {
+            final Core direct = cores.get(id);
+            if (direct != null && direct.getId() == id) {
+                return direct;
+            }
+        }
         for (Core core : cores) {
             if (core.getId() == id) {
                 return core;
             }
         }
         return null;
+    }
+
+    /*
+     * Parte 54: version of the physical state of the link. It changes whenever a circuit is added to or removed from
+     * one of its cores, the spectrum of a core changes, or an allocated circuit that uses the link changes its
+     * modulation, spectrum, core, power or requests. The QoT cache of PhysicalLayer uses it to know that the
+     * contribution of this link to a circuit's noise is still valid.
+     */
+    private transient long physicalVersion;
+
+    /** Parte 54: the physical state of the link changed. */
+    public void touch() {
+        physicalVersion++;
+    }
+
+    /** Parte 54: current version of the physical state of the link. */
+    public long getPhysicalVersion() {
+        return physicalVersion;
     }
 
     public ArrayList<Core> getAdjacentCores(int coreId) {
