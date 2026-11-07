@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [55](#parte-55) | Parte 55 — launcher 1.20.7: padrão de aparência por tipo de gráfico, botões de topo/fim, edição automática do launcher |
 | [54](#parte-54) | Parte 54 — otimizações de desempenho sem mudança nos resultados (clássico e QKD) |
 | [53](#parte-53) | Parte 53 — documentação das mudanças de desempenho e save states, verificação contra outras versões |
 | [52](#parte-52) | Parte 52 — save states ligados por padrão, cancelar sem perder o progresso, continuar execuções interrompidas (launcher 1.20.6) |
@@ -36,6 +37,35 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-55"></a>
+
+## Parte 55 — launcher 1.20.7: padrão de aparência por tipo de gráfico, botões de topo/fim, edição automática do launcher
+
+Feita igual na `main` (launcher 1.18.5) e na `experimental` (launcher 1.20.7), para o merge final não ter conflito nestes pontos. Só o launcher muda; o simulador e os resultados não mudam.
+
+### Estúdio de gráficos
+
+- Nova seção **"Padrão dos gráficos de …"** (chip "Padrão do tipo"): "Usar esta figura como padrão" guarda a aparência da figura para todos os gráficos do mesmo tipo (linhas, barras, barras em painéis, comparação com um caso, diagrama da fibra, topologia, mapas do espectro, perfil por slot, dispersão).
+  - Figuras novas desse tipo já abrem com o padrão; ao trocar para um modelo ainda não usado, o padrão também vale.
+  - "Aplicar a esta figura" e "Aplicar a todas…" (figura aberta, figuras salvas em `launcher/figures` e modelos guardados do tipo).
+  - Entram tamanho, fontes, cores de fundo e texto, legenda, grade, barras de erro, formato dos números, paleta etc. Não entram os ajustes que dependem dos dados: títulos, limites e marcas dos eixos, escala log, rotação dos rótulos do eixo x e linhas de referência.
+  - Os padrões ficam em `launcher/figure-styles.json` (endpoint `/api/figure-styles`), fora do git.
+- O título "Estúdio de gráficos" saiu do cabeçalho grande e foi para a barra fixa, ao lado dos botões; o texto explicativo virou dica do título.
+- Pasta de caso renomeada depois da simulação (CSVs com o prefixo antigo, ex.: pasta `EX - Teste_EX` com `Teste_EX_BlockingDetails.csv`): os arquivos passam a ser reconhecidos pelo nome do SNetS, e o caso não é mais ignorado nos gráficos.
+
+### Todas as páginas
+
+- Botões ↑ e ↓ fixos no canto inferior direito, sempre visíveis, levam ao topo e ao fim da página.
+
+### Edição do launcher e git
+
+- `Edition.java` agora é igual nas duas branches e escolhe a edição sozinho: a pasta com o arquivo local `launcher/EDICAO_EXPERIMENTAL` abre como experimental (porta 8766, `SNetS-SDM-QKD-exp.jar`); sem ele, como a main (porta 8765, `SNetS-SDM-QKD.jar`). `-Dsnets.edition=experimental|main` força uma das duas. O merge final não precisa mais mudar o launcher.
+- `.gitignore`: `launcher/EDICAO_EXPERIMENTAL`, `launcher/figure-styles.json` e `launcher/figures/`.
+- `tools/git/ocultar_simulations_locais.bat`: esconde do GitHub Desktop as alterações locais nos casos versionados em `simulations/` (`git update-index --skip-worktree`, vale só para a pasta; `desfazer` volta ao normal).
+- Testada e depois desfeita: fechar as janelas de execução junto com a aba do launcher. As janelas voltaram ao comportamento anterior (fechar a janela cancela a execução; fechar o navegador não interrompe nada).
 
 ---
 

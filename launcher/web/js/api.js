@@ -55,6 +55,9 @@
     figures: () => call('GET', 'figures'),
     figure: (name) => call('GET', 'figure', { name }),
     saveFigure: (name, json) => call('POST', 'figure', { name }, json),
+    // Parte 55: padrão de aparência por tipo de gráfico
+    figureStyles: () => call('GET', 'figure-styles'),
+    saveFigureStyles: (json) => call('POST', 'figure-styles', null, json),
     saveFigureImage: (name, ext, body) => call('POST', 'figure/image', { name, ext }, body),
     figureImageName: (name, exts) => call('GET', 'figure/image-name', { name, exts }),
     deleteFigure: (name) => call('POST', 'figure/delete', { name }),

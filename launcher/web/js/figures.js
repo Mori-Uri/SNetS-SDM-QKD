@@ -27,7 +27,11 @@
         try { files[f] = JSON.parse(cd.files[f]); } catch (e) { /* ignore */ }
       }
       const name = App.caseNameOf(path);
-      const csv = (cd.csv || []).map((c) => ({ name: c.name, size: c.size, mtime: c.mtime, suffix: suffixOf(name, c.name) }));
+      // Parte 55: pasta renomeada depois da simulação: os CSVs mantêm o prefixo antigo (ex.: pasta "EX - Teste_EX" com
+      // Teste_EX_BlockingDetails.csv). Sem isso o caso aparecia com arquivos "Teste_EX_BlockingDetails" e era ignorado.
+      const bases = (cd.csv || []).map((c) => c.name.replace(/\.csv$/i, ''));
+      const oldPrefix = bases.some((b) => b.startsWith(name + '_')) ? '' : commonCsvPrefix(bases);
+      const csv = (cd.csv || []).map((c) => ({ name: c.name, size: c.size, mtime: c.mtime, suffix: suffixOf(name, c.name, oldPrefix) }));
       // 1.14.0: cost indicators derived from QKDMetrics.csv (virtual file, computed in the launcher)
       const qm = csv.find((c) => c.suffix === 'QKDMetrics');
       if (qm) csv.push({ name: '(derivado do QKDMetrics) QKDCost', size: 0, mtime: qm.mtime, suffix: 'QKDCost', virtual: true });
@@ -38,9 +42,28 @@
     try { return await p; } catch (e) { caseCache.delete(path); throw e; }
   }
 
-  function suffixOf(caseName, csvName) {
-    let s = csvName.replace(/\.csv$/i, '');
-    if (s.startsWith(caseName + '_')) s = s.slice(caseName.length + 1);
+  /** Parte 55: arquivos que o SNetS grava como <prefixo>_<nome>.csv. */
+  const KNOWN_CSV = ['BlockingProbability', 'BitRateBlockingProbability', 'BlockingDetails', 'ConsumedEnergy', 'ExternalFragmentation',
+    'GroomingStatistics', 'ModulationUtilization', 'PhysicalLayerStatistics', 'RelativeFragmentation', 'SlotBlocking', 'SlotUtilization',
+    'SpectrumStatistics', 'SpectrumUtilization', 'TransmittersReceiversRegeneratorsUtilization', 'QKDChannelBlocking',
+    'QKDChannelSlotBlocking', 'QKDMetrics', 'QKDStatistics', 'DataSetInformation', 'AlgorithmCost'];
+
+  /** Parte 55: prefixo comum ("Teste_EX_") de todos os CSVs de uma pasta, cortado no último "_"; '' se não houver. */
+  function commonCsvPrefix(bases) {
+    if (bases.length < 2) return '';
+    let p = bases[0];
+    for (const b of bases) { let i = 0; while (i < p.length && i < b.length && p[i] === b[i]) i++; p = p.slice(0, i); }
+    const k = p.lastIndexOf('_');
+    return k > 0 ? p.slice(0, k + 1) : '';
+  }
+
+  function suffixOf(caseName, csvName, oldPrefix) {
+    const s = csvName.replace(/\.csv$/i, '');
+    if (s.startsWith(caseName + '_')) return s.slice(caseName.length + 1);
+    // Parte 55: pasta renomeada: reconhece o nome do arquivo do SNetS mesmo com outro prefixo
+    const known = KNOWN_CSV.find((k) => s === k || s.endsWith('_' + k));
+    if (known) return known;
+    if (oldPrefix && s.startsWith(oldPrefix) && s.length > oldPrefix.length) return s.slice(oldPrefix.length);
     return s;
   }
 
@@ -559,7 +582,7 @@
     if (t.type === 'slotline') { style.width = 1000; style.errorBars = 'none'; style.xAsCategories = false; style.lineWidth = 1.5; }
     if (t.type === 'ref') { style.width = t.itemsFrom === 'dim' || t.itemsRe ? 1400 : 900; style.fontSize = 15; style.grid = 'x'; style.errorBars = 'none'; style.title = ''; }
     if (t.layout === 'panels') { style.panelHeight = 300; style.barGap = 0.3; style.legend = 'none'; style.fontSize = 10; style.errorBars = 'none'; style.titleSize = 13; }
-    return {
+    const spec = {
       version: 1, template: t.id, type: t.type,
       cases: (cases || []).map((p) => ({ path: p, label: App.caseNameOf(p) })),
       file: t.file || '', metric: t.metric || '', metrics: (t.metrics || []).slice(), filters: {},
@@ -577,6 +600,8 @@
         by: t.by || 'Link', lp: -1, fx: {}, fy: {}, trend: true, pooled: false },
       labels: Object.assign({}, t.labels || {}), seriesStyle: {}, seriesOrder: [], style,
     };
+    applyTypeStyle(spec); // Parte 55: figuras novas abrem com o padrão do tipo
+    return spec;
   }
 
   // ================================================================ state
@@ -630,6 +655,105 @@
     delete tmplStore()[id];
     writeTemplates();
   }
+  // ---------------------------------------------------------------- Parte 55: padrão de aparência por tipo de gráfico
+  /**
+   * Parte 55: ajustes de aparência compartilhados por todos os gráficos do mesmo tipo (linhas, barras, mapas do
+   * espectro...). Ficam em launcher/figure-styles.json. Figuras novas desse tipo já abrem com o padrão, e "Aplicar"
+   * leva o padrão à figura aberta ou a todas as figuras salvas e modelos guardados do tipo. Não entram os ajustes que
+   * dependem dos dados de cada figura: títulos, limites e marcas dos eixos, escala log, rotação dos rótulos do eixo x
+   * e linhas de referência.
+   */
+  const TYPE_STYLE_SKIP = new Set(['title', 'xTitle', 'yTitle', 'panelLabel', 'yMin', 'yMax', 'xMin', 'xMax', 'yStep', 'xStep',
+    'yTicksExtra', 'xTicksExtra', 'refLines', 'yLog', 'xLabelRotate', 'xAsCategories', 'topoLabelOffsets', 'slotCauseColors', 'slotMin', 'slotMax']);
+  const TYPE_NAMES = {
+    line: 'gráficos de linha', bars: 'gráficos de barras', 'bars:panels': 'gráficos de barras em painéis', ref: 'gráficos de comparação com um caso',
+    cores: 'diagramas da fibra', topo: 'mapas da topologia', slots: 'mapas de ocupação do espectro', slotblock: 'mapas de bloqueio do espectro',
+    slotline: 'perfis de ocupação por slot', scatter: 'gráficos de dispersão',
+  };
+  let typeStyles = null; // { <tipo>: { style: {...}, saved: <ms> } }
+  function typeKey(spec) { return spec && spec.type === 'bars' && spec.bars && spec.bars.layout === 'panels' ? 'bars:panels' : (spec && spec.type) || 'line'; }
+  function typeName(spec) { return TYPE_NAMES[typeKey(spec)] || 'gráficos deste tipo'; }
+  function sharedStyle(style) {
+    const out = {};
+    for (const k of Object.keys(style || {})) if (!TYPE_STYLE_SKIP.has(k)) out[k] = JSON.parse(JSON.stringify(style[k]));
+    return out;
+  }
+  async function loadTypeStyles(force) {
+    if (typeStyles && !force) return typeStyles;
+    try { const d = await App.api.figureStyles(); typeStyles = JSON.parse((d && d.text) || '{}') || {}; } catch (e) { typeStyles = typeStyles || {}; }
+    return typeStyles;
+  }
+  /** Copia o padrão do tipo para o estilo da figura; false se o tipo ainda não tem padrão. */
+  function applyTypeStyle(spec) {
+    const p = typeStyles && typeStyles[typeKey(spec)];
+    if (!p || !p.style) return false;
+    spec.style = Object.assign(spec.style || {}, sharedStyle(p.style));
+    return true;
+  }
+  async function writeTypeStyles() { await App.api.saveFigureStyles(JSON.stringify(typeStyles || {}, null, 2)); }
+  async function saveTypeStyle() {
+    await loadTypeStyles(true);
+    typeStyles[typeKey(S.spec)] = { style: sharedStyle(S.spec.style), saved: Date.now() };
+    await writeTypeStyles();
+  }
+  async function forgetTypeStyle() {
+    await loadTypeStyles(true);
+    delete typeStyles[typeKey(S.spec)];
+    await writeTypeStyles();
+  }
+  /** Aplica o padrão à figura aberta, às figuras salvas e aos modelos guardados (memória dos modelos) do mesmo tipo. */
+  async function applyTypeStyleEverywhere() {
+    const k = typeKey(S.spec), name = typeName(S.spec);
+    const p = typeStyles && typeStyles[k];
+    if (!p) return;
+    await refreshSaved();
+    const targets = [];
+    for (const f of S.saved) {
+      try {
+        const spec = JSON.parse((await App.api.figure(f.name)).text);
+        if (typeKey(upgrade(JSON.parse(JSON.stringify(spec)))) === k) targets.push({ name: f.name, spec });
+      } catch (e) { /* figura ilegível: fica como está */ }
+    }
+    const mem = tmplStore();
+    const tmpls = Object.keys(mem).filter((id) => { try { return typeKey(mem[id]) === k; } catch (e) { return false; } });
+    if (!window.confirm('Aplicar o padrão dos ' + name + ' à figura aberta, a ' + targets.length + ' figura(s) salva(s) em launcher/figures e a '
+      + tmpls.length + ' modelo(s) guardado(s) deste tipo?\n\nTítulos, eixos, dados e cores das séries de cada figura não mudam. '
+      + 'As imagens já gravadas (SVG/PNG) só mudam quando forem gravadas de novo.')) return;
+    for (const t of targets) {
+      t.spec.style = Object.assign(t.spec.style || {}, sharedStyle(p.style));
+      await App.api.saveFigure(t.name, JSON.stringify(t.spec, null, 2));
+    }
+    for (const id of tmpls) mem[id].style = Object.assign(mem[id].style || {}, sharedStyle(p.style));
+    writeTemplates();
+    applyTypeStyle(S.spec);
+    S.dirty = true; persistDraft(); drawControls(); await refresh();
+    App.toast('Padrão aplicado: figura aberta, ' + targets.length + ' figura(s) salva(s) e ' + tmpls.length + ' modelo(s).', 'ok', 6000);
+  }
+  function typeStylePanel() {
+    const name = typeName(S.spec);
+    const p = typeStyles && typeStyles[typeKey(S.spec)];
+    const run = (fn) => async (ev) => {
+      const b = ev.currentTarget;
+      b.disabled = true;
+      try { await fn(); } catch (e) { App.toast(e.message, 'err'); } finally { b.disabled = false; }
+    };
+    const when = p && p.saved ? new Date(p.saved).toLocaleString('pt-BR') : '';
+    return el('div.stack-s',
+      el('p.small.muted', p
+        ? 'Há um padrão para os ' + name + (when ? ' (salvo em ' + when + ')' : '') + '. Figuras novas desse tipo já abrem com ele.'
+        : 'Ainda não há padrão para os ' + name + '. Deixe esta figura do jeito que quer (tamanho, fontes, legenda, grade, formato dos números…) e clique em "Usar esta figura como padrão".'),
+      el('div.toolbar', { style: { margin: '2px 0 0' } },
+        el('button.btn.small.primary', { type: 'button', title: 'Guarda a aparência desta figura para todos os ' + name + ': tamanho, fontes, cores de fundo, legenda, grade, barras de erro, formato dos números etc. Não guarda títulos, limites dos eixos, escala log nem linhas de referência.',
+          on: { click: run(async () => { await saveTypeStyle(); App.toast('Padrão dos ' + name + ' salvo.', 'ok'); drawControls(); }) } }, 'Usar esta figura como padrão'),
+        p ? el('button.btn.small', { type: 'button', title: 'Troca a aparência desta figura pela do padrão (os dados, títulos e eixos continuam)',
+          on: { click: run(async () => { applyTypeStyle(S.spec); S.dirty = true; persistDraft(); drawControls(); await refresh(); App.toast('Padrão aplicado a esta figura.', 'ok'); }) } }, 'Aplicar a esta figura') : null,
+        p ? el('button.btn.small', { type: 'button', title: 'Aplica o padrão à figura aberta, às figuras salvas em launcher/figures e aos modelos guardados deste tipo',
+          on: { click: run(applyTypeStyleEverywhere) } }, 'Aplicar a todas…') : null,
+        p ? el('button.btn.small.ghost', { type: 'button', title: 'Apaga o padrão deste tipo; as figuras já ajustadas continuam como estão',
+          on: { click: run(async () => { await forgetTypeStyle(); App.toast('Padrão dos ' + name + ' apagado.', 'ok'); drawControls(); }) } }, 'Esquecer padrão') : null),
+      el('p.small.muted', 'O padrão vale para o tipo de gráfico, não só para este modelo: por exemplo, todos os gráficos de linha (bloqueio × carga, SKR, custo…). Fica em launcher/figure-styles.json.'));
+  }
+
   function loadDraft() {
     try {
       const d = JSON.parse(localStorage.getItem(draftKey()) || 'null');
@@ -1765,6 +1889,7 @@
    * the case is always selected first and the figure is remembered per case.
    */
   async function renderInto(container, mode, casePath) {
+    await loadTypeStyles(); // Parte 55
     if (mode !== S.mode || casePath !== S.casePath || !S.spec) {
       S.mode = mode === 'case' ? 'case' : 'page';
       S.casePath = S.mode === 'case' ? casePath : null;
@@ -1796,9 +1921,10 @@
             App.showFigures();
           } } }, 'Abrir na página Gráficos'))]
       : [
-        el('div.fig-head', el('div', el('h1', 'Estúdio de gráficos'),
-          el('p.muted', 'Monte figuras com os CSVs de vários casos, ajuste o estilo e exporte em SVG/PNG. As figuras salvas ficam em launcher/figures e são recalculadas com os resultados atuais.'))),
-        el('div.fig-stickybar', toolbar())];
+        // Parte 55: sem o cabeçalho grande; o nome fica na barra fixa, ao lado dos botões
+        el('div.fig-stickybar', el('div.fig-bar-row',
+          el('span.fig-bar-title', { title: 'Monte figuras com os CSVs de vários casos, ajuste o estilo e exporte em SVG/PNG. As figuras salvas ficam em launcher/figures e são recalculadas com os resultados atuais.' }, 'Estúdio de gráficos'),
+          toolbar()))];
     const reportSec = section('Relatório: várias figuras numa imagem (SVG/PNG/PDF)', false, reportPanel());
     reportSec.classList.add('fig-report');
     host.append(...head, el('div.fig-layout', el('div.fig-side', navBox, leftCol), el('div.fig-right', infoBox, previewBox, tableBox, reportSec)));
@@ -1981,6 +2107,7 @@
       tag(section('2. Dados', true, dataPanel()), 'data', 'Dados'),
       usesCost(spec) ? tag(section('Pesos do custo', true, costPanel()), 'cost', 'Custo') : null,
       (seriesBox = el('div', { 'data-nav': 'series', 'data-nav-label': 'Séries e cores' })),
+      tag(section('Padrão dos ' + typeName(spec), false, typeStylePanel()), 'typestyle', 'Padrão do tipo'),
       tag(section('4. Aparência', false, appearancePanel()), 'look', 'Aparência'),
       ['line', 'bars'].includes(spec.type) ? tag(section('5. Rótulos dos valores', false, valuesPanel()), 'values', 'Valores') : null,
       spec.type === 'ref' ? tag(section('5. Gráfico de referência', true, refStylePanel()), 'ref', 'Referência') : null,
@@ -2183,7 +2310,7 @@
       const keepStyle = { width: spec.style.width, font: spec.style.font, fontSize: spec.style.fontSize, decimal: spec.style.decimal, palette: spec.style.palette, bg: spec.style.bg };
       S.spec = newSpec(id, []);
       S.spec.cases = keepCases;
-      Object.assign(S.spec.style, keepStyle);
+      if (!applyTypeStyle(S.spec)) Object.assign(S.spec.style, keepStyle); // Parte 55: o padrão do tipo vem primeiro
       if (S.spec.template === 'cores') { S.spec.style.width = Math.max(S.spec.style.width, 900); }
       changedData();
     };

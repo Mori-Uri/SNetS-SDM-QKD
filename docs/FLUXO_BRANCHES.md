@@ -55,8 +55,19 @@ Eles não devem ser copiados para a main antes do merge final:
 - `tools/regressao/`;
 - `docs/multibanda/`;
 - `simulations/QKD_Multibanda/`;
-- `simulations/SNetS-SDM-QKD-exp.jar`;
-- `launcher/src/launcher/Edition.java`.
+- `simulations/SNetS-SDM-QKD-exp.jar`.
 
-No merge final, troque em `Edition.java` o nome (`""`), a porta (8765) e o JAR (`SNetS-SDM-QKD.jar`), ou apague o
-arquivo e volte os três usos em `LauncherServer.java`.
+## Edição do launcher (Parte 55)
+
+`launcher/src/launcher/Edition.java` é o mesmo arquivo nas duas branches. O launcher se apresenta como experimental
+(selo EXPERIMENTAL, porta 8766, `SNetS-SDM-QKD-exp.jar`) só quando a pasta `launcher` tem o arquivo local
+`EDICAO_EXPERIMENTAL`, que está no `.gitignore`. A pasta `SNetS-SDM-QKD_ex` tem esse arquivo; a da main não. Assim o
+merge final não precisa mudar nada no launcher. Numa cópia nova da experimental, crie o arquivo (qualquer conteúdo)
+ou rode o launcher com `-Dsnets.edition=experimental`.
+
+## Alterações locais em simulations/ (Parte 55)
+
+Os casos de exemplo versionados em `simulations/` são alterados quando você roda estudos com eles, e essas
+alterações não vão para o git. Para elas não aparecerem no GitHub Desktop, rode uma vez em cada pasta
+`tools\git\ocultar_simulations_locais.bat` (vale só para aquela pasta; `... desfazer` volta ao normal). Arquivos
+gerados que não vão para o git entram no `.gitignore`.

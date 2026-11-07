@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
  */
 public final class LauncherServer {
 
-    static final String VERSION = "1.20.6";
+    static final String VERSION = "1.20.7";
 
     private final Settings settings;
     private final Workspace workspace;
@@ -434,6 +434,16 @@ public final class LauncherServer {
                 }
                 Map<String, Object> m = new LinkedHashMap<String, Object>();
                 m.put("text", figures.read(required(q, "name")));
+                return m;
+            }
+            case "/api/figure-styles": {
+                // Parte 55: padrão de aparência por tipo de gráfico (launcher/figure-styles.json)
+                if (post) {
+                    figures.saveStyles(readBody(ex));
+                    return ok();
+                }
+                Map<String, Object> m = new LinkedHashMap<String, Object>();
+                m.put("text", figures.readStyles());
                 return m;
             }
             case "/api/figure/image": {
