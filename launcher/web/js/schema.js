@@ -26,6 +26,8 @@
           'regeneratorAssignment'],
       },
       { title: 'QKD', keys: ['qkdProtectedRequestProbability', 'qkdProtectionRandomSeed', 'qkdKeyDemand', 'qkdWarmupFraction', 'qkdExactRequestCount'] },
+      // 1.20.0 (Parte 45)
+      { title: 'Save states (experimental)', desc: 'Ligados por padrão (Parte 52), mesmo sem este grupo no arquivo. O simulador grava o estado de cada simulação (carga × replicação) em savestate/ a cada intervalo, ao terminar e ao ser cancelado (botão Cancelar, Ctrl+C ou fechar a janela de console). Uma queda de energia não pode ser avisada: vale o último estado gravado. "Continuar execução" (no caso ou em Execuções) roda o caso de novo: as simulações concluídas não são refeitas e as interrompidas continuam do ponto salvo, com os mesmos resultados. O estado é ignorado se algum arquivo de entrada mudar (exceto threads) ou se o JAR for outro. A pasta savestate é apagada quando o caso termina.', keys: ['saveState'] },
     ],
     fields: {
       requests: { label: 'Requisições por replicação', type: 'int', min: 1 },
@@ -52,6 +54,10 @@
       'qkdKeyDemand.updateIntervalsMicroseconds': { label: 'Intervalos de renovação da chave', unit: 'µs', help: 'Lista separada por vírgulas; cada requisição protegida sorteia um deles com igual probabilidade.' },
       'qkdKeyDemand.randomSeed': { label: 'Semente da demanda de chave', type: 'int' },
       qkdWarmupFraction: { label: 'Warm-up das métricas QKD', type: 'prob', default: 0.1, help: 'Fração das chegadas de cada replicação descartada nas estatísticas QKD (padrão 0,1, a mesma regra das métricas clássicas do SNetS). Use 0 em estudos semiestáticos.' },
+      saveState: { label: 'Save states', default: { enabled: true, intervalMinutes: 10, keepAfterFinish: false } },
+      'saveState.enabled': { label: 'Gravar e retomar save states', default: true, help: 'Desligado: cancelar ou uma queda de energia perdem a execução inteira.' },
+      'saveState.keepAfterFinish': { label: 'Manter a pasta savestate depois que o caso termina', default: false, help: 'Normalmente ela é apagada quando os resultados são gravados.' },
+      'saveState.intervalMinutes': { label: 'Intervalo entre gravações', unit: 'min', default: 10, help: 'Cada gravação serializa a simulação inteira (rede, circuitos, eventos pendentes); em redes grandes leva de frações de segundo a poucos segundos. É o máximo que se perde numa queda de energia.' },
       qkdExactRequestCount: { label: 'Número exato de requisições', default: false, help: 'Processa exatamente "requests" chegadas por replicação. Sem isso o SNetS processa requests + (nº de geradores) chegadas, pois cada gerador já tem uma chegada agendada quando a geração para.' },
     },
   };
@@ -77,6 +83,8 @@
           'noiseFactorModelParameterA2', 'typeOfAmplifierGain', 'amplificationFrequency', 'switchInsertionLoss'],
       },
       { title: 'Fibra multinúcleo (crosstalk entre núcleos)', keys: ['couplingCoefficient', 'propagationConstant', 'bendingRadius', 'corePitch'] },
+      // 1.20.3 (Parte 49): QoT clássica por banda
+      { title: 'QoT clássica por banda (experimental)', desc: 'Cada circuito usa a atenuação, a figura de ruído, γ e β2 da sua própria frequência, e o ISRS inclina a potência entre as bandas (aproximação triangular, Zirngibl 1998; Semrau et al. 2018). Sem este grupo, ou com ele desligado, nada muda. Para C+L use centerFrequency = 190,6 THz e 992 slots de 12,5 GHz (184,4–196,8 THz).', keys: ['multiBand'] },
       { title: 'QKD — formato antigo', desc: 'Casos antigos guardavam aqui os parâmetros QKD. Desde a Parte 26 eles ficam no arquivo próprio qkdPhysicalLayer (aba Camada física QKD); use o botão acima para movê-los.', keys: ['qkdReceiver', 'qkdPhysical'] },
     ],
     fields: {
@@ -111,6 +119,17 @@
       propagationConstant: { label: 'Constante de propagação (β)' },
       bendingRadius: { label: 'Raio de curvatura', unit: 'm' },
       corePitch: { label: 'Distância entre núcleos (core pitch)', unit: 'm' },
+      multiBand: { label: 'QoT por banda', default: { enabled: true, attenuationModel: 'g652d', waterPeakDbPerKm: 0.0, noiseFigureDb: { S: 7.0, C: 5.0, L: 6.0 }, dispersionSlopePsNm2Km: 0.057, gammaScalesWithFrequency: true, isrs: true, ramanGainSlopePerWKmTHz: 0.028 } },
+      'multiBand.enabled': { label: 'Ativar a QoT por banda', default: true },
+      'multiBand.attenuationModel': { label: 'Atenuação por frequência', default: 'g652d', enum: {
+        g652d: 'g652d — curva G.652.D (Ferrari et al., 2020): ~0,19 dB/km em C e L, maior em S',
+        constante: 'constante — fiberLoss em todas as bandas' } },
+      'multiBand.waterPeakDbPerKm': { label: 'Pico de OH em 1383 nm', unit: 'dB/km', default: 0.0 },
+      'multiBand.noiseFigureDb': { label: 'Figura de ruído por banda', unit: 'dB', default: { S: 7.0, C: 5.0, L: 6.0 }, help: 'Chaves O, E, S, C, L, U. Banda ausente usa a figura de ruído do amplificador (grupo Amplificadores).' },
+      'multiBand.dispersionSlopePsNm2Km': { label: 'Inclinação da dispersão (S)', unit: 'ps/(nm²·km)', default: 0.057, help: 'D(λ) = D + S·(λ − λ_ref), com λ_ref = centerFrequency.' },
+      'multiBand.gammaScalesWithFrequency': { label: 'γ proporcional à frequência', default: true, help: 'γ(f) = γ·f/f_ref (área efetiva constante).' },
+      'multiBand.isrs': { label: 'Espalhamento Raman estimulado entre canais (ISRS)', default: true, help: 'As frequências altas cedem potência às baixas; o amplificador do span repõe a potência de cada canal, e o ISRS entra como perda extra no ASE. A mudança do NLI pelo ISRS não é modelada.' },
+      'multiBand.ramanGainSlopePerWKmTHz': { label: 'Inclinação do ganho Raman (C_r)', unit: '1/(W·km·THz)', default: 0.028, help: 'SSMF: 0,028 (Semrau et al., 2018). A verificação VMB-13e compara com as equações acopladas usando o ganho Raman medido do GNPy.' },
       qkdReceiver: { label: 'Receptor QKD (formato antigo)' },
       'qkdReceiver.detectorGateWindowPs': { label: 'Janela de detecção (T_g)', unit: 'ps' },
       'qkdReceiver.receiverOpticalEfficiency': { label: 'Eficiência óptica do receptor (η_f)', type: 'prob' },
@@ -141,6 +160,8 @@
       { title: 'Detector e receptor', desc: 'p_b = 1 − (1 − p_dark)(1 − p_XT), com p_XT = 1 − exp(−η_d·η_f·P_XT·T_g/hν).', keys: ['detector'] },
       { title: 'Fibra (atenuação do QCh)', desc: 'α(λ) = α₀ + c·(λ − λ₀)².', keys: ['fiber'] },
       { title: 'Crosstalk dos núcleos clássicos no QCh', keys: ['crosstalk'] },
+      // 1.19.0 (Parte 43): multibanda
+      { title: 'Multibanda (experimental)', desc: 'Arquitetura MF, MB ou MB-SDM e o modelo de espalhamento Raman (SpRS). O núcleo QKD da rede passa a representar a banda do QCh (MB, MB-SDM) ou a fibra escura (MF); declare-o sem núcleos vizinhos. Sem este grupo, nada muda. p_b = 1 − (1 − p_dark)(1 − p_XT)(1 − p_SpRS).', keys: ['multiband'] },
     ],
     fields: {
       source: { label: 'Fonte', default: { meanPhotonNumber: 0.7, pulseIntervalPs: 250.0, qchPowerDbm: -80.0, qchBandwidthGHz: 12.5 } },
@@ -166,6 +187,35 @@
         receiver_referenced: 'receiver_referenced — P_XT = P·ISO·h·L já referida ao receptor (T = 1)',
         distributed: 'distributed — cada ponto do trecho sofre a atenuação restante até o receptor',
         attenuated: 'attenuated — P_XT·10^(−αL/10): o canal clássico se atenua junto com o QCh (Moghaddam et al., 2021, eq. 1)' } },
+      multiband: { label: 'Multibanda', default: { enabled: true, architecture: 'MB', ramanModel: 'fisico', qchCenterNm: 1381.0, hostCoreId: 0, intercoreRaman: true, bidirectionalFiber: false, classicalBandStartThz: 191.3, attenuationModel: 'g652d', waterPeakDbPerKm: 0.0, temperatureK: 300.0, nliModel: 'nenhum' } },
+      'multiband.enabled': { label: 'Ativar a camada física multibanda', default: true },
+      'multiband.architecture': { label: 'Arquitetura', default: 'MB', enum: {
+        MF: 'MF — QCh numa fibra escura dedicada (p_b = p_dark)',
+        MB: 'MB — QCh em outra banda da fibra monomodo do tráfego clássico (SpRS do mesmo núcleo)',
+        MBSDM: 'MB-SDM — QCh em outra banda de um núcleo da MCF (SpRS do núcleo e dos vizinhos)' } },
+      'multiband.ramanModel': { label: 'Modelo de espalhamento Raman (SpRS)', default: 'fisico', enum: {
+        nenhum: 'nenhum — SpRS desprezado (Dibaj et al., JLT 2025, banda O)',
+        artigo: 'artigo — L·e^(−α_c L) e metade dos fótons detectados (Dibaj et al., JLT 2025, eq. 6; Mehdizadeh et al., 2024, conta todos os fótons: ver VALIDACAO_LITERATURA.md)',
+        fisico: 'fisico — comprimento efetivo exato e todos os fótons do filtro detectados (Eraerds et al., 2010)' } },
+      'multiband.qchCenterNm': { label: 'λ central do QCh', unit: 'nm', default: 1381.0, help: 'Centro da grade de QChs (wavelengthPolicy "grid") ou λ de todos os QChs ("fixed"). 1260–1460 nm = bandas O e E.' },
+      'multiband.hostCoreId': { label: 'Núcleo clássico que divide a fibra/núcleo com o QCh', default: 0, help: 'MB: o núcleo da fibra monomodo. MB-SDM: o núcleo da MCF que carrega o QCh. Ignorado em MF.' },
+      'multiband.bidirectionalFiber': { label: 'Os dois sentidos do enlace na mesma fibra', default: false, help: 'Ligado: os circuitos do enlace inverso (b→a) andam na mesma fibra em sentido contrário e somam SpRS backward (Eraerds et al., 2010, eq. 3; Cai et al., 2020, eq. 18). Desligado: um sentido por fibra (padrão do SNetS).' },
+      'multiband.intercoreRaman': { label: 'SpRS dos núcleos vizinhos (MB-SDM)', default: true, help: 'Cai, Sun e Ji (2020), eqs. 11 e 18, com o h do crosstalk da camada física.' },
+      'multiband.classicalBandStartThz': { label: 'Início da grade clássica (slot 1)', unit: 'THz', default: 191.3, help: 'Deve ser igual ao início da grade clássica da camada física: centerFrequency − slots × 12,5 GHz / 2. Banda C (centerFrequency 193,85 THz, 320 slots): 191,85. Comb C+L (centerFrequency 190,6 THz, 992 slots): 184,4.' },
+      'multiband.attenuationModel': { label: 'Modelo de atenuação', default: 'g652d', enum: {
+        g652d: 'g652d — G.652.D de 1260 a 1675 nm (Rayleigh + IR; Ferrari et al., 2020)',
+        quadratica: 'quadratica — o ajuste do grupo Fibra (só banda C)' } },
+      'multiband.waterPeakDbPerKm': { label: 'Pico de OH em 1383 nm', unit: 'dB/km', default: 0.0, help: '0 para fibra G.652.D de baixo pico d’água.' },
+      'multiband.temperatureK': { label: 'Temperatura da fibra', unit: 'K', default: 300.0 },
+      'multiband.antiStokesCorrection': { label: 'Correção anti-Stokes do SpRS (Parte 48)', default: 'nenhuma', enum: {
+        nenhuma: 'nenhuma — perfil Raman com o fator de Bose-Einstein (padrão)',
+        medida: 'medida — lado anti-Stokes ajustado às medidas em SMF-28 (Chapuran et al., 2009; Nweke et al., 2005): ×2,2 de 17 a 25 THz da bomba; não muda até 10 THz nem o lado Stokes' } },
+      'multiband.nliModel': { label: 'Ruído não linear (NLI) no QCh', default: 'nenhum', enum: {
+        nenhum: 'nenhum — sem NLI',
+        gn: 'gn — modelo GN (todos os produtos de FWM) dos circuitos do núcleo hospedeiro; só pesa com o QCh perto da banda clássica (banda S/C)' } },
+      'multiband.nliGammaPerWKm': { label: 'γ da fibra (NLI)', unit: '1/(W·km)', default: 1.2 },
+      'multiband.nliBeta2Ps2PerKm': { label: 'β2 (NLI)', unit: 'ps²/km', default: -22.317 },
+      'multiband.nliBeta3Ps3PerKm': { label: 'β3 (NLI)', unit: 'ps³/km', default: 0.1331 },
     },
   };
 
@@ -198,7 +248,7 @@
       'qkd.qTransmittersPerTrustedNode': { label: 'QTx por nó confiável intermediário', type: 'int', min: -1, default: -1, help: 'Nós confiáveis criados a cada QTND dentro dos enlaces. −1 = mesmo limite dos nós da rede; 0 = ilimitado.' },
       'qkd.qReceiversPerTrustedNode': { label: 'QRx por nó confiável intermediário', type: 'int', min: -1, default: -1 },
       'qkd.spanLanePlacement': { label: 'Posição dos QChs no núcleo QKD (modos span/link)', default: 'first', enum: { first: 'first — QCh k no slot k+1 (artigo-base)', wavelength: 'wavelength — QCh no slot do seu comprimento de onda (meio da banda primeiro)' }, help: 'Define onde cada QCh fica no espectro e, portanto, com quais canais clássicos dos núcleos vizinhos ele se sobrepõe (crosstalk). Com "first", a SKR usa o k-ésimo melhor λ da grade, mas o QCh ocupa o slot k+1.' },
-      'qkd.qchSlotPolicy': { label: 'Ordem de escolha do slot do QCh', default: 'abne', enum: { abne: 'abne — regra do ABNE/ACINE para o núcleo QKD: centro medium fit, externo par last fit, externo ímpar first fit (padrão desde a Parte 40)', firstfit: 'firstfit — menor índice de slot primeiro', lowestloss: 'lowestloss — slot mais próximo do mínimo de atenuação (só granularidade route)' }, help: 'Vale nos modos route, link e span. Com o núcleo QKD 1 (ímpar), abne e firstfit dão o mesmo resultado.' },
+      'qkd.qchSlotPolicy': { label: 'Ordem de escolha do slot do QCh', default: 'abne', enum: { abne: 'abne — regra do ABNE/ACINE para o núcleo QKD: centro medium fit, externo par last fit, externo ímpar first fit (padrão desde a Parte 40)', firstfit: 'firstfit — menor índice de slot primeiro', lowestloss: 'lowestloss — slot mais próximo do mínimo de atenuação (só granularidade route)', maxskr: 'maxskr — avalia todas as faixas livres e escolhe a de maior SKR mínima da rota (só granularidade route; com wavelengthPolicy grid escolhe o λ do QCh com menos ruído)' }, help: 'Vale nos modos route, link e span. Com o núcleo QKD 1 (ímpar), abne e firstfit dão o mesmo resultado.' },
       'qkd.qchGuardBand': { label: 'Banda de guarda entre QChs', unit: 'slots', type: 'int', min: 0, default: 0, help: 'Slots livres entre dois QChs do núcleo QKD. 0 = sem guarda (como até a Parte 39).' },
       'qkd.pichCorePolicy': { label: 'Núcleo do PICh', default: 'lowest', enum: { lowest: 'lowest — núcleo clássico de menor número (padrão)', fixed: 'fixed — o núcleo de pichCoreId (se estiver cheio, os outros)', leastUsed: 'leastUsed — núcleo clássico com menos slots ocupados no enlace' }, help: 'O núcleo QKD e os núcleos desativados nunca recebem PICh.' },
       'qkd.pichCoreId': { label: 'Núcleo fixo do PICh', type: 'int', min: 0, help: 'Usado com pichCorePolicy = fixed.' },

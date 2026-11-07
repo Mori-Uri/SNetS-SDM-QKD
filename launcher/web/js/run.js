@@ -8,7 +8,9 @@
   function defaultJar() {
     const jars = (App.state.info && App.state.info.jars) || [];
     const pref = App.state.info && App.state.info.settings.defaultJar;
-    return (jars.find((j) => j.path === pref) || jars.find((j) => /qkd/i.test(j.name) && j.location === 'simulations')
+    const own = App.state.info && App.state.info.simulatorJar; // Parte 44: JAR desta edição (experimental: SNetS-SDM-QKD-exp.jar)
+    return (jars.find((j) => j.path === pref) || jars.find((j) => own && j.name === own && j.location === 'simulations')
+      || jars.find((j) => /qkd/i.test(j.name) && j.location === 'simulations')
       || jars.find((j) => j.location === 'simulations') || jars[0] || {}).path || '';
   }
 
@@ -31,16 +33,24 @@
 
     const jarSel = jarSelect();
     const jvm = el('input.input.mono', { type: 'text', value: (st.info && st.info.settings.jvmArgs) || '', placeholder: 'ex.: -Xmx8g' });
-    const runBtn = el('button.btn.primary', { type: 'button', disabled: !!dirty.length || !jars.length }, 'Executar simulação');
+    const saved = App.savedInfo(st.casePath); // Parte 52
+    const runBtn = el('button.btn' + (saved && !saved.active ? '' : '.primary'), { type: 'button', disabled: !!dirty.length || !jars.length },
+      saved && !saved.active ? 'Executar do zero' : 'Executar simulação');
     const nSims = (Number(sim.loadPoints) || 0) * (Number(sim.replications) || 0);
     const cpus = (st.info && st.info.cpus) || 1;
     const threadsIn = el('input.input.num', { type: 'number', min: 1, max: 512, placeholder: String(sim.threads || '') });
     const settings = (st.info && st.info.settings) || {};
     const consoleCb = el('input', { type: 'checkbox', checked: !!settings.runConsole, disabled: !settings.consoleSupported });
+    const savedNow = saved && !saved.active;
+    if (savedNow) {
+      const sj = App.savedJar(saved);
+      if (sj.jar) jarSel.value = sj.jar.path;
+    }
     runBtn.addEventListener('click', async () => {
+      if (savedNow && !window.confirm('Executar do zero? O progresso salvo (' + App.savedText(saved) + ') será descartado.')) return;
       runBtn.disabled = true;
       try {
-        const r = await App.api.run(st.casePath, jarSel.value, jvm.value, Number(threadsIn.value) || 0, consoleCb.checked);
+        const r = await App.api.run(st.casePath, jarSel.value, jvm.value, Number(threadsIn.value) || 0, consoleCb.checked, savedNow ? 'fresh' : undefined);
         App.toast('Simulação iniciada (' + r.id + ')', 'ok');
         attachConsole(r.id);
         pollList();
@@ -66,7 +76,22 @@
       el('div.notice.info', { style: { marginTop: '10px' } },
         'A execução roda no processo do launcher: fechar ou recarregar o navegador NÃO a interrompe — reabra http://localhost e acompanhe em "Execuções". Ela termina se você cancelar aqui, fechar a janela de console dela (se aberta) ou fechar a janela principal do launcher.'
         + (settings.consoleSupported ? '' : ' (Janelas de console por execução só existem no Windows.)')),
-      el('div.toolbar', { style: { marginTop: '14px', marginBottom: 0 } }, runBtn));
+      el('div.toolbar', { style: { marginTop: '14px', marginBottom: 0 } }, savedNow ? resumeBtn() : null, runBtn));
+    function resumeBtn() {
+      const b = el('button.btn.primary', { type: 'button', disabled: !!dirty.length || !jars.length }, 'Continuar execução');
+      b.addEventListener('click', async () => {
+        b.disabled = true;
+        try {
+          const r = await App.api.run(st.casePath, jarSel.value, jvm.value, Number(threadsIn.value) || 0, consoleCb.checked, 'resume');
+          App.toast('Execução retomada (' + r.id + ')', 'ok');
+          attachConsole(r.id);
+          await pollList();
+          App.renderTab();
+        } catch (e) { App.toast(e.message, 'err'); b.disabled = false; }
+      });
+      return b;
+    }
+    if (savedNow) root.appendChild(savedPanel(saved));
     root.appendChild(runPanel);
 
     const consolePanel = el('section.panel#consolePanel', el('h2', 'Saída da execução'));
@@ -82,6 +107,37 @@
     return root;
   }
 
+  /** Parte 52: what is saved for this case: one cell per simulation (load point × replication). */
+  function savedPanel(s) {
+    const sims = (s.p.simulations || []).slice().sort((a, b) => a.loadPoint - b.loadPoint || a.replication - b.replication);
+    const lps = [...new Set(sims.map((x) => x.loadPoint))];
+    const reps = [...new Set(sims.map((x) => x.replication))].sort((a, b) => a - b);
+    const per = Number(s.p.requestsPerSimulation) || 0;
+    const cell = (x) => {
+      if (!x) return el('td', '');
+      const f = x.state === 'finished' ? 1 : per > 0 ? Math.min(1, (Number(x.requests) || 0) / per) : 0;
+      const cls = x.state === 'finished' ? 'done' : x.state === 'partial' ? 'part' : 'none';
+      return el('td.saved-cell.' + cls, { title: 'Carga ' + (x.loadPoint + 1) + ', replicação ' + (x.replication + 1) + ': '
+        + (x.state === 'finished' ? 'concluída' : x.state === 'partial' ? fmtNum(f * 100, 1) + ' % das requisições (gravado ' + fmtDate(x.savedAt) + ')' : 'não começou') },
+        x.state === 'finished' ? '✓' : x.state === 'partial' ? fmtNum(f * 100, 0) + ' %' : '–');
+    };
+    const sj = App.savedJar(s);
+    const warn = [];
+    if (s.changed.length) warn.push(el('div.notice.warn', 'Arquivos do caso mudaram depois da interrupção (' + s.changed.join(', ') + '). Se o conteúdo mudou, o simulador ignora o progresso e começa do zero.'));
+    if (!sj.same) warn.push(el('div.notice.warn', sj.jar ? 'O JAR ' + sj.jar.name + ' não é o mesmo que gravou o progresso: o progresso será ignorado.' : 'O JAR que gravou o progresso (' + s.jar + ') não foi encontrado: escolha o mesmo JAR, ou o progresso será ignorado.'));
+    return el('section.panel.saved-panel',
+      el('h2', '⏸ Execução interrompida'),
+      el('p.lead', (s.crashed ? 'A execução parou sem aviso (queda de energia ou processo encerrado); vale o último estado gravado, de até ' + fmtNum(Number(s.p.intervalMinutes) || 10, (Number(s.p.intervalMinutes) || 10) < 1 ? 1 : 0) + ' min antes. '
+        : 'A execução foi cancelada depois de gravar o estado de cada simulação. ') + App.savedText(s) + '.'),
+      ...warn,
+      el('div.table-wrap', { style: { maxHeight: '260px' } }, el('table.grid.saved-grid',
+        el('thead', el('tr', el('th', 'Carga'), reps.map((r) => el('th', 'Rep. ' + (r + 1))))),
+        el('tbody', lps.map((lp) => el('tr', el('th', String(lp + 1)), reps.map((r) => cell(sims.find((x) => x.loadPoint === lp && x.replication === r)))))))),
+      el('p.small.muted', '"Continuar execução" (abaixo) roda o caso de novo: as simulações concluídas (✓) não são refeitas e as em andamento continuam do ponto gravado, com os mesmos resultados de uma execução sem interrupção. Use o mesmo JAR e não altere os arquivos do caso.'),
+      el('div.toolbar', { style: { margin: 0 } },
+        el('button.btn.small.ghost', { type: 'button', on: { click: async () => { try { if (await App.discardSavedCase(s.path)) App.renderTab(); } catch (e) { App.toast(e.message, 'err'); } } } }, 'Descartar progresso')));
+  }
+
   function attachConsole(id) {
     R.consoleRunId = id;
     R.consoleNext = 0;
@@ -92,7 +148,7 @@
     const pre = el('div.console');
     const cancel = el('button.btn.small.danger', { type: 'button' }, 'Cancelar');
     cancel.addEventListener('click', async () => {
-      if (!window.confirm('Cancelar esta simulação? Os resultados parciais não serão salvos.')) return;
+      if (!window.confirm('Cancelar esta simulação? O simulador grava o estado de cada simulação antes de parar (pode levar alguns segundos) e você pode continuar depois.')) return;
       try { await App.api.cancelRun(id); } catch (e) { App.toast(e.message, 'err'); }
     });
     clear(panel).append(el('div.toolbar', { style: { marginBottom: '4px' } }, el('h2', 'Saída da execução'), el('span.spacer'), cancel), meta, bar, pre);
@@ -111,7 +167,7 @@
       if (atBottom) pre.scrollTop = pre.scrollHeight;
       const end = d.end || Date.now();
       clear(meta).append(
-        el('span.state.' + d.state, stateLabel(d.state)),
+        el('span.state.' + (d.savedStop && d.state === 'cancelled' ? 'saved' : d.state), runLabel(d)),
         el('span', 'Progresso ', el('b', fmtNum(d.progress * 100, 1) + ' %')),
         el('span', 'Tempo ', el('b', fmtDuration(end - d.start))),
         el('span', 'JAR ', el('b', d.jar)),
@@ -133,6 +189,14 @@
     };
     tick();
     R.logPoll = setInterval(tick, 1000);
+  }
+
+  /** Parte 52: a cancelled run whose state was saved is "interrompida (progresso salvo)". */
+  function runLabel(r) {
+    return r.state === 'cancelled' && r.savedStop ? 'interrompida · progresso salvo' : stateLabel(r.state) + (r.resumed && r.state === 'running' ? ' (continuação)' : '');
+  }
+  function isActive(path) {
+    return R.list.some((r) => r.case === path && (r.state === 'running' || r.state === 'queued'));
   }
 
   function stateLabel(s) {
@@ -198,8 +262,12 @@
     const totalThreads = el('input.input.num', { type: 'number', min: 1, max: 512 });
     const consoleCb = el('input', { type: 'checkbox', checked: !!settings.runConsole, disabled: !settings.consoleSupported });
     const plan = el('div.small.muted');
+    const freshCb = el('input', { type: 'checkbox' }); // Parte 52
+    const freshLbl = el('label.check', freshCb, ' Começar do zero os casos com execução interrompida (descarta o progresso salvo)');
     const updatePlan = () => {
       const n = picked.size;
+      const nSaved = [...picked].filter((p) => App.savedInfo(p)).length;
+      freshLbl.hidden = !nSaved;
       const par = mode.value === 'parallel';
       totalThreads.placeholder = par ? String(cpus) : 'do arquivo de cada caso';
       const T = Number(totalThreads.value) || (par ? cpus : 0);
@@ -212,8 +280,10 @@
       } else {
         plan.textContent = n + ' caso(s) em sequência; cada um usa ' + (T ? T + ' threads' : 'as threads do seu arquivo simulation') + '.';
       }
+      if (nSaved) plan.textContent += ' ' + nSaved + ' deles têm execução interrompida e ' + (freshCb.checked ? 'começam do zero.' : 'continuam de onde pararam.');
     };
     mode.addEventListener('change', updatePlan);
+    freshCb.addEventListener('change', updatePlan);
     totalThreads.addEventListener('input', updatePlan);
     const runBatch = el('button.btn.primary', { type: 'button' }, 'Executar os casos selecionados');
     runBatch.addEventListener('click', async () => {
@@ -221,7 +291,7 @@
       if (App.dirtyFiles().length && picked.has(st.casePath)) { App.toast('Salve as alterações deste caso antes de executar.', 'err'); return; }
       const ordered = cases.map((c) => c.path).filter((p) => picked.has(p));
       try {
-        const out = await App.api.batch(ordered, mode.value, jarSel.value, jvm.value, Number(totalThreads.value) || 0, consoleCb.checked);
+        const out = await App.api.batch(ordered, mode.value, jarSel.value, jvm.value, Number(totalThreads.value) || 0, consoleCb.checked, freshCb.checked ? 'fresh' : undefined);
         App.toast(out.length + ' caso(s) ' + (mode.value === 'parallel' ? 'iniciados em paralelo' : 'na fila de execução'), 'ok');
         pollList(); openDrawer();
       } catch (e) { App.toast(e.message, 'err'); }
@@ -260,6 +330,7 @@
           el('div.field', el('div.flabel', 'Modo de execução'), mode),
           el('div.field', el('div.flabel', 'Threads', el('span.unit', '(fila: por caso; paralelo: total a dividir)')), totalThreads),
           el('label.check', consoleCb, ' Uma janela de console por caso (fechá-la cancela aquele caso)'),
+          freshLbl,
           plan,
           el('div.toolbar', { style: { margin: 0 } }, runBatch))),
       el('details.group', { style: { marginTop: '14px' } }, el('summary', 'Gerar script .bat / .sh'),
@@ -372,19 +443,71 @@
     for (const r of R.list) {
       if (prev.has(r.id) && r.state !== 'running') {
         if (r.kind !== 'tool') {
-          App.toast(`${App.caseNameOf(r.case)}: ${stateLabel(r.state)}`, r.state === 'finished' ? 'ok' : 'err', 6000);
-          if (r.state === 'finished') { App.loadTree(); if (r.case === App.state.casePath) App.refreshCaseFiles(); }
+          App.toast(`${App.caseNameOf(r.case)}: ${runLabel(r)}`, r.state === 'finished' ? 'ok' : r.savedStop ? 'warn' : 'err', 6000);
+          App.loadTree();
+          if (r.state === 'finished' && r.case === App.state.casePath) App.refreshCaseFiles();
+          if (r.case === App.state.casePath && App.state.tab === 'run') setTimeout(() => App.loadTree().then(() => { if (App.state.tab === 'run') App.renderTab(); }), 600);
         }
       }
     }
+    const startedNow = running.some((r) => !prev.has(r.id));
     R.prevRunning = new Set(running.map((r) => r.id));
+    if (startedNow && App.drawSavedBanner) App.drawSavedBanner();
     if (!document.getElementById('runsDrawer').hidden) drawDrawer();
     clearTimeout(R.listPoll);
     R.listPoll = setTimeout(pollList, running.length || queued.length ? 2000 : 8000);
   }
 
+  /** Parte 52: every case with an interrupted execution (this session or earlier: power cut, closed launcher). */
+  R.pickSaved = new Set();
+  function savedSection() {
+    const all = App.savedCases ? App.savedCases() : [];
+    if (!all.length) return null;
+    for (const p of [...R.pickSaved]) if (!all.find((s) => s.path === p)) R.pickSaved.delete(p);
+    const mode = el('select.input', { style: { width: 'auto' } },
+      el('option', { value: 'sequential' }, 'em fila (uma após a outra)'),
+      el('option', { value: 'parallel' }, 'em paralelo (threads divididas)'));
+    mode.value = R.savedMode || 'sequential';
+    mode.addEventListener('change', () => { R.savedMode = mode.value; });
+    const go = el('button.btn.small.primary', { type: 'button', disabled: !R.pickSaved.size }, 'Continuar selecionadas (' + R.pickSaved.size + ')');
+    go.addEventListener('click', async () => {
+      go.disabled = true;
+      try { await App.resumeCases(all.map((s) => s.path).filter((p) => R.pickSaved.has(p)), mode.value); R.pickSaved.clear(); } catch (e) { App.toast(e.message, 'err'); }
+      drawDrawer();
+    });
+    const drop = el('button.btn.small.ghost', { type: 'button', disabled: !R.pickSaved.size }, 'Descartar o progresso');
+    drop.addEventListener('click', async () => {
+      if (!window.confirm('Descartar o progresso salvo de ' + R.pickSaved.size + ' caso(s)? As próximas execuções começam do zero.')) return;
+      try { for (const p of R.pickSaved) await App.api.discardSaved(p); R.pickSaved.clear(); await App.loadTree(); } catch (e) { App.toast(e.message, 'err'); }
+      drawDrawer();
+    });
+    const allBox = el('input', { type: 'checkbox', checked: R.pickSaved.size === all.length, title: 'Marcar todas' });
+    allBox.addEventListener('change', () => { if (allBox.checked) all.forEach((s) => R.pickSaved.add(s.path)); else R.pickSaved.clear(); drawDrawer(); });
+    const rows = all.sort((a, b) => b.updated - a.updated).map((s) => {
+      const cb = el('input', { type: 'checkbox', checked: R.pickSaved.has(s.path) });
+      cb.addEventListener('change', () => { if (cb.checked) R.pickSaved.add(s.path); else R.pickSaved.delete(s.path); drawDrawer(); });
+      const sj = App.savedJar(s);
+      const problem = s.changed.length ? 'arquivos do caso alterados' : !sj.same ? 'JAR diferente' : '';
+      return el('div.run-card.saved-card',
+        el('div.top', el('label.check', cb, el('span.path', s.path)), el('span.state.saved', s.crashed ? 'interrompida sem aviso' : 'interrompida')),
+        el('div.progress', el('div', { style: { width: (s.fraction * 100).toFixed(1) + '%' } })),
+        el('div.sub', App.savedText(s) + (problem ? ' · atenção: ' + problem + ' (o progresso será ignorado)' : '')),
+        el('div.toolbar', { style: { margin: 0 } },
+          el('button.btn.small', { type: 'button', on: { click: async () => { try { await App.resumeCases([s.path]); } catch (e) { App.toast(e.message, 'err'); } drawDrawer(); } } }, 'Continuar'),
+          el('button.btn.small.ghost', { type: 'button', on: { click: () => { closeDrawer(); App.openCase(s.path, 'run'); } } }, 'Abrir caso')));
+    });
+    return el('div.saved-section',
+      el('div.toolbar', { style: { margin: '0 0 6px' } }, el('h3', { style: { margin: 0 } }, '⏸ Interrompidas (' + all.length + ')'), el('span.spacer'),
+        el('label.check.small', allBox, ' todas')),
+      el('div.small.muted', { style: { marginBottom: '6px' } }, 'Casos com progresso salvo que não estão rodando: canceladas aqui, numa fila ou execução paralela, ou paradas por queda de energia.'),
+      ...rows,
+      el('div.toolbar', { style: { marginTop: '6px' } }, el('span.small', 'Continuar'), mode, go, drop));
+  }
+
   function drawDrawer() {
     const box = clear(document.getElementById('runsList'));
+    const sv = savedSection();
+    if (sv) box.appendChild(sv);
     if (!R.list.length) { box.appendChild(el('p.muted', 'Nenhuma execução iniciada nesta sessão do launcher.')); return; }
     const queued = R.list.filter((r) => r.state === 'queued').length;
     if (queued) {
@@ -395,7 +518,7 @@
       const end = r.end || Date.now();
       const isTool = r.kind === 'tool';
       box.appendChild(el('div.run-card',
-        el('div.top', el('span.path', isTool ? '⚙ ' + r.label : r.case), el('span.state.' + r.state, stateLabel(r.state))),
+        el('div.top', el('span.path', isTool ? '⚙ ' + r.label : r.case), el('span.state.' + (r.savedStop && r.state === 'cancelled' ? 'saved' : r.state), runLabel(r))),
         el('div.progress', el('div', { style: { width: (r.progress * 100).toFixed(1) + '%' } })),
         el('div.sub', (r.state === 'queued' ? r.jar + ' · aguardando' : `${r.jar} · início ${fmtDate(r.start)} · ${fmtDuration(end - r.start)} · ${fmtNum(r.progress * 100, 1)} %`)
           + (r.threads ? ' · ' + r.threads + ' threads' : '') + (r.group ? ' · lote ' + r.group : '') + (r.console && r.state === 'running' ? (r.consoleAttached ? ' · janela de console aberta' : ' · abrindo console') : '')),
@@ -404,7 +527,10 @@
             : r.state === 'queued' ? null
               : el('button.btn.small', { type: 'button', on: { click: () => { closeDrawer(); App.openCase(r.case, 'run').then(() => attachConsole(r.id)); } } }, 'Abrir saída'),
           r.state === 'queued' || r.state === 'running'
-            ? el('button.btn.small.ghost', { type: 'button', on: { click: async () => { await App.api.cancelRun(r.id); pollList(); } } }, r.state === 'queued' ? 'Remover da fila' : 'Cancelar') : null)));
+            ? el('button.btn.small.ghost', { type: 'button', on: { click: async () => { await App.api.cancelRun(r.id); pollList(); } } }, r.state === 'queued' ? 'Remover da fila' : 'Cancelar') : null,
+          // Parte 52: an interrupted run with saved progress continues from here
+          !isTool && (r.state === 'cancelled' || r.state === 'failed') && App.savedInfo && App.savedInfo(r.case) && !isActive(r.case)
+            ? el('button.btn.small.primary', { type: 'button', on: { click: async () => { try { await App.resumeCases([r.case]); } catch (e) { App.toast(e.message, 'err'); } } } }, 'Continuar') : null)));
     }
   }
   async function showToolLog(r) {
@@ -414,8 +540,8 @@
     } catch (e) { App.toast(e.message, 'err'); }
   }
 
-  function openDrawer() { document.getElementById('runsDrawer').hidden = false; drawDrawer(); }
+  function openDrawer() { document.getElementById('runsDrawer').hidden = false; drawDrawer(); if (App.loadTree) App.loadTree().then(() => { if (!document.getElementById('runsDrawer').hidden) drawDrawer(); }); }
   function closeDrawer() { document.getElementById('runsDrawer').hidden = true; }
 
-  App.run = { render, pollList, openDrawer, closeDrawer, attachConsole, buildBat, buildSh, defaultJar };
+  App.run = { render, pollList, openDrawer, closeDrawer, attachConsole, buildBat, buildSh, defaultJar, isActive };
 })(window.App);

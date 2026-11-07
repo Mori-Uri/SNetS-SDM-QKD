@@ -36,8 +36,10 @@
     createCase: (parent, name, from, copyRoutes) => call('POST', 'case/create', { parent, name, from, copyRoutes }),
     createFolder: (parent, name) => call('POST', 'folder/create', { parent, name }),
     writeScript: (name, content, overwrite) => call('POST', 'script', { name, overwrite }, content),
-    run: (path, jar, jvmArgs, threads, consoleWin) => call('POST', 'run', { path, jar, jvmArgs, threads: threads || null, console: consoleWin === undefined ? null : String(!!consoleWin) }),
-    batch: (cases, mode, jar, jvmArgs, threads, consoleWin) => call('POST', 'run/batch', { mode, jar, jvmArgs, threads: threads || null, console: consoleWin === undefined ? null : String(!!consoleWin) }, cases.join('\n')),
+    // Parte 52: how = 'fresh' (discard the saved progress first) or 'resume' (continue it)
+    run: (path, jar, jvmArgs, threads, consoleWin, how) => call('POST', 'run', { path, jar, jvmArgs, threads: threads || null, console: consoleWin === undefined ? null : String(!!consoleWin), fresh: how === 'fresh' ? '1' : null, resume: how === 'resume' ? '1' : null }),
+    batch: (cases, mode, jar, jvmArgs, threads, consoleWin, how) => call('POST', 'run/batch', { mode, jar, jvmArgs, threads: threads || null, console: consoleWin === undefined ? null : String(!!consoleWin), fresh: how === 'fresh' ? '1' : null, resume: how === 'resume' ? '1' : null }, cases.join('\n')),
+    discardSaved: (path) => call('POST', 'savestate/discard', { path }),
     runs: () => call('GET', 'runs'),
     runLog: (id, from) => call('GET', 'run/log', { id, from }),
     cancelRun: (id) => call('POST', 'run/cancel', { id }),

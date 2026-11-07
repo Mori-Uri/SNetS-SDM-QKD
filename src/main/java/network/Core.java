@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.TreeSet;
 
 /**
  * One spatial core of an SNetS multi-core fiber.
@@ -66,12 +67,14 @@ public class Core implements Serializable {
         if (qkdReserved || disabled) {
             return false;
         }
+        touch(); // Parte 54
         return spectrum.useSpectrum(spectrumBand, guardBand);
     }
 
     /** Classical release entry point retained unchanged for compatibility. */
     public void liberateSpectrum(int[] spectrumBand, int guardBand)
             throws Exception {
+        touch(); // Parte 54
         spectrum.freeSpectrum(spectrumBand, guardBand);
     }
 
@@ -125,6 +128,7 @@ public class Core implements Serializable {
         if (!qkdReserved) {
             return false;
         }
+        touch(); // Parte 54
         return spectrum.useSpectrum(spectrumBand, guardBand);
     }
 
@@ -135,6 +139,7 @@ public class Core implements Serializable {
             throw new IllegalStateException(
                     "Core " + id + " is not reserved for QKD");
         }
+        touch(); // Parte 54
         spectrum.freeSpectrum(spectrumBand, guardBand);
     }
 
@@ -160,16 +165,64 @@ public class Core implements Serializable {
 
     public void setCircuitList(HashSet<Circuit> circuitList) {
         this.circuitList = circuitList;
+        this.sortedCircuits = null; // Parte 54
+        touch();
     }
 
     public void addCircuit(Circuit circuit) {
         if (!circuitList.contains(circuit)) {
             circuitList.add(circuit);
+            if (sortedCircuits != null) sortedCircuits.add(circuit); // Parte 54
+            circuit.enteredCoreList(); // Parte 54
+            PhysicalStateChanges.membershipChanged();
         }
+        touch();
     }
 
     public void removeCircuit(Circuit circuit) {
-        circuitList.remove(circuit);
+        if (circuitList.remove(circuit)) {
+            circuit.leftCoreList(); // Parte 54
+            PhysicalStateChanges.membershipChanged();
+        }
+        if (sortedCircuits != null) sortedCircuits.remove(circuit); // Parte 54
+        touch();
+    }
+
+    /*
+     * Parte 54 (desempenho): the QoT and crosstalk code iterates the circuits of a core in id order, and used to build
+     * a new TreeSet from the HashSet above at every evaluation. The same ordered set is now kept up to date by
+     * addCircuit/removeCircuit. Callers must only read it.
+     */
+    private transient TreeSet<Circuit> sortedCircuits;
+
+    /** Parte 54: the circuits of this core in id order (read only; the same order as new TreeSet(getCircuitList())). */
+    public TreeSet<Circuit> getSortedCircuitList() {
+        if (sortedCircuits == null || !simulator.PerfChecks.ENABLED) {
+            final TreeSet<Circuit> s = new TreeSet<Circuit>(circuitList);
+            if (!simulator.PerfChecks.ENABLED) return s;
+            sortedCircuits = s;
+        } else if (simulator.PerfChecks.VERIFY) {
+            if (!sortedCircuits.equals(new TreeSet<Circuit>(circuitList)) || sortedCircuits.size() != circuitList.size()) {
+                throw new IllegalStateException("snets.verifyPerf: lista ordenada de circuitos do nucleo difere");
+            }
+        }
+        return sortedCircuits;
+    }
+
+    /*
+     * Parte 54: version of the physical state of this core (its circuits). The link that owns the core is told, so the
+     * link version changes whenever a circuit is added to or removed from any of its cores.
+     */
+    private Link owner;
+
+    /** Parte 54: set by the link that creates this core. */
+    void setOwner(Link link) {
+        this.owner = link;
+    }
+
+    /** Parte 54: the physical state of this core changed. */
+    public void touch() {
+        if (owner != null) owner.touch();
     }
 
     public int getId() {

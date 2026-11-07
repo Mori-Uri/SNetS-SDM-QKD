@@ -15,6 +15,8 @@ import java.util.Iterator;
 public class GroomingStatistics extends Measurement {
 
     private int observations;
+    /** Parte 54: stamp of the current observation (see computeReqByCirc). */
+    private int countStamp;
     private double sumReqByCirc;
     private int maxVirtualHops;
     private double sumVirtualHops;
@@ -106,6 +108,34 @@ public class GroomingStatistics extends Measurement {
      * @return the result of the operation.
      */
     private double computeReqByCirc(ControlPlane cp) {
+        if (simulator.PerfChecks.ENABLED) {
+            // Parte 54 (desempenho): the distinct active requests are counted with a stamp in each request instead of
+            // a new HashSet per observation (a request served by several circuits still counts once). Same counts,
+            // so the same ratio.
+            final int stamp = ++countStamp == 0 ? ++countStamp : countStamp;
+            int distinct = 0;
+            for (Circuit next : cp.getConnections()) {
+                for (RequestForConnection r : next.getRequests()) {
+                    if (r.markCounted(stamp)) {
+                        distinct++;
+                    }
+                }
+                if (next.getRequests().size() > maxReqByCirc) {
+                    maxReqByCirc = next.getRequests().size();
+                }
+            }
+            final double acli = distinct;
+            final double acirc = cp.getConnections().size();
+            if (simulator.PerfChecks.VERIFY) {
+                final HashSet<RequestForConnection> check = new HashSet<>();
+                for (Circuit next : cp.getConnections()) check.addAll(next.getRequests());
+                if (check.size() != distinct) throw new IllegalStateException("snets.verifyPerf: contagem de requisicoes difere");
+            }
+            if (Double.isNaN(acli / acirc)) {
+                return 0.0;
+            }
+            return acli / acirc;
+        }
         Iterator<Circuit> iterator = cp.getConnections().iterator();
         HashSet<RequestForConnection> activeClients = new HashSet<>(); //HashSet will ignore same requests in more than one circuit.
 

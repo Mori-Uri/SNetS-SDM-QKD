@@ -22,6 +22,15 @@ public final class QKDMetricsSnapshot implements Serializable {
     public double meanAdmissionQber;
     public double maximumAdmissionQber;
     public double maximumAdmissionPxtW;
+    /** Parte 44: multi-band layer on (qkdPhysicalLayer.multiband); the Raman fields below are 0 otherwise. */
+    public boolean multiband;
+    /** Parte 44: SpRS background probability per gate on the spans of the admitted sessions (mean and max). */
+    public double meanAdmissionRamanProbability, maximumAdmissionRamanProbability;
+    /** Parte 44: largest SpRS power at a QCh receiver among the admitted sessions (W). */
+    public double maximumAdmissionRamanPowerW;
+    /** Parte 45: NLI on the QCh (only with multiband.nliModel = gn). */
+    public boolean nli;
+    public double meanAdmissionNliProbability, maximumAdmissionNliProbability;
     public double acceptanceRatio = Double.NaN;
     public double blockingProbability = Double.NaN;
     /** Arrival-averaged (PASTA) occupancy after warm-up. */

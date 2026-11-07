@@ -500,6 +500,37 @@ public final class QKDSharedResourceManager implements Serializable {
                 }
             });
         }
+        if (mesh.getQkdNetworkParameters().isMaxSkrSlots() && starts.size() > 1) {
+            // Parte 49 (qchSlotPolicy "maxskr"): every free band is evaluated and the one with the highest minimum
+            // span SKR along the route goes first (in the multi-band mode this is the QCh wavelength with the least
+            // noise and loss); ties keep the slot order. Bands below the demand stay in the list as fallback.
+            final Core ref = links.get(0).getCore(coreId);
+            final java.util.Map<Integer, Double> score = new java.util.HashMap<Integer, Double>();
+            for (Integer s : starts) {
+                int[] band = new int[] {s.intValue(), s.intValue() + qchSlots - 1};
+                double wlS = slotWavelength(ref, band, defaultWl);
+                double minS = Double.POSITIVE_INFINITY;
+                for (int i = 0; i < links.size(); i++) {
+                    QKDChannelAllocation a = new QKDChannelAllocation(links.get(i), coreId, band, guardBand,
+                            routePlan.getLinkPlans().get(i).getSpanCount());
+                    QKDLinkChannelPhysicalResult r = additional == null
+                            ? evaluator.evaluateLinkChannel(links.get(i), routePlan.getLinkPlans().get(i),
+                                    mesh.getPhysicalLayer(), a, wlS)
+                            : evaluator.evaluateLinkChannelWithAdditionalClassicalCircuit(links.get(i),
+                                    routePlan.getLinkPlans().get(i), mesh.getPhysicalLayer(), a, wlS, additional);
+                    minS = Math.min(minS, r.getMinimumSecretKeyRateBps());
+                }
+                score.put(s, Double.valueOf(minS));
+            }
+            final List<Integer> order = new ArrayList<Integer>(starts);
+            Collections.sort(order, new Comparator<Integer>() {
+                @Override public int compare(Integer a, Integer b) {
+                    int c = Double.compare(score.get(b).doubleValue(), score.get(a).doubleValue());
+                    return c != 0 ? c : a.compareTo(b);
+                }
+            });
+            starts = order;
+        }
         for (Integer startObj : starts) {
             final int start = startObj.intValue();
             candidates++;

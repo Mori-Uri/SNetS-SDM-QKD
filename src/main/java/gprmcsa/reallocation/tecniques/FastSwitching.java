@@ -14,7 +14,7 @@ import util.IntersectionFreeSpectrum;
  *
  *         PENDING TESTING
  */
-public class FastSwitching {
+public class FastSwitching implements java.io.Serializable {
 
 	/**
 	 * Creates a new instance of FastSwitching.

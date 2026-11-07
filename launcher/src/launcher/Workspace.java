@@ -150,6 +150,25 @@ final class Workspace {
             }
             n.put("csvCount", csv);
             n.put("lastResult", last);
+            // Parte 52: progress saved by the simulator (savestate/progresso.json), parsed in the browser
+            File progress = new File(new File(dir, "savestate"), "progresso.json");
+            if (progress.isFile()) {
+                try {
+                    n.put("savedProgress", readText(progress));
+                } catch (IOException e) {
+                    n.put("savedProgress", null);
+                }
+                Map<String, Object> mt = new LinkedHashMap<String, Object>();
+                if (files != null) {
+                    for (File f : files) {
+                        String nm = f.getName().toLowerCase();
+                        if (f.isFile() && !nm.endsWith(".csv") && !nm.endsWith(".txt")) {
+                            mt.put(f.getName(), f.lastModified());
+                        }
+                    }
+                }
+                n.put("savedInputs", mt);
+            }
             File simulationConfig = existingConfigFile(dir, "simulation");
             n.put("modified", simulationConfig != null ? simulationConfig.lastModified() : 0L);
         }
@@ -189,6 +208,33 @@ final class Workspace {
         }
         n.put("hasCases", hasCases);
         return n;
+    }
+
+    /** Parte 52: deletes the progress saved by the simulator (folder savestate of the case). */
+    int discardSaved(String rel) throws IOException {
+        File dir = new File(resolve(rel), "savestate");
+        int n = 0;
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                if (f.isFile() && f.delete()) {
+                    n++;
+                }
+            }
+        }
+        if (dir.isDirectory() && !dir.delete()) {
+            throw new IOException("Não foi possível apagar " + dir.getAbsolutePath() + " (arquivo em uso?)");
+        }
+        return n;
+    }
+
+    /** Parte 52: asks a running simulation of this case to save its state and stop (file savestate/STOP). */
+    void requestStop(String rel) throws IOException {
+        File dir = new File(resolve(rel), "savestate");
+        if (!dir.isDirectory() && !dir.mkdirs()) {
+            throw new IOException("Não foi possível criar " + dir.getAbsolutePath());
+        }
+        java.nio.file.Files.write(new File(dir, "STOP").toPath(), "stop\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     // ------------------------------------------------------------------ case content

@@ -44,6 +44,8 @@ public class Simulation implements Serializable {
 
     private int loadPoint;
     private int replication;
+    /** Parte 45: cost of the algorithms (activeMetrics.AlgorithmCost), or null. */
+    private transient AlgorithmCostRecorder costRecorder;
 
     public Simulation(SimulationConfig sc, Mesh mesh, int loadPoint,
             int replication, Util util) {
@@ -121,6 +123,20 @@ public class Simulation implements Serializable {
         checkNotNull(regenerator,
                 "regeneratorAssignment: " + sc.getRegeneratorAssignment());
 
+        if (sc.getActiveMetrics() != null && sc.getActiveMetrics().AlgorithmCost) { // Parte 45
+            costRecorder = new AlgorithmCostRecorder();
+            grooming = costRecorder.wrap(grooming, TrafficGroomingAlgorithmInterface.class, "Grooming");
+            integrated = costRecorder.wrap(integrated, IntegratedRMLSAAlgorithmInterface.class, "IntegratedRMLSA");
+            routing = costRecorder.wrap(routing, RoutingAlgorithmInterface.class, "Routing");
+            kRouting = costRecorder.wrap(kRouting, KRoutingAlgorithmInterface.class, "KRouting");
+            spectrum = costRecorder.wrap(spectrum, SpectrumAssignmentAlgorithmInterface.class, "SpectrumAssignment");
+            modulation = costRecorder.wrap(modulation, ModulationSelectionAlgorithmInterface.class, "ModulationSelection");
+            coreAndSpectrum = costRecorder.wrap(coreAndSpectrum, CoreAndSpectrumAssignmentAlgorithmInterface.class,
+                    "CoreAndSpectrumAssignment");
+            reallocation = costRecorder.wrap(reallocation, ReallocationAlgorithmInterface.class, "Reallocation");
+            power = costRecorder.wrap(power, PowerAssignmentAlgorithmInterface.class, "PowerAssignment");
+        }
+
         if (sc.getNetworkType() == GPRMCSA.TRANSPARENT) {
             if (qkdEnabled) {
                 controlPlane = new QKDControlPlane(
@@ -135,6 +151,7 @@ public class Simulation implements Serializable {
                         coreAndSpectrum,
                         reallocation,
                         power);
+                ((QKDControlPlane) controlPlane).setCostRecorder(costRecorder); // Parte 45
             } else {
                 /*
                  * Legacy transparent path: same original SNetS components. The
@@ -156,6 +173,11 @@ public class Simulation implements Serializable {
                     spectrum, regenerator, modulation, coreAndSpectrum,
                     reallocation, power);
         }
+    }
+
+    /** Parte 45: cost recorder of this simulation, or null when activeMetrics.AlgorithmCost is off. */
+    public AlgorithmCostRecorder getCostRecorder() {
+        return costRecorder;
     }
 
     private static void checkNotNull(Object obj, String name) {

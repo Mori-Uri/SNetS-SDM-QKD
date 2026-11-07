@@ -16,9 +16,15 @@ import simulationControl.parsers.PhysicalLayerConfig;
  *   "detector":  { "detectorEfficiency": 0.3, "darkCountProbability": 1e-8,
  *                  "detectorGateWindowPs": 100.0, "receiverOpticalEfficiency": 1.0 },
  *   "fiber":     { "attenuationFloorDbPerKm": 0.18, "attenuationQuadraticDbPerKmNm2": 8e-6, "attenuationCenterNm": 1550.0 },
- *   "crosstalk": { "intercoreCrosstalkEnabled": true, "receiverTransferModel": "receiver_referenced" }
+ *   "crosstalk": { "intercoreCrosstalkEnabled": true, "receiverTransferModel": "receiver_referenced" },
+ *   "multiband": { "enabled": true, "architecture": "MB", "ramanModel": "fisico", "qchCenterNm": 1381.0,
+ *                  "hostCoreId": 0, "intercoreRaman": true, "bidirectionalFiber": false, "classicalBandStartThz": 191.3,
+ *                  "attenuationModel": "g652d", "waterPeakDbPerKm": 0.0, "temperatureK": 300.0 }
  * }
  * </pre>
+ *
+ * <p>Parte 43: the optional group {@code multiband} turns on the multi-band physical layer
+ * ({@link qkd.multiband.MultiBandSettings}). Without it, or with {@code "enabled": false}, nothing changes.</p>
  *
  * <p>The defaults are the values of the base article (Dibaj et al., 2024, Table 2 of the
  * qualification) and match Moghaddam et al., IEEE JSAC 2021, Table I for e_d, f,
@@ -39,6 +45,42 @@ public final class QKDPhysicalLayerConfig implements Serializable {
     private Detector detector = new Detector();
     private Fiber fiber = new Fiber();
     private CrosstalkCoupling crosstalk = new CrosstalkCoupling();
+    /** Parte 43: multi-band options; null (absent) = disabled. */
+    private Multiband multiband;
+
+    /** Parte 43: multi-band physical layer (see {@link qkd.multiband.MultiBandSettings}). */
+    public static final class Multiband implements Serializable {
+        private static final long serialVersionUID = 1L;
+        boolean enabled = true;
+        /** MF, MB or MBSDM. */
+        String architecture = "MB";
+        /** nenhum, artigo or fisico. */
+        String ramanModel = "fisico";
+        /** Centre of the QCh grid (nm); also the QCh wavelength with wavelengthPolicy "fixed". */
+        double qchCenterNm = 1381.0;
+        /** Classical core sharing the fibre/core with the QCh (MB, MBSDM). */
+        int hostCoreId = 0;
+        /** MBSDM: SpRS from the cores adjacent to the host core ([CAI20]). */
+        boolean intercoreRaman = true;
+        /** Parte 44: the two directions of a link share the fibre (backward SpRS from the reverse link). */
+        boolean bidirectionalFiber = false;
+        /** Parte 45: NLI of the classical channels on the QCh: nenhum or gn (GN model, host core). */
+        String nliModel = "nenhum";
+        /** Parte 45: fibre non-linear coefficient (1/(W km)) and dispersion of the NLI model. */
+        double nliGammaPerWKm = 1.2;
+        double nliBeta2Ps2PerKm = -22.317;
+        double nliBeta3Ps3PerKm = 0.1331;
+        /** Lower edge of classical slot 1 (THz). 191.3 = start of the C band; 184.4 for the C+L comb. */
+        double classicalBandStartThz = 191.3;
+        /** g652d (O to U band) or quadratica (fit of the fiber group). */
+        String attenuationModel = "g652d";
+        /** Extra loss of the OH peak at 1383 nm (dB/km); 0 for a low-water-peak G.652.D fibre. */
+        double waterPeakDbPerKm = 0.0;
+        /** Fibre temperature (K) of the Raman phonon population. */
+        double temperatureK = 300.0;
+        /** Parte 48: nenhuma or medida (anti-Stokes SpRS corrected by the measurements of [CHAPURAN09]/[NWEKE05]). */
+        String antiStokesCorrection = "nenhuma";
+    }
 
     /** Weak-coherent source and quantum-channel width. */
     public static final class Source implements Serializable {
@@ -140,11 +182,65 @@ public final class QKDPhysicalLayerConfig implements Serializable {
         if (!Double.isFinite(detector.detectorGateWindowPs) || detector.detectorGateWindowPs <= 0.0) {
             throw new IllegalArgumentException(FILE_NAME + ".detector.detectorGateWindowPs must be finite and > 0");
         }
-        return base.withReceiverAssumptions(
+        QKDPhysicalParameters params = base.withReceiverAssumptions(
                 detector.detectorGateWindowPs * 1e-12,
                 detector.receiverOpticalEfficiency,
                 QKDCrosstalkReceiverTransferMode.fromConfig(crosstalk.receiverTransferModel),
                 crosstalk.intercoreCrosstalkEnabled);
+        qkd.multiband.MultiBandSettings mb = toMultiBandSettings();
+        return mb == null ? params : rebuildWithCenter(params, mb.getQchCenterNm()).withMultiband(mb);
+    }
+
+    /** Parte 43: the multi-band settings, or {@code null} when the group is absent or disabled. */
+    public qkd.multiband.MultiBandSettings toMultiBandSettings() {
+        if (multiband == null || !multiband.enabled) return null;
+        final String loss = multiband.attenuationModel == null ? "g652d"
+                : multiband.attenuationModel.trim().toLowerCase(java.util.Locale.ROOT);
+        final qkd.multiband.FiberAttenuationModel model;
+        if (loss.equals("g652d")) {
+            model = multiband.waterPeakDbPerKm > 0.0
+                    ? qkd.multiband.FiberAttenuationModel.physical(
+                            qkd.multiband.FiberAttenuationModel.DEFAULT_RAYLEIGH_DB_UM4_PER_KM,
+                            multiband.waterPeakDbPerKm, 30.0)
+                    : qkd.multiband.FiberAttenuationModel.g652d();
+        } else if (loss.equals("quadratica") || loss.equals("quadratic")) {
+            model = null;
+        } else {
+            throw new IllegalArgumentException(FILE_NAME + ".multiband.attenuationModel must be g652d or quadratica");
+        }
+        final String nliName = multiband.nliModel == null ? "nenhum"
+                : multiband.nliModel.trim().toLowerCase(java.util.Locale.ROOT);
+        final qkd.multiband.NonlinearInterferenceModel nli;
+        if (nliName.equals("gn")) {
+            nli = new qkd.multiband.NonlinearInterferenceModel(multiband.nliGammaPerWKm, multiband.nliBeta2Ps2PerKm,
+                    multiband.nliBeta3Ps3PerKm, qkd.multiband.NonlinearInterferenceModel.DEFAULT_REFERENCE_HZ);
+        } else if (nliName.equals("nenhum") || nliName.equals("none")) {
+            nli = null;
+        } else {
+            throw new IllegalArgumentException(FILE_NAME + ".multiband.nliModel must be nenhum or gn");
+        }
+        return new qkd.multiband.MultiBandSettings(
+                qkd.multiband.MultiBandSettings.Architecture.parse(multiband.architecture),
+                qkd.multiband.MultiBandSettings.RamanModel.parse(multiband.ramanModel),
+                model,
+                new qkd.multiband.SpontaneousRamanModel(qkd.multiband.SpontaneousRamanModel.DEFAULT_SCALE,
+                        multiband.temperatureK, qkd.multiband.SpontaneousRamanModel.AntiStokesCorrection.parse(
+                                multiband.antiStokesCorrection)),
+                multiband.hostCoreId,
+                multiband.classicalBandStartThz * 1e12,
+                multiband.intercoreRaman,
+                multiband.qchCenterNm,
+                multiband.bidirectionalFiber).withNli(nli);
+    }
+
+    /** Same parameters with the QCh grid centred at {@code centerNm} (multi-band mode). */
+    private static QKDPhysicalParameters rebuildWithCenter(QKDPhysicalParameters p, double centerNm) {
+        return new QKDPhysicalParameters(p.getMu(), p.getPulseIntervalS(), p.getErrorCorrectionInefficiency(),
+                p.getPhaseErrorProbability(), p.getDetectorEfficiency(), p.getDarkCountProbability(),
+                p.getQchBandwidthHz(), p.getQchPowerDbm(), p.getAttenuationFloorDbPerKm(),
+                p.getAttenuationQuadratic(), centerNm, p.getPlanckConstantJs(), p.getSpeedOfLightMPerS(),
+                p.getDetectorGateWindowS(), p.getReceiverOpticalEfficiency(), p.getReceiverTransferMode(),
+                p.isIntercoreCrosstalkEnabled());
     }
 
     public double getMeanPhotonNumber() { fillMissingGroups(); return source.meanPhotonNumber; }

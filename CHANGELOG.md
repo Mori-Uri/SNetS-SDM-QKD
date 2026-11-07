@@ -5,10 +5,20 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
-| [55](#parte-55) | Parte 55 — launcher 1.18.5: padrão de aparência por tipo de gráfico, botões de topo/fim, edição automática do launcher |
-| [51](#parte-51) | Parte 51 — launcher 1.18.4: menu das configurações, mais ajustes nos gráficos e mapa por causas escolhidas |
-| [50](#parte-50) | Parte 50 — launcher 1.18.3: gráfico de comparação com um caso de referência |
-| [47](#parte-47) | Parte 47 — launcher 1.18.2: cabeçalhos fixos e edição em lote |
+| [55](#parte-55) | Parte 55 — launcher 1.20.7: padrão de aparência por tipo de gráfico, botões de topo/fim, edição automática do launcher |
+| [54](#parte-54) | Parte 54 — otimizações de desempenho sem mudança nos resultados (clássico e QKD) |
+| [53](#parte-53) | Parte 53 — documentação das mudanças de desempenho e save states, verificação contra outras versões |
+| [52](#parte-52) | Parte 52 — save states ligados por padrão, cancelar sem perder o progresso, continuar execuções interrompidas (launcher 1.20.6) |
+| [51](#parte-51) | Parte 51 — launcher 1.20.5: menu das configurações, mais ajustes nos gráficos e mapa por causas escolhidas |
+| [50](#parte-50) | Parte 50 — launcher 1.20.4: gráfico de comparação com um caso de referência |
+| [49](#parte-49) | Parte 49 — QoT clássica por banda com ISRS, política maxskr do QCh, casos iniciais e launcher 1.20.3 |
+| [48](#parte-48) | Parte 48 — correção anti-Stokes medida do SpRS (opcional) e launcher 1.20.2 |
+| [47](#parte-47) | Parte 47 — launcher 1.20.1: cabeçalhos fixos e edição em lote |
+| [46](#parte-46) | Parte 46 — validação contra a literatura: FWM de Peters, SpRS medido, NLI de Mehdizadeh reproduzido no GNPy |
+| [45](#parte-45) | Parte 45 — NLI no QCh (N2), verificação MB × MF em rede, custo dos algoritmos, save states, desempenho e launcher 1.20.0 |
+| [44](#parte-44) | Parte 44 — pasta experimental paralela, launcher 1.19.1 (edição experimental), SpRS nos resultados e fibra bidirecional |
+| [43](#parte-43) | Parte 43 — multibanda no simulador (N0 e N1), modelos de Raman selecionáveis e launcher 1.19.0 |
+| [42](#parte-42) | Parte 42 — branch experimental: teste de regressão, camada física multibanda e calculadora de enlace |
 | [41](#parte-41) | Parte 41 — repositório SNetS-SDM-QKD: README novo, CHANGELOG único, simulations/ fora do git, enlaces bidirecionais no launcher (1.18.1) |
 | [40](#parte-40) | Parte 40 — topologias e fibras de pequena escala, regra ABNE nos QChs, PICh configurável (launcher 1.18.0) |
 | [39](#parte-39) | Parte 39 — canal QKD bloqueado, nós confiáveis por enlace, qabne e launcher 1.17.0 |
@@ -32,7 +42,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 <a id="parte-55"></a>
 
-## Parte 55 — launcher 1.18.5: padrão de aparência por tipo de gráfico, botões de topo/fim, edição automática do launcher
+## Parte 55 — launcher 1.20.7: padrão de aparência por tipo de gráfico, botões de topo/fim, edição automática do launcher
 
 Feita igual na `main` (launcher 1.18.5) e na `experimental` (launcher 1.20.7), para o merge final não ter conflito nestes pontos. Só o launcher muda; o simulador e os resultados não mudam.
 
@@ -59,9 +69,157 @@ Feita igual na `main` (launcher 1.18.5) e na `experimental` (launcher 1.20.7), p
 
 ---
 
+<a id="parte-54"></a>
+
+## Parte 54 — otimizações de desempenho sem mudança nos resultados (clássico e QKD)
+
+Só na branch experimental. As propostas da análise da Parte 53 foram todas implementadas. Cada valor reaproveitado é o mesmo que o código original calcularia, então os resultados não mudam bit a bit. A descrição completa está em `docs/MUDANCAS_DESEMPENHO_E_SAVE_STATES.md`, seção 11.
+
+### Simulador
+
+- **QoT:**
+  - memória do `arcsinh` no NLI;
+  - termos de ruído (NLI, ASE e XT) por enlace guardados no circuito enquanto o enlace e o circuito não mudam;
+  - lista ordenada dos circuitos de cada núcleo mantida pelo núcleo, sem montar um `TreeSet` novo a cada avaliação.
+- **Espectro:** as faixas livres de cada núcleo ficam guardadas até o espectro mudar.
+- **Rastreamento de mudanças:**
+  - versão por enlace;
+  - circuitos na rede avisam quando mudam espectro, núcleo, modulação, potência, rota ou requisições;
+  - lista de requisições rastreada.
+  - Circuitos translúcidos desligam os caches que dependem disso.
+- **Métricas:**
+  - o consumo de energia é calculado só quando a métrica `ConsumedEnergy` lê o valor;
+  - `GroomingStatistics` conta as requisições sem montar um `HashSet` a cada observação.
+- **Execução:** com mais de uma thread, as cargas mais altas começam primeiro.
+- **QKD:**
+  - a atualização das sessões pula as que o circuito alocado ou liberado não pode afetar (núcleo não adjacente ou sem sobreposição de slots). Só sem multibanda, e só quando esse circuito é a única mudança desde a última atualização;
+  - os interferentes de um QCh são listados uma vez por enlace, não uma vez por *span*;
+  - os enlaces de cada sessão ficam guardados na sessão.
+- **Interruptores:**
+  - `-Dsnets.verifyPerf=true` compara cada valor dos caches com o cálculo original;
+  - `-Dsnets.noPerfCache=true` desliga os caches;
+  - `-Dsnets.perfStats=true` mostra o aproveitamento.
+
+### Verificação
+
+- **Modo de verificação (`-Dsnets.verifyPerf=true`), 17 casos de regressão:** nenhuma diferença entre os caches e o cálculo original.
+- **Regressão normal:**
+  - casos C e Q idênticos ou equivalentes à referência `main`;
+  - casos M idênticos ou equivalentes à `experimental`;
+  - os 17 casos idênticos ou equivalentes à Parte 52 (`p52base`).
+- **Teste_EX e Teste_Ex_QKD reduzidos:** mesmos valores da Parte 52.
+- **Save states:** Q01 e C01 parados e continuados, com resultado igual.
+- **Tempo:**
+
+| Caso | Antes | Agora | Redução |
+|---|---|---|---|
+| Teste_EX reduzido | 258 s | 148 s | −43 % |
+| Teste_Ex_QKD reduzido | 202 s | 111 s | −45 % |
+| Casos de regressão | — | — | −13 % a −59 % |
+
+### Arquivos
+
+- **Simulador:**
+  - novos: `simulator/PerfChecks.java`, `network/QotLinkCache.java`, `network/PhysicalStateChanges.java` e `network/TrackedRequestList.java`;
+  - alterados: `network/Circuit.java`, `Core.java`, `Link.java`, `Spectrum.java`, `PhysicalLayer.java`, `Crosstalk.java` e `Mesh.java`;
+  - alterados: `measurement/GroomingStatistics.java`, `request/RequestForConnection.java` e `simulationControl/SimulationManagement.java`;
+  - alterados: `qkd/control/QKDExistingSessionImpactEvaluator.java`, `QKDActiveConnection.java` e `qkd/physical/QKDPhysicalLayer.java`;
+  - `simulations/SNetS-SDM-QKD-exp.jar`.
+- **Documentação:** `docs/MUDANCAS_DESEMPENHO_E_SAVE_STATES.md` (seção 11).
+
+---
+
+<a id="parte-53"></a>
+
+## Parte 53 — documentação das mudanças de desempenho e save states, verificação contra outras versões
+
+Só documentação: nenhum código do simulador ou do launcher mudou.
+
+### Documento novo
+
+`docs/MUDANCAS_DESEMPENHO_E_SAVE_STATES.md` registra, para revisão no laboratório:
+
+- cada mudança de desempenho, com o código antes e depois e o motivo de o resultado não mudar;
+- a métrica `AlgorithmCost`;
+- o funcionamento dos save states e do cancelar e continuar;
+- as verificações abaixo e onde ainda dá para ganhar tempo.
+
+### Verificações
+
+- **Experimental × main, casos completos do laboratório:**
+  - Teste_Ex_QKD: 18 CSVs idênticos;
+  - Teste_EX: idênticos, exceto o efeito do sorteio sem semente do `spcsav2` no núcleo do circuito bloqueado (bloqueio por núcleo, causa fragmentação × outros e fragmentação externa, cargas 6–7).
+- **Execução cancelada e continuada (Classico_CANCEL) × contínua:** igual, com a mesma ressalva do `spcsav2`.
+- **SBRC26 (código do Alexandre, só com a semente injetada) × main × experimental:**
+  - casos: Teste_EX e NSFNet CPSD, EPA, IMPA e CPA (`prmscav3`);
+  - resultado: todos idênticos.
+- **SNetS-SMD_XT (Rayline) × SBRC26:** Teste_EX e NSFNet CPSD idênticos.
+- **Perfil (JFR) e protótipo fora do repositório:**
+  - memória do `arcsinh` no NLI e cache das faixas livres;
+  - −21 % no clássico e −14 % no QKD;
+  - CSVs idênticos.
+
+---
+
+<a id="parte-52"></a>
+
+## Parte 52 — save states ligados por padrão, cancelar sem perder o progresso, continuar execuções interrompidas (launcher 1.20.6)
+
+Só na branch experimental: os save states (Parte 45) não existem no simulador da main.
+
+### Simulador
+
+- **Save states ligados por padrão:** sem o grupo `saveState` no arquivo `simulation`, eles ficam ligados e gravam a cada 10 min. `"enabled": false` desliga.
+- **Parada com gravação:** o simulador para depois de gravar o estado de cada simulação, entre dois eventos, quando:
+  - aparece o arquivo `savestate/STOP` (o launcher o cria ao cancelar);
+  - o usuário aperta Ctrl+C;
+  - a janela de console é fechada ou o processo recebe um pedido normal de término.
+
+  O processo termina com o código 3 e não grava resultados. As simulações que ainda não tinham começado ficam para a continuação.
+- **Queda de energia:** não dá para avisar o simulador. Vale o último estado gravado, de no máximo um intervalo antes (10 min por padrão).
+- **`savestate/progresso.json`:** resumo para o launcher, com as simulações concluídas, em andamento (com as requisições já processadas) e sem início, a data da última gravação, os arquivos do caso e o JAR.
+- **Hash do estado:** passa a incluir o JAR do simulador. Um estado gravado por outra versão do JAR não é retomado.
+- **Fim do caso:** quando o caso termina e os resultados são gravados, a pasta `savestate` é apagada. `"keepAfterFinish": true` a mantém.
+- **Verificação:**
+  - Q01 cancelado com o arquivo STOP e depois continuado: CSVs iguais aos de uma execução sem interrupção. O ConsumedEnergy muda só na última casa decimal, como já acontece entre execuções normais.
+  - Q01 interrompido com Ctrl+C e continuado: também igual.
+  - Regressão C/Q/M idêntica.
+
+### Launcher 1.20.6
+
+- **Cancelar:** pede ao simulador que grave e pare (o arquivo STOP). O processo só é encerrado à força se não parar em 120 s. A execução aparece como "interrompida · progresso salvo".
+- **Fechar o launcher:** pede o mesmo a todas as execuções e espera até 30 s.
+- **Lista de casos:** um caso com execução interrompida mostra `⏸ 42 %` (parte das requisições já feita).
+- **Caso aberto:** uma faixa sob o título mostra "Execução interrompida", o que foi gravado e os botões **Continuar execução**, **Detalhes** e **Descartar progresso**. Ela também distingue a interrupção sem aviso (queda de energia ou processo encerrado).
+- **Aba Executar:**
+  - um painel mostra cada simulação (carga × replicação) concluída (✓), em andamento (% das requisições) ou sem início;
+  - um aviso aparece se os arquivos do caso ou o JAR mudaram, porque nesse caso o progresso seria ignorado;
+  - o botão principal vira **Continuar execução**, e **Executar do zero** descarta o progresso, com confirmação.
+- **Execuções:**
+  - a seção **Interrompidas** lista todos os casos com progresso salvo que não estão rodando. Entram os cancelados numa fila ou execução paralela e os parados por queda de energia em outra sessão;
+  - cada caso tem uma caixa de seleção, e há **todas**;
+  - **Continuar selecionadas** roda em fila ou em paralelo, e **Descartar o progresso** apaga o progresso das selecionadas;
+  - cada execução cancelada com progresso salvo tem o botão **Continuar**.
+- **Vários casos:** os casos com execução interrompida continuam de onde pararam, ou começam do zero se a caixa "Começar do zero" estiver marcada.
+- **Aba Simulação:** o grupo Save states tem textos novos e a opção "Manter a pasta savestate depois que o caso termina".
+
+### Arquivos
+
+- **Simulador:**
+  - `simulator/SaveStateStore.java`, `EventMachine.java` e `Simulator.java`;
+  - `simulationControl/SimulationManagement.java` e `parsers/SimulationConfig.java`;
+  - `simulations/SNetS-SDM-QKD-exp.jar`.
+- **Launcher:**
+  - `Runner.java`, `Workspace.java` e `LauncherServer.java`;
+  - `app.js`, `run.js`, `api.js`, `schema.js`, `index.html` e `styles.css`;
+  - `snets-launcher.jar`.
+- **Documentação:** `docs/SAVE_STATES_CUSTO_DESEMPENHO.md`.
+
+---
+
 <a id="parte-51"></a>
 
-## Parte 51 — launcher 1.18.4: menu das configurações, mais ajustes nos gráficos e mapa por causas escolhidas
+## Parte 51 — launcher 1.20.5: menu das configurações, mais ajustes nos gráficos e mapa por causas escolhidas
 
 **Organização das configurações (Estúdio de gráficos):**
 
@@ -117,13 +275,15 @@ Feita igual na `main` (launcher 1.18.5) e na `experimental` (launcher 1.20.7), p
   - espessura dos eixos e linha do eixo y sempre visível.
 - **Barras:** cantos arredondados, e cor e espessura do contorno.
 
+Igual à Parte 51 da main (launcher 1.18.4), trazida para a experimental.
+
 **Arquivos:** `launcher/web/js/figures.js`, `launcher/web/js/figrender.js`, `launcher/web/styles.css`, `launcher/src/launcher/LauncherServer.java` e `launcher/snets-launcher.jar`.
 
 ---
 
 <a id="parte-50"></a>
 
-## Parte 50 — launcher 1.18.3: gráfico de comparação com um caso de referência
+## Parte 50 — launcher 1.20.4: gráfico de comparação com um caso de referência
 
 Novo tipo de gráfico no Estúdio de gráficos: **Comparação com um caso de referência** (barras divergentes).
 
@@ -175,8 +335,146 @@ O tipo também pode ser escolhido para qualquer outro arquivo ou métrica.
 - A tabela "Dados do gráfico" e o CSV trazem o valor, o valor da referência e a diferença.
 - A diferença usa a média das replicações e não mostra o intervalo de confiança.
 - Correção na validação do launcher: casos com `qkd.qchGranularity = route` eram marcados com o erro "qkd.qchGranularity deve ser "link" ou "span"", uma regra antiga; o simulador aceita `route`, `link` e `span`.
+- Na experimental, a validação passou a aceitar `qchSlotPolicy = maxskr` (Parte 49).
+
+Igual à Parte 50 da main (launcher 1.18.3), trazida para a experimental.
 
 **Arquivos:** `launcher/web/js/figures.js`, `launcher/web/js/figrender.js`, `launcher/web/js/validate.js`, `launcher/src/launcher/LauncherServer.java` e `launcher/snets-launcher.jar`.
+
+---
+
+<a id="parte-49"></a>
+
+## Parte 49 — QoT clássica por banda com ISRS, política maxskr do QCh, casos iniciais e launcher 1.20.3
+
+### 1. QoT clássica por banda (opcional, desligada por padrão)
+
+Novo bloco `multiBand` no arquivo `physicalLayer` (classe `network.ClassicalMultiBand`). Com ele, cada circuito usa os valores da sua própria frequência:
+
+- perda G.652.D, ou `fiberLoss` com `attenuationModel: constante`;
+- figura de ruído da banda;
+- energia do fóton h·f;
+- γ ∝ f;
+- β2 a partir de D(λ) = D + S·Δλ.
+
+Também entra o **ISRS**, pela aproximação triangular (Zirngibl 1998; Semrau et al. 2018), como perda extra no ASE de cada span, calculada com os circuitos que estão no enlace.
+
+- Sem o bloco, ou com `enabled: false`, nada muda (regressão C/Q/M idêntica).
+- A mudança do NLI pelo ISRS (GGN) não é modelada.
+- Detalhes em `docs/multibanda/QOT_CLASSICA_POR_BANDA.md`.
+
+### 2. `qchSlotPolicy = maxskr` (granularidade `route`)
+
+- Avalia todas as faixas livres do núcleo QKD na rota e tenta primeiro a de maior SKR mínima.
+- Com `wavelengthPolicy = grid`, isso escolhe o λ do QCh com menos ruído e perda.
+- Teste curto em Linha C+L (800 requisições):
+
+| Política | SKR média de admissão | SKR mínima de admissão |
+|---|---|---|
+| firstfit | 46,8 Mbit/s | 12,6 Mbit/s |
+| maxskr | 54,5 Mbit/s | 50,9 Mbit/s |
+
+- O custo é maior: ~2× o firstfit nesse teste.
+
+### 3. Verificação VMB-13 (`MultiBandClassicalQoTVerification`)
+
+- Bloco ausente ou desligado não muda nada.
+- Em f_ref os parâmetros são os do arquivo.
+- Perda, NF, γ e β2 variam por banda.
+- A média de ρ do ISRS é 1 e a inclinação é 4,34·P·C_r·L_eff·B.
+- A inclinação confere com as equações de Raman acopladas usando o ganho Raman medido do GNPy, com diferença de 5–13 % (`verificacao/QKD_reference/ISRS_GNPy`).
+
+Os verificadores multibanda das Partes 42–48 continuam passando.
+
+### 4. Casos `simulations/QKD_Multibanda_Parte49` (Linha e Losango, 13 casos cada)
+
+| Grupo | Casos | O que compara |
+|---|---|---|
+| A | A0–A4 | MF × MB (1381 nm, `antiStokesCorrection` nenhuma × medida; 1310 nm) × MB-SDM |
+| B | B1–B4 | QoT única × por banda, sem e com ISRS, na banda C e no C+L |
+| C | C1–C4 | firstfit, abne, lowestloss e maxskr no C+L |
+
+- Tamanho inicial: 20 000 requisições, 5 cargas e 5 replicações.
+- Os casos são gerados por `tools/casos/gerar_casos_parte49.py`.
+- Nos casos novos, `classicalBandStartThz` está coerente com a grade da camada física: 191,85 THz na banda C e 184,4 THz no C+L. Nos casos da Parte 43 está 191,3; ver o `LEIA-ME.md` da pasta.
+
+### 5. Launcher 1.20.3
+
+- Grupo **QoT clássica por banda (experimental)** na aba Camada física.
+- Opção `maxskr` em `qkd.qchSlotPolicy`.
+- Ajuda de `classicalBandStartThz` com a regra centerFrequency − slots × 12,5 GHz / 2.
+
+### Arquivos
+
+- **Simulador:**
+  - `network/ClassicalMultiBand` (novo) e `network/PhysicalLayer`;
+  - `simulationControl/parsers/PhysicalLayerConfig` e `NetworkConfig` (javadoc);
+  - `qkd/network/QKDNetworkParameters` e `qkd/capacity/QKDSharedResourceManager`;
+  - `qkd/verification/MultiBandClassicalQoTVerification` (novo);
+  - `simulations/SNetS-SDM-QKD-exp.jar`.
+- **Launcher:** `schema.js`, `LauncherServer.java` e `snets-launcher.jar`.
+- **Documentação e referência:**
+  - `docs/multibanda/QOT_CLASSICA_POR_BANDA.md`;
+  - `verificacao/QKD_reference/ISRS_GNPy/`;
+  - `tools/casos/gerar_casos_parte49.py`.
+- **Configuração:** `.gitignore` (casos da Parte 49 entram sem os resultados).
+
+### Regressão
+
+- Casos C e Q: idênticos à referência `main`.
+- Casos M: idênticos à referência `experimental`.
+
+---
+
+<a id="parte-48"></a>
+
+## Parte 48 — correção anti-Stokes medida do SpRS (opcional) e launcher 1.20.2
+
+**Nova opção `multiband.antiStokesCorrection`** = `nenhuma` (padrão) | `medida`.
+
+- Com `medida`, o lado anti-Stokes do SpRS (QCh em comprimento de onda menor que o canal clássico) é multiplicado
+  por um fator tirado de medidas em fibra SMF-28:
+  - 1 até 10 THz da bomba;
+  - 2,3 a 17 THz e 2,2 a 24,7 THz (Chapuran et al., 2009, Tabela 1);
+  - 1,1 a 27,6 THz (Nweke et al., 2005);
+  - 1 a partir de 30 THz.
+- O lado Stokes e a região perto da bomba não mudam, então o VMB-2 (Eraerds) continua valendo.
+- Vale para os dois modelos de Raman (`artigo` e `fisico`).
+- É uma correção **empírica**. O perfil de ganho Raman confere com Hollenbeck e Cantrell (2002) nessa faixa, então a
+  causa não está identificada.
+
+**Verificação VMB-12f:**
+
+| Comparação | Sem correção | Com correção |
+|---|---|---|
+| Chapuran, 17 e 24,7 THz (modelo/medida) | 0,43 e 0,45 | 0,98 e 0,99 |
+| Nweke, bomba 1465 nm → 1310 nm, 10 km (medido ~1e-2 fóton/ns) | 7e-3 | 1,5e-2 |
+| Mehdizadeh Fig. 5(b), banda E: erro máximo da QBER | 0,072 | 0,011 |
+
+- A 1410 nm a diferença com o Mehdizadeh continua.
+
+**Efeito no caso M01** (QCh a 1381 nm, canais na banda C):
+
+| Grandeza | `nenhuma` | `medida` |
+|---|---|---|
+| p_SpRS | 3,0e-4 | 6,6e-4 |
+| SKR | 53,4 Mbit/s | 47,7 Mbit/s (−11 %) |
+| QBER | 0,018 | 0,022 |
+
+**Outras mudanças:**
+
+- VMB-5 (ruído na banda O, Dibaj 2025) passou de [PENDENTE] a [INFO]: as medidas a 1310 nm mostram que esse ruído
+  existe.
+- No launcher, a descrição do modelo `artigo` agora diz que ele segue Dibaj 2025, eq. 6.
+
+**Arquivos:**
+
+- Simulador: `SpontaneousRamanModel`, `QKDPhysicalLayerConfig`, `MultiBandLiteratureVerification`,
+  `MultiBandPhysicsVerification` e `SNetS-SDM-QKD-exp.jar`.
+- Launcher: `schema.js`, `LauncherServer.java` e `snets-launcher.jar`.
+
+**Regressão:** com o padrão `nenhuma`, os casos M são iguais à referência `experimental` e os casos Q iguais à
+`main`.
 
 ---
 
@@ -215,6 +513,408 @@ O tipo também pode ser escolhido para qualquer outro arquivo ou métrica.
 
 **Arquivos:** `launcher/web/js/bulk.js` (novo), `app.js`, `api.js`, `figures.js`, `index.html`, `styles.css`,
 `launcher/src/launcher/Workspace.java`, `LauncherServer.java` e `snets-launcher.jar`. O simulador não mudou.
+
+---
+
+<a id="parte-46"></a>
+
+## Parte 46 — validação contra a literatura: FWM de Peters, SpRS medido, NLI de Mehdizadeh reproduzido no GNPy
+
+**Mehdizadeh 2024 (QCh a 1522 nm, item VMB-11f da Parte 45): resolvido.**
+
+- O "NLI" da Fig. 3 do artigo é o NLI que o GNPy calcula para o QCh tratado como canal de −80 dBm (SPM + XPM sobre o
+  próprio QCh). Reproduzido com o GNPy 2.14.2 e com a fórmula fechada que ele usa, dentro de 1 dB da figura.
+- Esse ruído dá cerca de 1e-8 fótons por janela, desprezível.
+- A diferença vinha do SpRS. O artigo conta todos os fótons de SpRS (fração 1), sem o fator 0,5 de Dibaj 2025
+  (eq. 6). Com fração 1, a QBER da Fig. 5(b) bate de 1440 a 1522 nm (erro máximo de 0,026).
+- **Os dois artigos do grupo usam convenções diferentes.** O modelo `artigo` do simulador segue Dibaj 2025, e o
+  `fisico` fica mais perto de Mehdizadeh. Nada mudou no comportamento do simulador.
+
+**Novos itens (`MultiBandLiteratureVerification`, VMB-12a–e):**
+
+| Item | O que confere | Resultado |
+|---|---|---|
+| VMB-12a | FWM de 2 canais CW (Peters 2009) | ±1 dB |
+| VMB-12b | NLI do simulador × FWM CW | ±2,4 dB |
+| VMB-12c | espectros de SpRS medidos por Peters 2009 | modelo 13 a 33 % abaixo; a forma com a distância confere |
+| VMB-12d | NLI de Mehdizadeh, Fig. 3 | ±1 dB |
+| VMB-12e | QBER de Mehdizadeh, Fig. 5(b) | ±0,026 |
+
+- **Pendente:** de 1392 a 1450 nm, o artigo tem 2 a 5 vezes mais SpRS que o nosso perfil Raman. Nessa região, a
+  seção de choque está fora da faixa medida, e o artigo não diz como a estendeu.
+
+**Arquivos:**
+
+- Novos: `qkd/multiband/FourWaveMixingModel.java` (FWM de canais CW, fórmula de Inoue) e
+  `qkd/verification/MultiBandLiteratureVerification.java`.
+- Atualizados: `MultiBandPhysicsVerification` (VMB-3) e `MultiBandNliVerification` (VMB-11f). Os dois pendentes de
+  1522 nm passaram a [INFO] com a explicação.
+- Novos dados: `verificacao/QKD_reference/Mehdizadeh_GNPy/`, com o script do GNPy, o CSV e o LEIA-ME.
+- Nova documentação: `docs/multibanda/VALIDACAO_LITERATURA.md`, com a tabela de todas as validações (VMB-1 a VMB-12)
+  e os pendentes.
+
+**Regressão:** o simulador não mudou; os casos M continuam iguais à referência `experimental`.
+
+---
+
+<a id="parte-45"></a>
+
+## Parte 45 — NLI no QCh (N2), verificação de rede MB × MF, custo dos algoritmos, save states, desempenho e launcher 1.20.0
+
+**1. Nível N2: ruído não linear (NLI) no canal quântico**
+
+- `qkd.multiband.NonlinearInterferenceModel`: integral do modelo GN, com todos os produtos de FWM, na frequência do
+  QCh.
+  - O integrando tem cristas estreitas de casamento de fase, e as células perto delas são subamostradas até
+    0,15 GHz.
+  - Quando nenhum produto pode cair no QCh, o resultado é 0 sem integrar. É o caso do QCh em O/E com a banda
+    clássica em C+L.
+- No simulador, nova opção `multiband.nliModel` = `nenhum` (padrão) | `gn`. Com `gn`:
+  - o NLI vem dos circuitos do núcleo hospedeiro;
+  - os valores padrão de γ, β2 e β3 são os de Mehdizadeh e Dibaj e podem ser trocados;
+  - p_b = 1 − (1 − p_dark)(1 − p_XT)(1 − p_SpRS)(1 − p_NLI);
+  - o `QKDMetrics.csv` ganha as linhas de NLI.
+- Calculadora de enlace: opção `nli=gn`. O `ClassicalChannel` passou a ter largura de banda; o comb de referência usa
+  75 GHz.
+- **QoT clássica por banda não foi feita.** Os casos usam a grade clássica só na banda C. A mudança mexe no núcleo da
+  camada física clássica (`PhysicalLayer`, com α, NF e γ globais) e fica para quando houver grade C+L e revisão sua.
+
+**2. Verificação**
+
+`MultiBandNliVerification` (VMB-11a–f):
+
+| Item | O que confere | Resultado |
+|---|---|---|
+| VMB-11a | NLI no centro de um espectro plano × forma fechada de Poggiolini 2014 | erro 0,13 % |
+| VMB-11b | independência do passo da grade (2,5 a 10 GHz); NLI cúbico na potência e proporcional a γ² | OK |
+| VMB-11c | NLI = 0 no QCh de 1260 a 1400 nm com o comb C+L | OK |
+| VMB-11d | NLI cai com a distância da borda da banda | OK |
+| VMB-11e | simulador = calculadora | erro 0 no NLI; 1e-3 na SKR |
+| VMB-11f | Mehdizadeh, 1522 nm a 5 km | **PENDENTE** |
+
+Detalhe do VMB-11f:
+- artigo: 25,8 Mbit/s;
+- modelo (SpRS + NLI): 76,8 Mbit/s, com p_NLI = 4,7e-5;
+- o NLI do GN fica cerca de 2 ordens abaixo do que faltaria para reproduzir a QBER do artigo.
+
+`MultiBandIwcitVerification` (VMB-10a/b), Dibaj IWCIT 2024:
+
+| Item | Alvo do artigo | Modelo |
+|---|---|---|
+| VMB-10a, Fig. 3: SKR/Q-TRx | 40 / 50 / 30,83 Mbit/s | 4–7 % acima |
+| VMB-10b, Fig. 5: QTND ótimo em MB a 1380 nm | 20 km | 20 km |
+| VMB-10b, Fig. 5: QTND ótimo em MF a 1550 nm | 25 km | 25 km |
+| VMB-10b: ganho do MF sobre sem nó confiável | 15 % | 19 % |
+| VMB-10b: ganho do MB | +40 % | **PENDENTE** |
+
+**VMB-10c, rede completa no motor nativo do SNetS.**
+- Novo: `QKDNativeReferenceMain --arquitetura mb --raman artigo|fisico|nenhum`.
+- O MB gera o mesmo cenário do MF do artigo-base, com o QCh na banda O+E da fibra clássica 0.
+- Rodada de 5 replicações:
+
+| Topologia | MB: mínimo de Q-TRx | MF: mínimo de Q-TRx | MF usa menos (artigo) |
+|---|---|---|---|
+| Small Core | 357 em QTND 20 km | 242 em QTND 30 km | **32,2 %** (31 %) |
+| Butterfly | 221 em QTND 20 km | 151 em QTND 30 km | **31,6 %** (28 %) |
+| Metro | 209 em QTND 20 km | 146 em QTND 25 km | **30,2 %** (28 %) |
+
+- O QTND ótimo do MB (20 km) é o do artigo.
+- Os três modelos de Raman dão praticamente o mesmo resultado (no O-band o SpRS pesa pouco), o que bate com o que
+  o artigo diz.
+
+**3. Custo computacional dos algoritmos (métrica `AlgorithmCost`)**
+
+- Gera `<caso>_AlgorithmCost.csv`, com chamadas e tempo de cada algoritmo:
+  - grooming, RMLSA integrado, roteamento, espectro, núcleo e espectro, modulação, potência, realocação;
+  - admissão QKD, proteção e atualização das sessões.
+- Proxies das interfaces medem tempo e chamadas sem mudar resultados (conferido).
+- Arquivos: `simulator/AlgorithmCostRecorder.java`, `Simulation`, `SimulationManagement`, `SimulationFileManager`,
+  `SimulationConfig.Metrics.AlgorithmCost`, `SimulationRequest`, `QKDControlPlane`.
+
+**4. Save states**
+
+- Opção `simulation.saveState` (`enabled`, `intervalMinutes`).
+- Cada simulação grava `savestate/lp<L>_rep<R>.state` periodicamente e ao terminar.
+- Rodando o caso de novo:
+  - simulações concluídas são reaproveitadas;
+  - as interrompidas continuam do ponto salvo, com os mesmos resultados;
+  - estados de entradas diferentes são ignorados.
+- Arquivos: `simulator/SaveStateStore.java`, `Simulator`, `EventMachine` (gancho entre eventos),
+  `SimulationManagement`; `Serializable` em 9 classes; `Circuit` grava o `id` primeiro.
+- O `Util` comum às simulações é gravado como marca e religado na leitura. A leitura e a gravação usam pilha de
+  1 GB (redes grandes).
+- Detalhes em `docs/SAVE_STATES_CUSTO_DESEMPENHO.md`.
+
+**5. Desempenho, sem mudar resultados**
+
+- Faixas livres lidas uma vez por observação nas métricas de fragmentação e utilização.
+- Busca binária na inserção de eventos.
+- Q01 com uma thread: 25,8 s → 19,9 s (−23 %).
+
+**6. Launcher 1.20.0**
+
+- Simulação: grupo **Save states**.
+- Camada física QKD: opções de NLI.
+- Métricas: **AlgorithmCost** (aparece sozinha, lida do código).
+- Descrições das linhas de NLI.
+
+**Regressão desta parte**
+
+- Casos C e Q: idênticos ou equivalentes à referência `main`.
+- Casos M: iguais à referência `experimental`.
+- Retomada de save state: Q01, C01, M02 e C05 iguais aos da execução sem interrupção.
+
+---
+
+<a id="parte-44"></a>
+
+## Parte 44 — pasta experimental paralela, launcher 1.19.1 (edição experimental), SpRS nos resultados e fibra bidirecional
+
+**Pasta paralela `SNetS-SDM-QKD_ex`**
+
+- A pasta `Documentos\Simulador\SNetS-SDM-QKD_ex` é uma cópia completa do repositório (com o `.git`), sempre na branch
+  `experimental`.
+- A pasta `SNetS-SDM-QKD` volta a ser a da `main`.
+- Os dois launchers podem rodar ao mesmo tempo.
+- Regras do fluxo main → experimental em `docs/FLUXO_BRANCHES.md`.
+
+**Launcher 1.19.1 (edição experimental)**
+
+- `launcher/src/launcher/Edition.java` (só na experimental):
+  - selo **EXPERIMENTAL** no cabeçalho e no título da aba;
+  - porta padrão 8766 (a main usa a 8765);
+  - `SNetS-SDM-QKD-exp.jar` como JAR padrão para rodar e como saída do **Gerar JAR**.
+- Aba Rede, novas fibras prontas com o núcleo QKD virtual:
+  - **Monomodo + núcleo QKD virtual** (núcleos 0 e 1);
+  - **7 núcleos + núcleo QKD virtual** (núcleos 0–6 e 7).
+  - Ao aplicar, o núcleo QKD do caso passa a ser o virtual.
+- Camada física QKD: nova opção `multiband.bidirectionalFiber`.
+- Descrições das novas métricas de SpRS (`metricinfo.js`).
+
+**Simulador**
+
+- `multiband.bidirectionalFiber` (padrão `false`): os circuitos do enlace inverso (b→a) andam na mesma fibra em
+  sentido contrário e somam SpRS backward:
+  - mesmo núcleo: Eraerds 2010, eq. 3;
+  - núcleos vizinhos em MB-SDM: Cai 2020, eq. 18.
+- `QKDMetrics.csv`, só em casos com o grupo `multiband`, ganha três linhas:
+  - `Mean admission SpRS background probability`;
+  - `Maximum admission SpRS background probability`;
+  - `Maximum admission SpRS power (W)`.
+- Casos sem `multiband` geram exatamente os mesmos arquivos de antes.
+
+**Verificação**
+
+- `MultiBandNetworkVerification`, item VMB-9i: com fibra bidirecional, o SpRS forward + backward (mesmo núcleo e
+  intercore) é igual ao da calculadora de enlace com canais contrapropagantes (erro 0).
+- Teste de regressão:
+  - casos C e Q idênticos (ou equivalentes) à referência `main`;
+  - casos M iguais à referência `experimental`, exceto pelas três linhas novas do `QKDMetrics.csv`;
+  - a referência `experimental` foi refeita.
+
+---
+
+<a id="parte-43"></a>
+
+## Parte 43 — multibanda no simulador (N0 e N1), modelos de Raman selecionáveis e launcher 1.19.0
+
+Agora dá para simular uma rede multibanda. O multibanda entra num grupo novo e opcional, `multiband`, do arquivo
+`qkdPhysicalLayer.json`. Sem esse grupo, nada muda: os 14 casos do teste de regressão dão os mesmos valores da main.
+
+**Simulador**
+
+- Arquiteturas MF, MB e MB-SDM (`multiband.architecture`).
+  - O núcleo QKD da rede vira um núcleo virtual, declarado sem vizinhos:
+    - MF: representa a fibra escura;
+    - MB e MB-SDM: representa a banda do QCh dentro do núcleo `hostCoreId`.
+  - Os QChs continuam com os recursos de hoje: slots, TDM, PICh, Q-TRx e nós confiáveis.
+- QCh em qualquer banda (`qchCenterNm`, ex.: 1381 nm). A perda vem da curva G.652.D de 1260 a 1675 nm em todo o
+  cálculo: SKR, grade de λ e XT.
+- Ruído Raman espontâneo (SpRS) na admissão QKD e na proteção das sessões ativas:
+  - a fonte são os circuitos clássicos ativos e o candidato;
+  - no mesmo núcleo, forward;
+  - nos núcleos vizinhos (MB-SDM), pelo SpRS intercore de Cai et al. 2020;
+  - p_b = 1 − (1 − p_dark)(1 − p_XT)(1 − p_SpRS).
+- Três modelos de Raman (`ramanModel`), escolhidos por caso como as variantes de XT e de modulação:
+  - `nenhum`: Dibaj, JLT 2025;
+  - `artigo`: Mehdizadeh 2024 e Dibaj 2025, eq. 6;
+  - `fisico`: Eraerds 2010.
+- O XT linear no QCh só conta quando o QCh está dentro da grade clássica (in-band); em MF ele nunca conta.
+- Arquivos alterados:
+  - `QKDPhysicalParameters` e `QKDPhysicalLayerConfig`: grupo `multiband`;
+  - `QKDPhysicalLayer`: seção 6, "multi-band spans";
+  - `QKDSpanPhysicalResult`: potência e p_b do SpRS.
+- Classe nova: `qkd.multiband.MultiBandSettings`.
+- Hipóteses:
+  - SpRS só forward (os enlaces do SNetS são unidirecionais);
+  - potência clássica = potência de lançamento em cada trecho QKD;
+  - sem NLI/FWM.
+  - Detalhes em `docs/multibanda/SIMULACAO_MULTIBANDA.md`.
+
+**Launcher 1.19.0**
+
+- Aba **Camada física QKD**, grupo novo **Multibanda (experimental)**: arquitetura, modelo de Raman, λ do QCh, núcleo
+  hospedeiro, SpRS dos vizinhos, início da grade clássica, modelo de atenuação, pico de OH e temperatura.
+- Mudaram `web/js/schema.js` e `LauncherServer.java` (versão).
+
+**Casos (`simulations/QKD_Multibanda/`)**
+
+- Topologias: `Linha` (2 nós, 1 enlace de 50 km) e `Losango` (5 nós, 6 enlaces).
+- Em cada topologia, 9 casos:
+  - fibra monomodo: MF, e MB com os 3 modelos de Raman;
+  - MCF de 7 núcleos: MF, e MB-SDM com os 3 modelos;
+  - o modelo atual (núcleo QKD na banda C), para comparação.
+- Os casos partem do `QKD_Test10/Q100_R100`, com QTND de 25 km. Ver `QKD_Multibanda/LEIA-ME.md`.
+
+**Verificação**
+
+- `qkd.verification.MultiBandNetworkVerification` (VMB-9a a VMB-9h), com enlaces e circuitos do SNetS:
+  - sem o grupo `multiband`, os parâmetros são os da Parte 42;
+  - o grupo é lido do arquivo;
+  - o SpRS é igual ao da calculadora de enlace (erro 0), nos modelos `artigo` e `fisico` e no intercore;
+  - a SKR é igual (erro ≤ 1e-7);
+  - MF e `nenhum` dão a SKR da fibra escura;
+  - o XT só entra in-band;
+  - a SKR segue a ordem `nenhum` > `artigo` > `fisico`.
+- Teste de regressão:
+  - os 14 casos C e Q batem com a referência `main`;
+  - nas tabelas por par muda só a ordem das linhas;
+  - 3 casos multibanda novos (M01–M03) com a referência `experimental`;
+  - o arquivo opcional `casos/<caso>/regressao.json` permite ignorar CSVs que não se repetem.
+- Rodada curta dos 18 casos (4000 requisições, 2 cargas), SKR média na admissão:
+
+| Linha, QTND 25 km | SKR (Mbit/s) | QBER |
+|---|---|---|
+| MF e MB/MB-SDM com Raman `nenhum` (1381 nm) | 58,4 | 0,0150 |
+| MB-SDM `artigo` / `fisico` | 57,5–58,0 / 57,0–57,8 | 0,0152–0,0159 |
+| MB (monomodo) `artigo` / `fisico` | 54,9–55,2 / 52,7–53,3 | 0,017–0,019 |
+| Modelo atual, banda C (1550 nm) | 93,9 | 0,0150 |
+
+- Com demanda de 2,33 Mbit/s e QTND de 25 km, ainda não há bloqueio por SKR; os modelos de Raman mudam só a SKR e a
+  QBER. A diferença no bloqueio aparece com QTND maior ou com demanda maior.
+
+**Achado (sem alteração, precisa de aprovação)**
+
+- O `spcsav2` sorteia sem semente (`new Random()`) o núcleo usado para classificar a causa de um bloqueio clássico
+  (`ShortestPathsCoreAndSpectrumAssignment_v2`, linha 117).
+- Com poucos núcleos clássicos, a divisão do bloqueio por causa (fragmentação × outros) e a fragmentação externa
+  mudam entre execuções com a mesma semente. Isso também acontece no JAR da main.
+- O bloqueio total e as métricas QKD não são afetados.
+
+---
+
+<a id="parte-42"></a>
+
+## Parte 42 — branch experimental: teste de regressão, camada física multibanda e calculadora de enlace
+
+Primeira entrega da branch `experimental`. Nada muda nos resultados dos casos existentes: o JAR experimental foi
+comparado com o da main em 14 casos (4 clássicos e 10 QKD), com resultado idêntico, e o SNetS-SDM-QKD foi
+comparado com o SBRC26 original (ver "Regressão desta entrega").
+
+**Teste de regressão (`tools/regressao/`)**
+
+- `regressao.py` (Python, só biblioteca padrão), com três comandos:
+  - `gerar`: roda os casos e grava uma referência;
+  - `comparar`: compara um JAR com a referência;
+  - `determinismo`: roda o mesmo JAR duas vezes.
+- 14 casos pequenos em `casos/` (C01–C05 clássicos, Q01–Q10 QKD), todos com `trafficRandomSeed` fixo.
+- `referencias/<nome>/manifesto.json` guarda o SHA-256 de cada CSV e vai para o git. Os CSVs ficam locais.
+- Diferenças aceitas como `EQUIVALENTE`:
+  - números iguais até 1e-12 relativo;
+  - linhas em outra ordem;
+  - rótulo `Numm Attempts` corrigido.
+  Qualquer outra diferença é falha. Detalhes em `tools/regressao/LEIA-ME.md`.
+
+**Achados do teste de regressão**
+
+- O `SNetS-SDM-SBRC26.jar` original **não repete os próprios resultados**. A semente do tráfego vem do relógio
+  (`new RandGenerator()` em `Mesh`), e duas execuções do mesmo caso diferem em até 25 % (ex.: utilização de Tx).
+  - Por isso a comparação byte a byte com ele não faz sentido.
+  - Para comparar mesmo assim, o SBRC26 foi recompilado só para teste (não versionado), com uma única mudança: a
+    semente lida de `trafficRandomSeed`, com o mesmo deslocamento por carga e replicação do SNetS-SDM-QKD.
+  - Resultado em C01 (metro), C03 (USA, IMPA) e C05 (prmscav3 + apamem): ver "Regressão desta entrega".
+  - O patch está em `tools/regressao/sbrc26_semente/`.
+- O SNetS-SDM-QKD é determinístico com semente fixa. A única variação entre execuções é a última casa decimal de
+  `ConsumedEnergy.csv` (≈1e-15 relativo), por causa da ordem de soma entre threads.
+
+**Camada física multibanda (`qkd.multiband`, novo pacote, ainda fora da simulação de rede)**
+
+| Classe | O que faz | Referência |
+|---|---|---|
+| `OpticalBand` | Bandas O, E, S, C, L, U: limites, amplificador, NF e γ | Ferrari et al. 2020, Tab. II |
+| `FiberAttenuationModel` | Perda da G.652.D de 1260 a 1675 nm: Rayleigh + IR + pico de OH opcional, ou tabela (0,377 dB/km em 1260 nm; 0,185 em 1550 nm) | Ferrari 2020; Mehdizadeh 2024 |
+| `RamanGainProfile` | Perfil g0(Δν) da SSMF, 0–42 THz | GNPy (BSD-3) |
+| `SpontaneousRamanModel` | Seção de choque do SpRS com fator de Bose (Stokes e anti-Stokes), escala ajustada à medida de Eraerds; comprimentos efetivos forward (exato e o do artigo), backward e intercore | Eraerds 2010; Kawahara 2011; Cai 2020 |
+| `ClassicalChannel` | Canal clássico (frequência, potência, sentido) e o comb C+L de referência (184,4–196,8 THz, 112,5 GHz) | Mehdizadeh 2024; Dibaj 2025 |
+| `MultiBandQkdLinkModel` | Orçamento de ruído p_b = p_dark + p_SpRS (mesmo núcleo) + p_SpRS (núcleos vizinhos) e SKR do BB84 decoy para MF, MB e MB-SDM | — |
+| `MultiBandLinkResult` | Resultado com o ruído separado por origem (NLI ainda 0) | — |
+| `LinkCalculator` | Calculadora de enlace em linha de comando (ponto único ou varredura, saída CSV) | — |
+
+- `MultiBandQkdLinkModel` tem duas predefinições:
+  - `paperCompatible`: convenção de Mehdizadeh/Dibaj, com L·e^{-αL} e fração detectada 0,5;
+  - `physical`: forma exata e fração 1.
+- `BB84DecoyModel.evaluateWithAttenuation(alphaDbPerKm, L, pb)` é uma sobrecarga nova que recebe a perda já
+  calculada. O `evaluate` antigo agora delega a ela, com a mesma conta. O verificador VMB-7 prova bit a bit que os
+  resultados não mudam.
+
+Exemplo da calculadora:
+
+```bat
+java -cp simulations\SNetS-SDM-QKD-exp.jar qkd.multiband.LinkCalculator arq=mb lambda=1260:1460:5 L=5,15,30 saida=varredura.csv
+```
+
+**Verificação (`qkd.verification.MultiBandPhysicsVerification`)**
+
+O verificador aparece sozinho no botão "Verificação QKD" do launcher. Ele tem 8 itens:
+
+| Item | O que confere | Resultado |
+|---|---|---|
+| VMB-1 | Perda em 1260, 1360 e 1550 nm (0,38 / 0,28 / 0,18 dB/km) e mínimo na banda C | OK |
+| VMB-2 | ρ contra a medida de Eraerds 2010, 9 pontos de −5 a +11 THz | OK (±20 %) |
+| VMB-3 | Mehdizadeh 2024: SKR 3,08 Mbit/s (1381 nm, 70 km), 0,53 Mbit/s (1260 nm, 70 km) e 160,82 Mbit/s (1260 nm, 5 km) | OK (6–13 %) |
+| VMB-4 | Dibaj IWCIT 2024 em 1380 nm: 185 / 100 / 40 Mbit/s a 5 / 15 / 30 km | OK (4–7 %) |
+| VMB-5 | Dibaj JLT 2025, Fig. 10 (μ = 0,5, 1360 nm): 385 kbit/s a 100 km, 15 kbit/s a 150 km e 0,354 kbit/s a 200 km | OK (6 %, 9 %, mesma ordem) |
+| VMB-6 | Cai 2020: pico do SpRS intercore em 40 km e do mesmo núcleo em 20 km; P_F e P_B a 50 km; linearidade em h | OK (≤0,2 %) |
+| VMB-7 | MF = BB84 com p_b = p_dark; a sobrecarga não muda o `evaluate` (45 pontos, bit a bit) | OK |
+| VMB-8 | Limites: α_q = α_c, saturação do backward, L = 0, h = 0, SpRS reduz a SKR | OK |
+
+Dois itens ficam como `[PENDENTE]` e não falham:
+
+- **Banda S junto ao comb (1522 nm, 5 km).** O modelo dá 77 Mbit/s contra 25,8 Mbit/s no artigo. Falta o ruído não
+  linear (NLI/FWM), previsto para o nível N2.
+- **SpRS no VMB-5.** O artigo diz que o ruído é desprezível no O-band, e os limiares dele saem com p_b = p_dark. Com
+  o SpRS do comb C+L, o modelo dá 0,5 kbit/s a 150 km em vez de 15. É um conflito entre o JLT 2025 e o Comm. Lett.
+  2024, dos mesmos autores, a discutir.
+
+**Regressão desta entrega**
+
+| Comparação | Casos | Resultado |
+|---|---|---|
+| `SNetS-SDM-QKD-exp.jar` (esta branch) × `SNetS-SDM-QKD.jar` (main, Parte 41) | 14 (C01–C05, Q01–Q10) | Todos idênticos. A única diferença é `ConsumedEnergy.csv`, equivalente (1e-15) |
+| `SNetS-SDM-QKD.jar` × SBRC26 original com semente fixa (`sbrc26_semente`) | C01, C03, C05 | Todos equivalentes (ver abaixo) |
+
+O que muda entre o SBRC26 original e o SNetS-SDM-QKD nos casos clássicos:
+
+- todos os valores são iguais;
+- as tabelas por par saem em outra ordem de linhas;
+- o rótulo `Numm Attempts` foi corrigido para `Num Attempts`;
+- há CSVs novos do addon (`BlockingDetails`, `SlotBlocking`, `SlotUtilization`).
+
+Isso responde à dúvida sobre resultados clássicos divergentes entre versões: com a mesma semente, o SNetS-SDM-QKD
+reproduz o SBRC26. As diferenças entre execuções do SBRC26 vêm da semente pelo relógio, não do código.
+
+Outras notas:
+
+- O C02 (núcleo desativado) usa um recurso que só existe no SNetS-SDM-QKD, por isso fica fora da comparação com o
+  SBRC26.
+- O código-fonte desta branch é igual ao da main em 343 arquivos (hash). Só mudaram `BB84DecoyModel.java` (a
+  sobrecarga) e os 9 arquivos novos.
+- Verificadores do launcher: todos passam com o JAR experimental, exceto três que já falham com o JAR da main. Eles
+  não foram alterados nesta parte:
+  - `QKDArticleBaseReferenceVerification` e `QKDNativeArticleBaseVerification` precisam da pasta
+    `simulations/QKD_reference/`;
+  - `QKDExistingSessionProtectionVerification` espera o primeiro QCh no slot 1, que mudou com a regra ABNE da
+    Parte 40.
 
 ---
 

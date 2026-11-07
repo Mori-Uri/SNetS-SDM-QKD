@@ -19,7 +19,9 @@
   function defaultQkdJar() {
     const j = jars();
     const pref = App.state.info && App.state.info.settings.defaultJar;
-    return (j.find((x) => x.path === pref && /qkd/i.test(x.name)) || j.find((x) => /qkd/i.test(x.name))
+    const own = App.state.info && App.state.info.simulatorJar; // Parte 44
+    return (j.find((x) => x.path === pref && /qkd/i.test(x.name)) || j.find((x) => own && x.name === own)
+      || j.find((x) => /qkd/i.test(x.name))
       || j.find((x) => x.path === pref) || j[0] || {}).path || '';
   }
 

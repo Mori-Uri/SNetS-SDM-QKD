@@ -151,6 +151,13 @@
     [/^minimum admission skr/i, 'Menor SKR de sessão observada na admissão.', 'Mbit/s'],
     [/^mean admission qber$/i, 'QBER média das sessões na admissão (pior trecho). Próxima do erro de alinhamento e_d quando o crosstalk é desprezível.', 'fração'],
     [/^maximum admission qber$/i, 'Maior QBER de sessão observada na admissão.', 'fração'],
+    // Parte 44: multibanda (só aparecem com qkdPhysicalLayer.multiband)
+    [/^mean admission sprs background probability$/i, 'Probabilidade média de contagem de fundo por janela causada pelo espalhamento Raman (SpRS) dos canais clássicos, nos trechos das sessões admitidas.', 'probabilidade'],
+    [/^maximum admission sprs background probability$/i, 'Maior probabilidade de fundo por SpRS num trecho de sessão admitida.', 'probabilidade'],
+    [/^maximum admission sprs power/i, 'Maior potência de SpRS no filtro do receptor QKD entre as sessões admitidas.', 'W'],
+    // Parte 45
+    [/^mean admission nli background probability$/i, 'Probabilidade média de fundo por janela causada pelo ruído não linear (NLI, modelo GN) dos canais clássicos, nos trechos das sessões admitidas.', 'probabilidade'],
+    [/^maximum admission nli background probability$/i, 'Maior probabilidade de fundo por NLI num trecho de sessão admitida.', 'probabilidade'],
     [/^mean key demand/i, 'Demanda média de material de chave das sessões aceitas.', 'Mbit/s'],
     [/^mean active qchs$/i, 'Número médio de QChs ativos na rede (amostrado nas chegadas; pela propriedade PASTA equivale à média no tempo).', 'QChs'],
     [/^mean active q-trx pairs$/i, 'Número médio de pares transmissor-receptor quânticos (Q-TRx) em uso: um por trecho de cada QCh ativo.', 'pares'],

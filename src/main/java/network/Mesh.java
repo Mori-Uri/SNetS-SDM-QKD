@@ -293,6 +293,7 @@ public class Mesh implements Serializable {
      * @return double
      */
     public double getTotalPowerConsumption() {
+        ensurePowerConsumption(); // Parte 54
         return totalPowerConsumption;
     }
 
@@ -302,6 +303,7 @@ public class Mesh implements Serializable {
      * @return double
      */
     public double getTotalPowerConsumptionTransponders() {
+        ensurePowerConsumption(); // Parte 54
         return totalPowerConsumptionTransponders;
     }
 
@@ -311,6 +313,7 @@ public class Mesh implements Serializable {
      * @return double
      */
     public double getTotalPowerConsumptionOXCs() {
+        ensurePowerConsumption(); // Parte 54
         return totalPowerConsumptionOXCs;
     }
 
@@ -320,6 +323,7 @@ public class Mesh implements Serializable {
      * @return double
      */
     public double getTotalPowerConsumptionAmplifiers() {
+        ensurePowerConsumption(); // Parte 54
         return totalPowerConsumptionAmplifiers;
     }
 
@@ -329,6 +333,46 @@ public class Mesh implements Serializable {
      * @param cp ControlPlane
      */
     public void computesPowerConsmption(ControlPlane cp) {
+    	// Parte 54 (desempenho): the totals are read only by the ConsumedEnergy metric, once per request, but were
+    	// recomputed over the whole network at every allocation and release. Now this call only marks them as out of
+    	// date, and they are computed when read, from the same network state (every change of the state calls this
+    	// method before the next read). With -Dsnets.verifyPerf=true they are also computed here and compared when read.
+    	if (simulator.PerfChecks.ENABLED) {
+    		powerConsumptionCp = cp;
+    		powerConsumptionDirty = true;
+    		if (!simulator.PerfChecks.VERIFY) {
+    			return;
+    		}
+    	}
+    	computePowerConsumptionNow(cp);
+    }
+
+    /** Parte 54: control plane of the pending computation of the totals, and whether they are out of date. */
+    private ControlPlane powerConsumptionCp;
+    private boolean powerConsumptionDirty;
+
+    /** Parte 54: computes the totals if they are out of date (see computesPowerConsmption). */
+    private void ensurePowerConsumption() {
+    	if (!powerConsumptionDirty) {
+    		return;
+    	}
+    	powerConsumptionDirty = false;
+    	if (simulator.PerfChecks.VERIFY) {
+    		final double[] eager = { totalPowerConsumptionTransponders, totalPowerConsumptionOXCs,
+    				totalPowerConsumptionAmplifiers, totalPowerConsumption, totalDataTransmitted };
+    		computePowerConsumptionNow(powerConsumptionCp);
+    		simulator.PerfChecks.same(eager[0], totalPowerConsumptionTransponders, "consumo dos transponders");
+    		simulator.PerfChecks.same(eager[1], totalPowerConsumptionOXCs, "consumo dos OXCs");
+    		simulator.PerfChecks.same(eager[2], totalPowerConsumptionAmplifiers, "consumo dos amplificadores");
+    		simulator.PerfChecks.same(eager[3], totalPowerConsumption, "consumo total");
+    		simulator.PerfChecks.same(eager[4], totalDataTransmitted, "dados transmitidos");
+    		return;
+    	}
+    	computePowerConsumptionNow(powerConsumptionCp);
+    }
+
+    /** The original computation of the totals. */
+    private void computePowerConsumptionNow(ControlPlane cp) {
     	totalPowerConsumptionTransponders = EnergyConsumption.computeTranspondersPowerConsumption(cp);
     	totalPowerConsumptionOXCs = EnergyConsumption.computeOxcsPowerConsumption(nodeList);
     	totalPowerConsumptionAmplifiers = EnergyConsumption.computeLinksPowerConsumption(linkList, cp);
@@ -344,6 +388,7 @@ public class Mesh implements Serializable {
      * @return double
      */
     public double getTotalDataTransmitted() {
+    	ensurePowerConsumption(); // Parte 54
     	return totalDataTransmitted;
     }
 

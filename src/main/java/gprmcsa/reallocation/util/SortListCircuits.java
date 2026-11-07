@@ -13,7 +13,7 @@ import network.ControlPlane;
  * @author gustavo
  *
  */
-public class SortListCircuits {
+public class SortListCircuits implements java.io.Serializable {
 
 	/**
 	 * Construtor

@@ -64,6 +64,10 @@ final class Runner {
         volatile boolean consoleSeen = false;
         volatile long lastBeat = 0;
         String group = null;
+        /** Parte 52: the simulator saved its state before stopping (exit code 3). */
+        volatile boolean savedStop = false;
+        /** Parte 52: this run continues a saved execution. */
+        boolean resumed = false;
 
         Run(String id, String kind, String casePath, String label, String jar, List<String> command,
                 File workDir, boolean queued) {
@@ -119,6 +123,8 @@ final class Runner {
             m.put("console", console);
             m.put("consoleAttached", consoleSeen);
             m.put("group", group);
+            m.put("savedStop", savedStop);
+            m.put("resumed", resumed);
             return m;
         }
     }
@@ -416,7 +422,12 @@ final class Runner {
             int code = p.waitFor();
             run.exitCode = code;
             run.end = System.currentTimeMillis();
-            if (run.cancelled) {
+            // Parte 52: exit code 3 = stopped after saving the state (launcher, Ctrl+C or the console window)
+            if (code == 3 && "case".equals(run.kind)) {
+                run.savedStop = true;
+                run.state = "cancelled";
+                run.add("[launcher] o estado foi gravado: continue a execução pelo caso ou em Execuções");
+            } else if (run.cancelled) {
                 run.state = "cancelled";
             } else {
                 run.state = code == 0 ? "finished" : "failed";
@@ -570,9 +581,38 @@ final class Runner {
                 return;
             }
         }
-        Process p = r.process;
+        final Process p = r.process;
         if (p != null && "running".equals(r.state)) {
             r.cancelled = true;
+            if ("case".equals(r.kind) && r.casePath != null) {
+                // Parte 52: the simulator saves the state of every simulation and stops (savestate/STOP); the
+                // process is killed only if it does not end in time
+                try {
+                    workspace.requestStop(r.casePath);
+                    r.add("[launcher] cancelamento solicitado: o simulador grava o estado e para (pode levar alguns segundos)");
+                } catch (IOException e) {
+                    r.add("[launcher] não foi possível pedir a parada (" + e.getMessage() + "): o processo será encerrado");
+                    p.destroyForcibly();
+                    return;
+                }
+                final Run rr = r;
+                Thread t = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            if (!p.waitFor(STOP_WAIT_SECONDS, java.util.concurrent.TimeUnit.SECONDS)) {
+                                rr.add("[launcher] o simulador não parou em " + STOP_WAIT_SECONDS + " s: processo encerrado (fica o último estado gravado)");
+                                p.destroyForcibly();
+                            }
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                }, "snets-stop-" + r.id);
+                t.setDaemon(true);
+                t.start();
+                return;
+            }
             r.add("[launcher] cancelamento solicitado");
             p.destroy();
             try {
@@ -582,6 +622,31 @@ final class Runner {
             }
             if (p.isAlive()) {
                 p.destroyForcibly();
+            }
+        }
+    }
+
+    /** Parte 52: seconds the launcher waits for the simulator to save and stop. */
+    static final int STOP_WAIT_SECONDS = 120;
+
+    /** Parte 52: true when the case is running or queued in this launcher. */
+    synchronized boolean isActive(String casePath) {
+        for (Run r : runs.values()) {
+            if (("running".equals(r.state) || "queued".equals(r.state)) && casePath.equals(r.casePath)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Parte 52: marks the latest runs of these cases as resumed executions. */
+    synchronized void markResumed(List<Object> summaries) {
+        for (Object o : summaries) {
+            if (o instanceof Map) {
+                Run r = runs.get(String.valueOf(((Map<?, ?>) o).get("id")));
+                if (r != null) {
+                    r.resumed = true;
+                }
             }
         }
     }
@@ -599,11 +664,36 @@ final class Runner {
         return n;
     }
 
-    synchronized void stopAll() {
-        clearQueue();
-        for (Run r : runs.values()) {
-            Process p = r.process;
-            if (p != null && p.isAlive()) {
+    /** Closing the launcher: the simulations save their state and stop (up to 30 s), then everything is killed. */
+    void stopAll() {
+        List<Process> alive = new ArrayList<Process>();
+        synchronized (this) {
+            clearQueue();
+            for (Run r : runs.values()) {
+                Process p = r.process;
+                if (p != null && p.isAlive()) {
+                    if ("case".equals(r.kind) && r.casePath != null) {
+                        try {
+                            workspace.requestStop(r.casePath);
+                        } catch (IOException e) {
+                            // killed below
+                        }
+                    }
+                    alive.add(p);
+                }
+            }
+        }
+        long limit = System.currentTimeMillis() + 30000L;
+        for (Process p : alive) {
+            try {
+                long left = limit - System.currentTimeMillis();
+                if (left > 0) {
+                    p.waitFor(left, java.util.concurrent.TimeUnit.MILLISECONDS);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            if (p.isAlive()) {
                 p.destroyForcibly();
             }
         }

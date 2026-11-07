@@ -39,6 +39,8 @@ public class SimulationRequest {
         public final static String FILE_DATASET_INFORMATION = "DataSetInformation.csv";
         public final static String FILE_PHYSICAL_LAYER_STATISTICS = "PhysicalLayerStatistics.csv";
         public final static String FILE_QKD_STATISTICS = "QKDStatistics.csv";
+        /** Parte 45: computational cost of the algorithms. */
+        public final static String FILE_ALGORITHM_COST = "AlgorithmCost.csv";
         public final static String FILE_QKD_METRICS = "QKDMetrics.csv";
         public final static String FILE_BLOCKING_DETAILS = "BlockingDetails.csv";
         public final static String FILE_SLOT_UTILIZATION = "SlotUtilization.csv";
@@ -60,6 +62,8 @@ public class SimulationRequest {
         public String dataSetInformation;
         public String physicalLayerStatistics;
         public String qkdStatistics;
+        /** Parte 45 (activeMetrics.AlgorithmCost). */
+        public String algorithmCost;
         public String qkdMetrics;
         public String blockingDetails;
         public String slotUtilization;

@@ -37,6 +37,13 @@ public class SimulationManagement {
     private List<List<Simulation>> simulations;
     private volatile int done;
     private volatile int failed;
+    /** Parte 52: simulations stopped by a stop request (saved for the resume). */
+    private volatile int stopped;
+    /** Parte 52: save states of the last run (null = off). */
+    private simulator.SaveStateStore saveStates;
+
+    /** Parte 52: save states of the last run, or null. */
+    public simulator.SaveStateStore getSaveStates() { return saveStates; }
     private int numOfSimulations;
     private List<List<Measurements>> mainMeasuremens;
 
@@ -152,18 +159,63 @@ public class SimulationManagement {
                 simulationRequest.getSimulationConfig().getThreads());
         done = 0;
         failed = 0;
+        stopped = 0;
+        // Parte 45: save states (simulation.saveState). Parte 52: on unless "enabled": false
+        final simulator.SaveStateStore saveStates = simulator.SaveStateStore.forRequest(simulationRequest);
+        this.saveStates = saveStates;
+        if (saveStates != null) saveStates.begin(simulations, simulationRequest.getSimulationConfig().getRequests());
 
-        for (List<Simulation> loadPoint : simulations) {
-            for (final Simulation replication : loadPoint) {
+        // Parte 54 (desempenho): with more than one thread, the simulations of the highest load points (the slowest)
+        // are started first, so the last ones to finish are short and the threads are not left idle at the end of the
+        // run. Each simulation is independent and keeps its own seed, so the results do not change. With one thread
+        // the original order is kept.
+        final List<List<Simulation>> order = new java.util.ArrayList<List<Simulation>>(simulations);
+        if (simulationRequest.getSimulationConfig().getThreads() > 1 && simulator.PerfChecks.ENABLED) {
+            java.util.Collections.reverse(order);
+        }
+        for (List<Simulation> loadPoint : order) {
+            for (int index = 0; index < loadPoint.size(); index++) {
+                final simulator.SaveStateStore.State state = saveStates == null ? null
+                        : saveStates.load(loadPoint.get(index).getLoadPoint(), loadPoint.get(index).getReplication(),
+                                loadPoint.get(index).getUtil());
+                if (state != null) {
+                    loadPoint.set(index, state.getSimulation());
+                    System.out.println("Save state: carga " + state.getSimulation().getLoadPoint() + ", replicacao "
+                            + state.getSimulation().getReplication() + (state.isFinished() ? " ja concluida"
+                            : " retomada do ponto salvo"));
+                }
+                final Simulation replication = loadPoint.get(index);
+                if (state != null && state.isFinished()) {
+                    mainMeasuremens.get(replication.getLoadPoint()).set(replication.getReplication(),
+                            replication.getMeasurements());
+                    synchronized (SimulationManagement.this) {
+                        done++;
+                    }
+                    continue;
+                }
                 executor.execute(new Runnable() {
                     @Override
                     public void run() {
+                        // Parte 52: a stop was requested before this simulation started: it is left for the resume
+                        if (simulator.SaveStateStore.isStopRequested()) {
+                            synchronized (SimulationManagement.this) {
+                                stopped++;
+                                done++;
+                            }
+                            return;
+                        }
                         try {
                             Simulator simulator = new Simulator(replication);
+                            simulator.setSaveStates(saveStates);
 
+                            final long wall0 = System.nanoTime(); // Parte 45
                             mainMeasuremens
                                 .get(replication.getLoadPoint())
-                                .set(replication.getReplication(), simulator.start());
+                                .set(replication.getReplication(),
+                                        state != null ? simulator.resume(state) : simulator.start());
+                            if (replication.getCostRecorder() != null) {
+                                replication.getCostRecorder().setWallNanos(System.nanoTime() - wall0);
+                            }
 
                             int finished;
                             synchronized (SimulationManagement.this) {
@@ -171,6 +223,11 @@ public class SimulationManagement {
                             }
                             simulationProgressListener.onSimulationProgressUpdate(
                                     ((double) finished) / ((double) numOfSimulations));
+                        } catch (simulator.SaveStateStore.Stopped st) {
+                            synchronized (SimulationManagement.this) {
+                                stopped++;
+                                done++;
+                            }
                         } catch (Throwable ex) {
                             ex.printStackTrace();
                             /*
@@ -196,6 +253,19 @@ public class SimulationManagement {
         }
 
         executor.shutdown();
+        if (stopped > 0) {
+            // Parte 52: stopped on request (launcher, Ctrl+C): the progress stays in savestate/, no results are
+            // written and the process ends with exit code 3
+            if (saveStates != null) saveStates.writeProgress("stopped");
+            System.out.println("[snets] execucao interrompida: " + stopped + " de " + numOfSimulations
+                    + " simulacoes paradas" + (saveStates != null ? "; progresso salvo em " + saveStates.getDir()
+                    : " (save states desligados: nada foi salvo)"));
+            System.out.println("[snets] rode o mesmo caso de novo para continuar de onde parou.");
+            System.out.flush();
+            simulator.SaveStateStore.markExitHandled();
+            if (!Boolean.getBoolean("snets.noExitOnStop")) System.exit(simulator.SaveStateStore.EXIT_STOPPED);
+            throw new simulator.SaveStateStore.Stopped(stopped + " of " + numOfSimulations + " simulations stopped");
+        }
         if (failed > 0) {
             throw new IllegalStateException(failed + " of " + numOfSimulations
                     + " simulations failed; see the stack traces above. No results were saved.");
@@ -204,6 +274,7 @@ public class SimulationManagement {
         ResultManager resultManager = new ResultManager(mainMeasuremens);
         SimulationRequest.Result finalResult = resultManager.getResults();
         finalResult.qkdStatistics = buildQkdStatisticsCsv();
+        finalResult.algorithmCost = buildAlgorithmCostCsv();
         finalResult.qkdMetrics = buildQkdMetricsCsv();
         finalResult.blockingDetails = buildBlockingDetailsCsv();
         finalResult.qkdChannelBlocking = buildChannelCsv(false);
@@ -218,6 +289,8 @@ public class SimulationManagement {
         }
         blockingSnapshotsCache = null;
         simulationRequest.setResult(finalResult);
+        // Parte 52: every simulation finished; the save states are deleted when the results are on disk
+        if (saveStates != null) saveStates.caseFinished();
         simulationProgressListener.onSimulationFinished();
     }
 
@@ -350,6 +423,15 @@ public class SimulationManagement {
         metrics.put("Minimum admission SKR (Mbit/s)", m -> m.accepted > 0 ? m.minimumAdmissionRawSkrMbps : Double.NaN);
         metrics.put("Mean admission QBER", m -> m.accepted > 0 ? m.meanAdmissionQber : Double.NaN);
         metrics.put("Maximum admission QBER", m -> m.accepted > 0 ? m.maximumAdmissionQber : Double.NaN);
+        if (snaps.get(0).get(0).multiband) { // Parte 44: only with qkdPhysicalLayer.multiband
+            metrics.put("Mean admission SpRS background probability", m -> m.accepted > 0 ? m.meanAdmissionRamanProbability : Double.NaN);
+            metrics.put("Maximum admission SpRS background probability", m -> m.accepted > 0 ? m.maximumAdmissionRamanProbability : Double.NaN);
+            metrics.put("Maximum admission SpRS power (W)", m -> m.accepted > 0 ? m.maximumAdmissionRamanPowerW : Double.NaN);
+        }
+        if (snaps.get(0).get(0).nli) { // Parte 45: only with multiband.nliModel = gn
+            metrics.put("Mean admission NLI background probability", m -> m.accepted > 0 ? m.meanAdmissionNliProbability : Double.NaN);
+            metrics.put("Maximum admission NLI background probability", m -> m.accepted > 0 ? m.maximumAdmissionNliProbability : Double.NaN);
+        }
         metrics.put("Mean key demand (Mbit/s)", m -> m.accepted > 0 ? m.totalDemandMbps / m.accepted : Double.NaN);
         metrics.put("Mean active QChs", m -> m.meanActiveQchs);
         metrics.put("Mean active Q-TRx pairs", m -> m.meanActiveQTrxPairs);
@@ -410,6 +492,21 @@ public class SimulationManagement {
             }
         }
         return sb.toString();
+    }
+
+    /** Parte 45: AlgorithmCost.csv (activeMetrics.AlgorithmCost), or null when the metric is off. */
+    private String buildAlgorithmCostCsv() {
+        StringBuilder sb = new StringBuilder(simulator.AlgorithmCostRecorder.header());
+        boolean any = false;
+        long requests = simulationRequest.getSimulationConfig().getRequests();
+        for (List<Simulation> load : simulations) {
+            for (Simulation sim : load) {
+                if (sim.getCostRecorder() == null) continue;
+                any = true;
+                sb.append(sim.getCostRecorder().rows(sim.getLoadPoint(), sim.getReplication(), requests));
+            }
+        }
+        return any ? sb.toString() : null;
     }
 
     private String buildQkdStatisticsCsv() {

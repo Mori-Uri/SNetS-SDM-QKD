@@ -27,6 +27,11 @@ public final class QKDPhysicalParameters implements Serializable {
     private final double receiverOpticalEfficiency;
     private final QKDCrosstalkReceiverTransferMode receiverTransferMode;
     private final boolean intercoreCrosstalkEnabled;
+    /**
+     * Parte 43: multi-band options (loss model, Raman model, architecture); {@code null} = behaviour up to Parte 42.
+     * Set only by {@link #withMultiband}, on a fresh copy, so instances stay immutable.
+     */
+    private qkd.multiband.MultiBandSettings multiband;
 
     public QKDPhysicalParameters() {
         this(0.7, 250e-12, 1.16, 0.015, 0.3, 1e-8,
@@ -132,11 +137,36 @@ public final class QKDPhysicalParameters implements Serializable {
                 qchPowerDbm,attenuationFloorDbPerKm,attenuationQuadratic,
                 attenuationCenterNm,planckConstantJs,speedOfLightMPerS,
                 detectorGateWindowS,receiverOpticalEfficiency,
-                receiverTransferMode,intercoreCrosstalkEnabled);
+                receiverTransferMode,intercoreCrosstalkEnabled).copyMultiband(multiband);
     }
+
+    /**
+     * Parte 43: copy of these parameters with the multi-band options. With settings whose loss model is not null,
+     * {@link #attenuationDbPerKm} uses it instead of the quadratic C-band fit.
+     */
+    public QKDPhysicalParameters withMultiband(qkd.multiband.MultiBandSettings settings) {
+        return new QKDPhysicalParameters(mu,pulseIntervalS,
+                errorCorrectionInefficiency,phaseErrorProbability,
+                detectorEfficiency,darkCountProbability,qchBandwidthHz,
+                qchPowerDbm,attenuationFloorDbPerKm,attenuationQuadratic,
+                attenuationCenterNm,planckConstantJs,speedOfLightMPerS,
+                detectorGateWindowS,receiverOpticalEfficiency,
+                receiverTransferMode,intercoreCrosstalkEnabled).copyMultiband(settings);
+    }
+
+    private QKDPhysicalParameters copyMultiband(qkd.multiband.MultiBandSettings settings) {
+        this.multiband = settings;
+        return this;
+    }
+
+    /** Parte 43: multi-band options, or {@code null} when the case has no {@code multiband} group. */
+    public qkd.multiband.MultiBandSettings getMultiband() { return multiband; }
 
     public double attenuationDbPerKm(double wavelengthNm) {
         requirePositive(wavelengthNm, "wavelengthNm");
+        if (multiband != null && multiband.getAttenuation() != null) {
+            return multiband.getAttenuation().dbPerKm(wavelengthNm); // Parte 43: G.652.D O-U
+        }
         double delta=wavelengthNm-attenuationCenterNm;
         return attenuationFloorDbPerKm+attenuationQuadratic*delta*delta;
     }

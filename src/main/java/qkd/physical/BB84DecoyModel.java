@@ -11,7 +11,7 @@ package qkd.physical;
  *
  * <p>Refer\u00eancias: Eq. (1) de [DIBAJ24] M. R. Dibaj et al., "Cost-Optimized Quantum Communication Networks: The Crucial Role of Trusted Node Placement in Multi-Band and Multi-Fiber Realms", IWCIT 2024 (artigo-base) (limite inferior do BB84 com estados decoy); Eqs. (9)-(18) de [MOGH21] E. E. Moghaddam, H. Beyranvand, J. A. Salehi, "Resource Allocation in SDM-EONs Secured With QKD", IEEE JSAC 39(9), 2021; verifica\u00e7\u00e3o num\u00e9rica na Tabela 5 de [MORI26] U. P. Mori, qualifica\u00e7\u00e3o "Planejamento de N\u00f3s Confi\u00e1veis para QKD em SDM-EONs: An\u00e1lise da Coexist\u00eancia Qu\u00e2ntico-Cl\u00e1ssica", UFPI, 2026.</p>
  */
-public final class BB84DecoyModel {
+public final class BB84DecoyModel implements java.io.Serializable {
 
     private final QKDPhysicalParameters parameters;
 
@@ -60,8 +60,30 @@ public final class BB84DecoyModel {
             throw new IllegalArgumentException("lengthKm must be finite and >= 0");
         }
         requireProbability(backgroundProbability, "backgroundProbability");
+        return evaluateWithAttenuation(attenuationDbPerKm(wavelengthNm), lengthKm, backgroundProbability);
+    }
 
-        final double alpha = attenuationDbPerKm(wavelengthNm);
+    /**
+     * Parte 42: same decoy-state BB84 bound with the fibre attenuation given by the caller, so that a
+     * wavelength-dependent loss model other than the quadratic C-band fit (e.g. the multi-band G.652.D model of
+     * {@code qkd.multiband.FiberAttenuationModel}) can be used. {@link #evaluate(double, double, double)} delegates
+     * here with {@code attenuationDbPerKm(wavelengthNm)}, so its results are unchanged.
+     *
+     * @param alphaDbPerKm fibre attenuation at the quantum-channel wavelength, in dB/km (&gt;= 0)
+     * @param lengthKm QKD span length in km
+     * @param backgroundProbability total background probability p_b per detection window
+     */
+    public QKDPhysicalResult evaluateWithAttenuation(double alphaDbPerKm, double lengthKm,
+            double backgroundProbability) {
+        if (!Double.isFinite(alphaDbPerKm) || alphaDbPerKm < 0.0) {
+            throw new IllegalArgumentException("alphaDbPerKm must be finite and >= 0");
+        }
+        if (!Double.isFinite(lengthKm) || lengthKm < 0.0) {
+            throw new IllegalArgumentException("lengthKm must be finite and >= 0");
+        }
+        requireProbability(backgroundProbability, "backgroundProbability");
+
+        final double alpha = alphaDbPerKm;
         final double eta = parameters.getDetectorEfficiency()
                 * Math.pow(10.0, -alpha * lengthKm / 10.0);
         final double mu = parameters.getMu();

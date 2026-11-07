@@ -1,0 +1,124 @@
+{
+  "requestGenerators": [
+    {
+      "source": "1",
+      "destination": "2",
+      "bitRate": 100000000000.0,
+      "arrivalRate": 77.5,
+      "holdRate": 1.0,
+      "arrivalRateIncrease": 77.5,
+      "qkdProtectedProbability": 1.0,
+      "keyRateMbps": 2.3333333333333335
+    },
+    {
+      "source": "1",
+      "destination": "2",
+      "bitRate": 200000000000.0,
+      "arrivalRate": 62.0,
+      "holdRate": 1.0,
+      "arrivalRateIncrease": 62.0,
+      "qkdProtectedProbability": 1.0,
+      "keyRateMbps": 2.3333333333333335
+    },
+    {
+      "source": "1",
+      "destination": "2",
+      "bitRate": 300000000000.0,
+      "arrivalRate": 46.5,
+      "holdRate": 1.0,
+      "arrivalRateIncrease": 46.5,
+      "qkdProtectedProbability": 1.0,
+      "keyRateMbps": 2.3333333333333335
+    },
+    {
+      "source": "1",
+      "destination": "2",
+      "bitRate": 400000000000.0,
+      "arrivalRate": 31.0,
+      "holdRate": 1.0,
+      "arrivalRateIncrease": 31.0,
+      "qkdProtectedProbability": 1.0,
+      "keyRateMbps": 2.3333333333333335
+    },
+    {
+      "source": "1",
+      "destination": "2",
+      "bitRate": 500000000000.0,
+      "arrivalRate": 15.5,
+      "holdRate": 1.0,
+      "arrivalRateIncrease": 15.5,
+      "qkdProtectedProbability": 1.0,
+      "keyRateMbps": 2.3333333333333335
+    },
+    {
+      "source": "1",
+      "destination": "2",
+      "bitRate": 100000000000.0,
+      "arrivalRate": 232.5,
+      "holdRate": 1.0,
+      "arrivalRateIncrease": 232.5,
+      "qkdProtectedProbability": 1.0,
+      "keyRateMbps": 2.3333333333333335
+    },
+    {
+      "source": "2",
+      "destination": "1",
+      "bitRate": 100000000000.0,
+      "arrivalRate": 77.5,
+      "holdRate": 1.0,
+      "arrivalRateIncrease": 77.5,
+      "qkdProtectedProbability": 1.0,
+      "keyRateMbps": 2.3333333333333335
+    },
+    {
+      "source": "2",
+      "destination": "1",
+      "bitRate": 200000000000.0,
+      "arrivalRate": 62.0,
+      "holdRate": 1.0,
+      "arrivalRateIncrease": 62.0,
+      "qkdProtectedProbability": 1.0,
+      "keyRateMbps": 2.3333333333333335
+    },
+    {
+      "source": "2",
+      "destination": "1",
+      "bitRate": 300000000000.0,
+      "arrivalRate": 46.5,
+      "holdRate": 1.0,
+      "arrivalRateIncrease": 46.5,
+      "qkdProtectedProbability": 1.0,
+      "keyRateMbps": 2.3333333333333335
+    },
+    {
+      "source": "2",
+      "destination": "1",
+      "bitRate": 400000000000.0,
+      "arrivalRate": 31.0,
+      "holdRate": 1.0,
+      "arrivalRateIncrease": 31.0,
+      "qkdProtectedProbability": 1.0,
+      "keyRateMbps": 2.3333333333333335
+    },
+    {
+      "source": "2",
+      "destination": "1",
+      "bitRate": 500000000000.0,
+      "arrivalRate": 15.5,
+      "holdRate": 1.0,
+      "arrivalRateIncrease": 15.5,
+      "qkdProtectedProbability": 1.0,
+      "keyRateMbps": 2.3333333333333335
+    },
+    {
+      "source": "2",
+      "destination": "1",
+      "bitRate": 100000000000.0,
+      "arrivalRate": 232.5,
+      "holdRate": 1.0,
+      "arrivalRateIncrease": 232.5,
+      "qkdProtectedProbability": 1.0,
+      "keyRateMbps": 2.3333333333333335
+    }
+  ]
+}

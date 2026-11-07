@@ -188,6 +188,8 @@ public class NetworkConfig {
          * (core 0, or 18 with 19 cores), last fit in even outer cores, first fit in odd outer cores. With the QKD core
          * on core 1 (odd) it is the same as "firstfit". "firstfit" and "abne" apply to the route, link and span modes
          * ("lowestloss" only to route; spanLanePlacement = "wavelength" wins in span/link lanes).
+         * Parte 49: "maxskr" (route only) evaluates every free band and tries first the one with the highest
+         * minimum span SKR along the route (noise-aware choice of the QCh wavelength, e.g. in the multi-band mode).
          */
         private String qchSlotPolicy = "abne";
         /** Parte 40: guard band (slots) between two QChs of the QKD core. 0 = none (behaviour up to Part 39). */

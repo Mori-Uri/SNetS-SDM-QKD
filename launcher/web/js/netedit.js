@@ -192,9 +192,11 @@
     const applyCores = () => {
       if (!showN) return;
       App.setValue('network', ['cores'], P().coresConfig(showN));
+      // 1.19.1 (Parte 44): fibras multibanda já indicam o núcleo QKD virtual
+      if (P().CORES[showN].qkdCore !== undefined && st.model.network.qkd) App.setValue('network', ['qkd', 'quantumCoreId'], P().CORES[showN].qkdCore);
       ui.cores = '';
       App.renderTab();
-      const warn = qkdCore !== null && !P().CORES[showN].ids.includes(qkdCore);
+      const warn = P().CORES[showN].qkdCore === undefined && qkdCore !== null && !P().CORES[showN].ids.includes(qkdCore);
       App.toast(P().CORES[showN].name + ' aplicada' + (warn ? ' — o núcleo QKD (' + qkdCore + ') não existe nesta fibra' : ''), warn ? 'warn' : 'ok', warn ? 7000 : 3000);
     };
     // ---------------- disabled cores (network.disabledCores)

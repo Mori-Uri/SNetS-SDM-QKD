@@ -28,7 +28,7 @@ import request.RequestForConnection;
  *
  * <p>Refer\u00eancias: [MORI26], [DIBAJ24], [MOGH21] (PICh).</p>
  */
-public final class QKDProvisioningService {
+public final class QKDProvisioningService implements java.io.Serializable {
 
     private static final double MAXIMUM_QBER_FOR_STAGE_11 = 1.0;
     private static final int QKD_GUARD_BAND_SLOTS = 0;

@@ -34,8 +34,10 @@ public final class QKDNetworkParameters implements Serializable {
     private final int alternativeRoutes;
     private final int pichSlots;
     private boolean lowestLossSlots;
+    /** Parte 49: route granularity, the free band with the highest minimum span SKR is chosen (qchSlotPolicy maxskr). */
+    private boolean maxSkrSlots;
     private boolean wavelengthLanes;
-    /** Parte 40: QCh slot rule ("firstfit", "lowestloss" or "abne") and guard band between QChs. */
+    /** Parte 40: QCh slot rule ("firstfit", "lowestloss", "abne" or, Parte 49, "maxskr") and guard band between QChs. */
     private String qchSlotPolicy = "firstfit";
     private int qchGuardBand = 0;
     /** Parte 40: PICh placement (core rule, fixed core, slot rule, guard band; -1 = network guard band). */
@@ -115,8 +117,10 @@ public final class QKDNetworkParameters implements Serializable {
             throw new IllegalArgumentException("network.qkd.alternativeRoutes must be >= 0");
         }
         final String slotPolicy = config.getQchSlotPolicy();
-        if (!"firstfit".equals(slotPolicy) && !"lowestloss".equals(slotPolicy) && !"abne".equals(slotPolicy)) {
-            throw new IllegalArgumentException("network.qkd.qchSlotPolicy must be \"abne\", \"firstfit\" or \"lowestloss\"");
+        if (!"firstfit".equals(slotPolicy) && !"lowestloss".equals(slotPolicy) && !"abne".equals(slotPolicy)
+                && !"maxskr".equals(slotPolicy)) {
+            throw new IllegalArgumentException(
+                    "network.qkd.qchSlotPolicy must be \"abne\", \"firstfit\", \"lowestloss\" or \"maxskr\"");
         }
         if (config.getQchGuardBand() < 0) {
             throw new IllegalArgumentException("network.qkd.qchGuardBand must be >= 0");
@@ -151,6 +155,7 @@ public final class QKDNetworkParameters implements Serializable {
                 config.getTdmSlots(), "grid".equals(policy), "route".equals(granularity),
                 config.getAlternativeRoutes(), config.getPichSlots());
         out.lowestLossSlots = "lowestloss".equals(slotPolicy);
+        out.maxSkrSlots = "maxskr".equals(slotPolicy);
         out.qchSlotPolicy = slotPolicy;
         out.qchGuardBand = config.getQchGuardBand();
         out.pichCorePolicy = pcp;
@@ -259,6 +264,10 @@ public final class QKDNetworkParameters implements Serializable {
     }
 
     /** Part 23: route-granularity QCh bands tried closest-to-attenuation-minimum first. */
+    public boolean isMaxSkrSlots() {
+        return maxSkrSlots;
+    }
+
     public boolean isLowestLossSlots() {
         return lowestLossSlots;
     }
@@ -268,7 +277,7 @@ public final class QKDNetworkParameters implements Serializable {
         return pichSlots;
     }
 
-    /** Parte 40: "firstfit", "lowestloss" or "abne" (spectral rule of the QKD core, as ABNE/ACINE). */
+    /** Parte 40: "firstfit", "lowestloss" or "abne" (spectral rule of the QKD core, as ABNE/ACINE); Parte 49: "maxskr". */
     public String getQchSlotPolicy() { return qchSlotPolicy; }
     /** Parte 40: guard band (slots) between QChs in the QKD core. */
     public int getQchGuardBand() { return qchGuardBand; }

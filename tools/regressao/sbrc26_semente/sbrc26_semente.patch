@@ -1,0 +1,47 @@
+--- "network/Mesh.java"	2026-11-01 04:49:47.193369870 -0300
++++ network/Mesh.java	2026-11-01 04:49:59.463129338 -0300
+@@ -21,6 +21,9 @@
+  * @author Iallen
+  */
+ public class Mesh implements Serializable {
++    /** TWIN DE TESTE (regressao): semente do trafego; null = comportamento original. */
++    public static Long seedOverride = null;
++
+ 
+     private Vector<Node> nodeList;
+     private Vector<Link> linkList;
+@@ -53,7 +56,7 @@
+         this.guarBand = nc.getGuardBand();
+         this.othersConfig = oc;
+ 
+-        RandGenerator randGenerator = new RandGenerator();
++        RandGenerator randGenerator = seedOverride == null ? new RandGenerator() : new RandGenerator(seedOverride.longValue()); // TWIN DE TESTE
+         HashMap<String, Node> nodesAux = new HashMap<>();
+ 
+         // Create nodes
+--- "simulationControl/SimulationManagement.java"	2026-11-01 04:49:47.037369861 -0300
++++ simulationControl/SimulationManagement.java	2026-11-01 04:49:59.463274211 -0300
+@@ -82,6 +82,13 @@
+         PhysicalLayerConfig plc = sr.getPhysicalLayerConfig();
+         OthersConfig oc = sr.getOthersConfig();
+ 
++        Long twinSeed = null; // TWIN DE TESTE: le trafficRandomSeed do arquivo simulation
++        try {
++            String txt = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(filesPath, "simulation")), "UTF-8");
++            java.util.regex.Matcher mm = java.util.regex.Pattern.compile("\"trafficRandomSeed\"\\s*:\\s*(-?\\d+)").matcher(txt);
++            if (mm.find()) twinSeed = Long.valueOf(mm.group(1));
++        } catch (Exception e) { /* sem semente */ }
++        System.out.println("TWIN trafficRandomSeed = " + twinSeed);
+         System.out.println("Calculating the modulations transmission ranges");
+         Mesh meshTemp = new Mesh(nc, tc, plc, oc, null, util);
+ 
+@@ -90,7 +97,9 @@
+         for (int i = 0; i < sc.getLoadPoints(); i++) { // Create the simulations for each load point
+             List<Simulation> reps = new ArrayList<>();
+             for (int j = 0; j < sc.getReplications(); j++) { // Create the simulations for each replication
++                Mesh.seedOverride = twinSeed == null ? null : Long.valueOf(twinSeed.longValue() + ((long) i) * 100000L + j); // TWIN
+                 Mesh m = new Mesh(nc, tc, plc, oc, meshTemp.getModTrDistance(), util);
++                Mesh.seedOverride = null; // TWIN
+                 incArrivedRate(m.getPairList(), i);
+                 Simulation s = new Simulation(sc, m, i, j, util);
+                 reps.add(s);

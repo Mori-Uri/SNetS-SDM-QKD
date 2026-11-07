@@ -84,8 +84,18 @@ public class RelativeFragmentation extends Measurement {
      * Makes a observation of the average relative fragmentation on all links for each configured c value
      */
     private void observationLinks(Mesh mesh) {
+        // Parte 45 (desempenho): the free bands of every core are read once per observation and reused for every c
+        // (before: once per c). Same values, same order of the sums: identical results.
+        final List<List<List<int[]>>> bands = new ArrayList<>();
+        for (Link link : mesh.getLinkList()) {
+            final List<List<int[]>> perCore = new ArrayList<>();
+            for (Core core : link.getCores()) {
+                perCore.add(core.getFreeSpectrumBands(0));
+            }
+            bands.add(perCore);
+        }
         for (Integer c : relativeFrag.keySet()) {
-            this.observationAllLinks(c, mesh);
+            this.observationAllLinks(c, mesh, bands);
         }
     }
 
@@ -94,15 +104,17 @@ public class RelativeFragmentation extends Measurement {
      *
      * @param c
      */
-    private void observationAllLinks(Integer c, Mesh mesh) {
+    private void observationAllLinks(Integer c, Mesh mesh, List<List<List<int[]>>> bands) {
     	ComputesFragmentation cf = new ComputesFragmentation();
         double averageFragLink = 0.0;
 
+        int linkIndex = 0;
         for (Link link : mesh.getLinkList()) {
         	double fragAllCores = 0.0;
 
-        	for (Core core: link.getCores()) {
-        		fragAllCores += cf.relativeFragmentation(core.getFreeSpectrumBands(0), c);
+        	final List<List<int[]>> perCore = bands.get(linkIndex++);
+        	for (int k = 0; k < perCore.size(); k++) {
+        		fragAllCores += cf.relativeFragmentation(perCore.get(k), c);
         	}
 
         	fragAllCores = fragAllCores / link.getNumberOfCores();
