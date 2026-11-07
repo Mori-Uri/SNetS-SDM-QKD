@@ -56,11 +56,13 @@
     <section id="caseView" hidden>
       <div class="case-sticky" id="caseSticky">
       <div class="case-head">
+        <!-- Parte 56: pasta, nome do caso e modo de execução numa linha só -->
         <div class="case-title">
-          <div class="crumbs" id="caseCrumbs"></div>
-          <h1 id="caseName"></h1>
-          <div id="caseMode" class="case-mode"></div>
+          <span class="crumbs" id="caseCrumbs"></span><h1 id="caseName"></h1>
         </div>
+        <span class="head-sep" aria-hidden="true"></span>
+        <div id="caseMode" class="case-mode"></div>
+        <span class="head-spacer"></span>
         <div class="case-actions">
           <span class="dirty-badge" id="dirtyBadge" hidden></span>
           <button class="btn" id="btnOpenFolder" title="Abrir a pasta do caso no explorador">Abrir pasta</button>
@@ -71,6 +73,8 @@
       </div>
       <div class="case-saved" id="caseSaved" hidden></div>
       <nav class="tabs" id="tabs" role="tablist"></nav>
+      <!-- Parte 56: atalhos para as seções da aba e ferramentas do arquivo (Formulário/JSON, restaurar) -->
+      <div class="case-subbar" id="caseSubbar" hidden></div>
       </div>
       <div class="tab-body" id="tabBody"></div>
     </section>

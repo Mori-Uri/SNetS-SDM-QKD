@@ -63,12 +63,15 @@
     const d = App.dirtyFiles();
     const badge = document.getElementById('dirtyBadge');
     badge.hidden = !d.length;
-    badge.textContent = d.length === 1 ? '1 arquivo alterado' : d.length + ' arquivos alterados';
+    badge.textContent = d.length === 1 ? '1 alterado' : d.length + ' alterados';
+    badge.title = 'Arquivos com alterações não salvas: ' + d.join(', ');
     document.querySelectorAll('.tab[data-file]').forEach((t) => {
       const f = t.dataset.file;
       t.querySelector('.mod').hidden = !(st.dirty[f] && !st.parseErrors[f]);
       t.querySelector('.errmark').hidden = !st.parseErrors[f];
     });
+    const rb = document.getElementById('btnRestoreFile');
+    if (rb) rb.disabled = !st.dirty[rb.dataset.file];
   };
 
   App.dirtyFiles = () => FILES.filter((f) => st.dirty[f]);
@@ -358,6 +361,8 @@
     document.getElementById('caseCrumbs').textContent = st.bulk ? 'modelo: ' + App.displayPath(path) : App.isVerificationPath(path)
       ? parts.slice(0, -1).map((p) => p + '/').join('').slice(1)
       : 'simulations/' + parts.slice(0, -1).map((p) => p + '/').join('');
+    document.getElementById('caseCrumbs').title = document.getElementById('caseCrumbs').textContent + document.getElementById('caseName').textContent;
+    document.getElementById('caseName').title = document.getElementById('caseName').textContent;
     document.getElementById('caseView').classList.toggle('bulk-mode', !!st.bulk);
     document.getElementById('btnExitBulk').hidden = !st.bulk;
     document.getElementById('btnGoReview').textContent = st.bulk ? 'Aplicar nos casos' : 'Revisar e salvar';
@@ -466,6 +471,7 @@
   function renderTabInner() {
     const body = clear(document.getElementById('tabBody'));
     let node;
+    subbarTools = null;
     try {
       switch (st.tab) {
         case 'overview': node = st.bulk ? App.bulk.renderOverview() : renderOverview(); break;
@@ -485,7 +491,103 @@
       node = el('div.notice.err', 'Erro ao montar esta aba: ' + e.message);
     }
     body.appendChild(node);
+    drawSubbar();
   }
+
+  // ------------------------------------------------------------------ Parte 56: sub-barra da aba (atalhos das seções + ferramentas do arquivo)
+
+  let subbarTools = null;
+  let subbarTargets = [];
+
+  function pageScroller() {
+    const main = document.getElementById('main');
+    return main && main.scrollHeight > main.clientHeight + 4 && getComputedStyle(main).overflowY !== 'visible'
+      ? main : document.scrollingElement || document.documentElement;
+  }
+
+  function stickyHeight() {
+    const h = document.getElementById('caseSticky');
+    return h ? h.offsetHeight : 0;
+  }
+
+  /** Top-level sections of the tab body: panels with a title and form groups (nested ones are skipped). */
+  function sectionTargets(body) {
+    if (body.querySelector('.results-studio, .fig-layout')) return [];
+    const out = [];
+    body.querySelectorAll('section.panel > h2, details.group > summary').forEach((h) => {
+      const sec = h.parentElement;
+      if (sec.parentElement && sec.parentElement.closest('section.panel, details.group')) return;
+      const t = h.querySelector('.group-title');
+      const label = (t ? t.textContent : h.textContent).replace(/\s+/g, ' ').trim().replace(/\s*\([^()]*\)$/, '');
+      if (!label) return;
+      out.push({ sec, label, off: sec.classList.contains('opt-off') });
+    });
+    return out;
+  }
+
+  function scrollToSection(sec) {
+    if (sec.tagName === 'DETAILS' && !sec.open) sec.open = true;
+    const sc = pageScroller();
+    const scTop = sc === document.scrollingElement || sc === document.documentElement ? 0 : sc.getBoundingClientRect().top;
+    const top = sec.getBoundingClientRect().top - scTop + sc.scrollTop - stickyHeight() - 8;
+    sc.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  }
+
+  function drawSubbar() {
+    const bar = document.getElementById('caseSubbar');
+    if (!bar) return;
+    clear(bar);
+    const body = document.getElementById('tabBody');
+    subbarTargets = sectionTargets(body);
+    const tools = subbarTools;
+    // a single section needs no shortcut, but the file tools stay
+    const showChips = subbarTargets.length > 1;
+    if (!showChips && !tools) { bar.hidden = true; subbarTargets = []; return; }
+    bar.hidden = false;
+    if (showChips) {
+      const chips = el('div.subbar-chips', { role: 'navigation', 'aria-label': 'Seções desta aba' });
+      subbarTargets.forEach((t) => {
+        t.chip = el('button.subbar-chip', { type: 'button', title: 'Ir para: ' + t.label + (t.off ? ' (desligado)' : ''), on: { click: () => scrollToSection(t.sec) } },
+          t.label, t.off ? el('span.off', ' · off') : null);
+        chips.appendChild(t.chip);
+      });
+      bar.appendChild(chips);
+    } else subbarTargets = [];
+    if (tools) {
+      bar.appendChild(el('div.subbar-tools', ...tools));
+    }
+    spySubbar();
+  }
+
+  /** Marks the chip of the section under the fixed header. */
+  function spySubbar() {
+    if (!subbarTargets.length) return;
+    const sc = pageScroller();
+    const scTop = sc === document.scrollingElement || sc === document.documentElement ? 0 : sc.getBoundingClientRect().top;
+    const line = scTop + stickyHeight() + 24;
+    let cur = subbarTargets[0];
+    for (const t of subbarTargets) if (t.sec.getBoundingClientRect().top <= line) cur = t;
+    if (sc.scrollTop > 0 && sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 2) {
+      // at the bottom the last short sections never reach the line: the last one visible wins
+      const vis = subbarTargets.filter((t) => t.sec.getBoundingClientRect().top < window.innerHeight);
+      if (vis.length) cur = vis[vis.length - 1];
+    }
+    for (const t of subbarTargets) if (t.chip) t.chip.classList.toggle('is-active', t === cur);
+    // keeps the active chip visible when the chips row scrolls sideways
+    const box = cur.chip && cur.chip.parentElement;
+    if (box && box.scrollWidth > box.clientWidth) {
+      const b = box.getBoundingClientRect(), r = cur.chip.getBoundingClientRect();
+      if (r.left < b.left || r.right > b.right) box.scrollLeft += r.left - b.left - 8;
+    }
+  }
+
+  (function bindSpy() {
+    let raf = 0;
+    const on = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; spySubbar(); }); };
+    const main = document.getElementById('main');
+    if (main) main.addEventListener('scroll', on, { passive: true });
+    window.addEventListener('scroll', on, { passive: true });
+  })();
 
   // ------------------------------------------------------------------ config tabs (form/json)
 
@@ -504,8 +606,11 @@
         App.refreshDirty(); App.renderTab();
       } },
     }, 'Restaurar original');
-    root.appendChild(el('div.toolbar', seg, el('span.spacer'),
-      el('span.small.muted.mono', 'arquivo: ' + file + (st.caseData.mtimes[file] ? ' · ' + fmtDate(st.caseData.mtimes[file]) : '')), restore));
+    restore.id = 'btnRestoreFile';
+    restore.dataset.file = file;
+    // Parte 56: Formulário/JSON, arquivo e Restaurar original ficam na sub-barra fixa da aba
+    subbarTools = [seg, el('span.subbar-sep', { 'aria-hidden': 'true' }),
+      el('span.subbar-file', { title: 'Arquivo de configuração editado nesta aba' }, 'arquivo: ' + file + (st.caseData.mtimes[file] ? ' · ' + fmtDate(st.caseData.mtimes[file]) : '')), restore];
 
     if (file === 'qkdPhysicalLayer' || file === 'physicalLayer') { const n = qkdPhysicalNotice(file, exists); if (n) root.appendChild(n); }
     if (!exists) {

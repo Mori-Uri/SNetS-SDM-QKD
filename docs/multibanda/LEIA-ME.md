@@ -20,6 +20,9 @@ Casos de exemplo: `simulations/QKD_Multibanda/`.
 
 QoT clássica por banda e ISRS (Parte 49): `QOT_CLASSICA_POR_BANDA.md`. Casos iniciais: `simulations/QKD_Multibanda_Parte49/`.
 
+Como o QCh contorna os amplificadores em MF, SDM, MB e MB-SDM, com diagrama, e o passo a passo para montar um caso
+MB ou MB-SDM no launcher: `AMPLIFICADORES_E_QCH.md`.
+
 ## Calculadora de enlace
 
 Física de um trecho QKD fora do simulador de rede: MF (fibra escura), MB (comb C+L no mesmo núcleo) ou MB-SDM

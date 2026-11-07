@@ -160,17 +160,31 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 
 /* ---------- case header & tabs ---------- */
 /* 1.18.2: title, actions and tabs form one fixed block (before, the tabs slid under a taller header) */
-.case-sticky { position: sticky; top: 0; z-index: 6; background: var(--bg); margin-bottom: 18px; }
+.case-sticky { position: sticky; top: 0; z-index: 6; background: var(--bg); margin-bottom: 18px; container: casehead / inline-size; }
 .case-head {
   background: var(--bg);
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-  padding: 18px 0 10px;
+  display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap;
+  padding: 12px 0 8px;
 }
-.case-title { min-width: 0; }
+/* Parte 56: pasta/caso | modo de execução ... ações, numa linha */
+.case-title { min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; }
 .crumbs { font-size: 12px; color: var(--fg-3); font-family: var(--mono); overflow-wrap: anywhere; }
-.case-title h1 { font-size: 20px; overflow-wrap: anywhere; }
+.case-title h1 { font-size: 19px; overflow-wrap: anywhere; margin: 0; }
+.head-sep { width: 1px; align-self: stretch; min-height: 22px; background: var(--border-strong); }
+.head-spacer { flex: 1 1 auto; }
+@container casehead (min-width: 960px) {
+  /* a linha do cabeçalho não quebra: a pasta e o resumo do modo encolhem com reticências */
+  .case-head { flex-wrap: nowrap; }
+  .case-title { flex: 0 1 auto; flex-wrap: nowrap; overflow: hidden; }
+  .case-title .crumbs { flex: 0 1 auto; min-width: 2em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .case-title h1 { flex: 0 1 auto; min-width: 3em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .case-mode { flex: 0 1 auto; flex-wrap: nowrap; min-width: 0; }
+  .case-mode > span.small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .case-actions { flex: 0 0 auto; flex-wrap: nowrap; }
+  .case-actions .btn { white-space: nowrap; }
+}
 .case-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.dirty-badge { background: var(--warn-soft); color: var(--warn); border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+.dirty-badge { background: var(--warn-soft); color: var(--warn); border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .tabs {
   background: var(--bg);
   display: flex; gap: 2px; border-bottom: 1px solid var(--border); overflow-x: auto;
@@ -438,8 +452,43 @@ label.check { display: inline-flex; align-items: center; gap: 4px; font-size: 13
 }
 
 /* ------------------------------------------------------------ modo Clássica/QKD */
-.case-mode { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.case-mode { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .case-mode:empty { display: none; }
+.case-mode:empty + .head-spacer, .head-sep:has(+ .case-mode:empty) { display: none; }
+/* Parte 56: barra de seções da aba (fixa com o cabeçalho) */
+.case-subbar { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; padding: 7px 0; border-bottom: 1px solid var(--border); background: var(--bg); }
+.case-subbar[hidden] { display: none; }
+.subbar-chips { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; flex: 1 1 340px; }
+.subbar-chip { border: 1px solid var(--border); background: var(--surface-2); color: var(--fg-2, inherit); border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; line-height: 1.4; white-space: nowrap; }
+.subbar-chip:hover { border-color: var(--accent); }
+.subbar-chip.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.subbar-chip .off { opacity: .7; font-weight: 400; }
+.subbar-spacer { flex: 1 1 auto; }
+.subbar-chips + .subbar-spacer { display: none; }
+.subbar-sep { width: 1px; align-self: stretch; min-height: 20px; background: var(--border-strong); }
+.subbar-tools { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; margin-left: auto; }
+.subbar-chips + .subbar-tools { border-left: 1px solid var(--border-strong); padding-left: 10px; }
+.subbar-file { font-family: var(--mono); font-size: 12px; color: var(--fg-3); white-space: nowrap; }
+/* Parte 56: resumo das opções no topo de cada grupo do formulário */
+.group > summary { flex-wrap: wrap; }
+.group-sum { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 0 18px; font-weight: 400; }
+.group-sum:empty { display: none; }
+.sum-chip { font-size: 11.5px; color: var(--fg-2); background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 7px; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sum-chip b { font-weight: 600; color: var(--fg); }
+/* Parte 56: grupos opcionais com chave liga/desliga */
+.switch-btn { display: inline-flex; align-items: center; gap: 7px; border: 0; background: transparent; padding: 0; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--fg-2); }
+.switch-btn .track { width: 34px; height: 19px; border-radius: 999px; background: var(--border-strong); position: relative; transition: background .15s; flex: 0 0 auto; }
+.switch-btn .track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: left .15s; }
+.switch-btn[aria-checked="true"] .track { background: var(--accent); }
+.switch-btn[aria-checked="true"] .track::after { left: 17px; }
+.switch-btn[aria-checked="true"] .state { color: var(--accent-ink); }
+.group.opt-off > summary { color: var(--fg-2); }
+.opt-off-note { margin: 0; }
+/* Parte 56: campos booleanos como chave liga/desliga */
+label.check.switch input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 34px; height: 19px; border-radius: 999px; background: var(--border-strong); position: relative; cursor: pointer; margin: 0; transition: background .15s; flex: 0 0 auto; }
+label.check.switch input[type="checkbox"]::after { content: ""; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: left .15s; }
+label.check.switch input[type="checkbox"]:checked { background: var(--accent); }
+label.check.switch input[type="checkbox"]:checked::after { left: 17px; }
 .mode-seg button { padding: 3px 12px; }
 .spanbar .sb-a { fill: var(--accent); }
 .spanbar .sb-b { fill: var(--series-2); }

@@ -6,7 +6,7 @@
  */
 (function (App) {
   'use strict';
-  const { el, clear, isPlainObject, getPath, deepEqual, parseNumber, fmtNum } = App;
+  const { el, clear, isPlainObject, getPath, deepEqual, deepClone, parseNumber, fmtNum } = App;
 
   function hintFor(schema, path) {
     if (!schema) return {};
@@ -92,10 +92,15 @@
     return [wrap, warn];
   }
 
+  // Parte 56: os campos booleanos viram chaves liga/desliga
   function boolInput(fileKey, path, value, fieldNode, text) {
-    const cb = el('input', { type: 'checkbox', checked: !!value });
-    cb.addEventListener('change', () => set(fileKey, path, cb.checked, fieldNode));
-    return el('label.check', cb, text || (value ? 'ativado' : 'desativado'));
+    const cb = el('input', { type: 'checkbox', checked: !!value, role: 'switch' });
+    const lab = el('span', text || (value ? 'ativado' : 'desativado'));
+    cb.addEventListener('change', () => {
+      set(fileKey, path, cb.checked, fieldNode);
+      if (!text) lab.textContent = cb.checked ? 'ativado' : 'desativado';
+    });
+    return el('label.check.switch', cb, lab);
   }
 
   function textInput(fileKey, path, value, fieldNode) {
@@ -355,6 +360,122 @@
       }, '+ ' + (schema.fields[k].label || k))));
   }
 
+  // ---------------------------------------------------------------- Parte 56: resumo das opções e grupos liga/desliga
+
+  function shortLabel(hint, key) {
+    let t = String(hint.short || hint.label || key).replace(/\s*\([^()]*\)$/, '');
+    if (t.length > 34) t = t.slice(0, 32) + '…';
+    return t;
+  }
+
+  function fmtVal(v, hint) {
+    hint = hint || {};
+    if (hint.enum && hint.enum[v] !== undefined) return String(hint.enum[v]).split(' — ')[0];
+    if (typeof v === 'boolean') return v ? 'sim' : 'não';
+    if (typeof v === 'number') return fmtNum(v) + (hint.unit ? ' ' + hint.unit : '');
+    if (v === null || v === undefined || v === '') return '—';
+    if (Array.isArray(v)) {
+      if (v.length <= 6 && v.every((x) => x === null || typeof x !== 'object')) return v.map((x) => (typeof x === 'number' ? fmtNum(x) : String(x))).join(', ');
+      return fmtNum(v.length) + ' itens';
+    }
+    if (isPlainObject(v)) {
+      const e = Object.entries(v);
+      if (e.length <= 5 && e.every(([, x]) => x === null || typeof x !== 'object')) return e.map(([k, x]) => k + ' ' + fmtVal(x)).join(' · ');
+      return fmtNum(e.length) + ' entradas';
+    }
+    return String(v);
+  }
+
+  /** label/value pairs of the options chosen in a group (one level into objects; tables are left to the item count). */
+  function summaryItems(fileKey, keys, schema, skipEnabled) {
+    const obj = App.state.model[fileKey];
+    const out = [];
+    const isTable = (v) => Array.isArray(v) && v.length > 0 && v.every(isPlainObject);
+    for (const k of keys) {
+      if (!isPlainObject(obj) || !(k in obj)) continue;
+      const v = obj[k], h = hintFor(schema, [k]);
+      if (isTable(v)) continue;
+      if (isPlainObject(v) && !h.openObject) {
+        for (const kk of Object.keys(v)) {
+          if (skipEnabled && kk === 'enabled') continue;
+          if (isTable(v[kk])) continue;
+          const hh = hintFor(schema, [k, kk]);
+          out.push([shortLabel(hh, kk), fmtVal(v[kk], hh)]);
+        }
+      } else out.push([shortLabel(h, k), fmtVal(v, h)]);
+    }
+    return out;
+  }
+
+  function drawSummary(box, items) {
+    clear(box);
+    const max = 12;
+    for (const [k, v] of items.slice(0, max)) box.appendChild(el('span.sum-chip', { title: k + ': ' + v }, k + ': ', el('b', v)));
+    if (items.length > max) box.appendChild(el('span.sum-chip', { title: 'Mais ' + (items.length - max) + ' opções no grupo' }, '+' + (items.length - max)));
+  }
+
+  /** Key of a group that is a single on/off block ({ enabled, ... }), or null. */
+  function toggleKey(g, schema) {
+    if (!schema || g.keys.length !== 1) return null;
+    const k = g.keys[0], f = schema.fields[k];
+    return f && !f.noToggle && isPlainObject(f.default) && 'enabled' in f.default ? k : null;
+  }
+
+  function toggleOn(obj, k, schema) {
+    const f = schema.fields[k];
+    if (!isPlainObject(obj[k])) return !!f.absentEnabled;
+    if (obj[k].enabled === undefined) {
+      const d = schema.fields[k + '.enabled'];
+      return d && d.default !== undefined ? !!d.default : f.default.enabled !== false;
+    }
+    return obj[k].enabled !== false;
+  }
+
+  function setToggle(fileKey, k, schema, on) {
+    const obj = App.state.model[fileKey];
+    if (!isPlainObject(obj[k])) obj[k] = deepClone(schema.fields[k].default);
+    obj[k].enabled = on;
+    App.refreshDirty(); App.renderTab();
+  }
+
+  function switchButton(on, onChange) {
+    return el('button.switch-btn', {
+      type: 'button', role: 'switch', 'aria-checked': String(on), title: on ? 'Desligar' : 'Ligar',
+      style: { marginLeft: 'auto' },
+      on: { click: (ev) => { ev.preventDefault(); ev.stopPropagation(); onChange(!on); } },
+    }, el('span.state', on ? 'ligado' : 'desligado'), el('span.track'));
+  }
+
+  /** Body of an on/off group: its fields without the 'enabled' flag, or a note when it is off or absent. */
+  function toggleBody(fileKey, k, schema, on, body, grid) {
+    const obj = App.state.model[fileKey];
+    const f = schema.fields[k];
+    const present = isPlainObject(obj[k]);
+    const btn = (label, title, fn) => el('button.btn.small', { type: 'button', title, on: { click: fn } }, label);
+    if (!on) {
+      body.appendChild(el('div.notice.opt-off-note',
+        el('div', present
+          ? 'Desligado: o bloco ' + k + ' fica no arquivo com enabled = false e o simulador o ignora. Ligue para editar os parâmetros.'
+          : 'Desligado: o bloco ' + k + ' não está no arquivo. Ao ligar, ele é adicionado com os valores padrão.'),
+        present && !f.absentEnabled ? el('div.toolbar', { style: { marginTop: '8px', marginBottom: '0' } },
+          btn('Remover do arquivo', 'Apaga o bloco ' + k + ' do arquivo (o efeito é o mesmo de desligado)', () => {
+            delete App.state.model[fileKey][k]; App.refreshDirty(); App.renderTab();
+          })) : null));
+      return;
+    }
+    if (!present) {
+      body.appendChild(el('div.notice.opt-off-note',
+        el('div', 'Ligado pelo padrão do simulador: o bloco ' + k + ' não está no arquivo, então valem os valores padrão.'),
+        el('div.toolbar', { style: { marginTop: '8px', marginBottom: '0' } },
+          btn('Gravar os parâmetros no arquivo', 'Adiciona o bloco ' + k + ' com os valores padrão, para editá-los', () => setToggle(fileKey, k, schema, true)))));
+      return;
+    }
+    for (const kk of Object.keys(obj[k])) if (kk !== 'enabled') grid.appendChild(field(fileKey, [k, kk], obj[k][kk], schema));
+    body.appendChild(grid);
+    const mk = missingKnown(fileKey, [k], obj[k], { fields: schema.fields, exclude: (schema.exclude || []).concat([k + '.enabled']) });
+    if (mk) body.appendChild(mk);
+  }
+
   /** Renders the grouped form for one configuration file. */
   function renderForm(fileKey) {
     const schema = App.schema[fileKey];
@@ -370,21 +491,32 @@
       present.forEach((k) => used.add(k));
       const addable = g.keys.filter((k) => !(k in obj) && schema.fields[k] && schema.fields[k].default !== undefined);
       if (!present.length && !addable.length) continue;
-      const det = el('details.group', { open: g.open !== false });
+      const tk = toggleKey(g, schema);
+      const on = tk ? toggleOn(obj, tk, schema) : true;
+      const det = el('details.group' + (tk && !on ? '.opt-off' : ''), { open: g.open !== false });
       const body = el('div.group-body');
       if (g.desc) body.appendChild(el('p.help.muted.small', { style: { margin: '0 0 10px' } }, g.desc));
       const grid = el('div.fields');
-      for (const k of present) grid.appendChild(field(fileKey, [k], obj[k], schema));
-      body.appendChild(grid);
-      if (addable.length) {
-        const sub = {};
-        for (const k of g.keys) if (k in obj) sub[k] = true;
-        const fake = { fields: {}, exclude: [] };
-        for (const k of addable) fake.fields[k] = schema.fields[k];
-        body.appendChild(missingKnown(fileKey, [], sub, fake));
+      if (tk) toggleBody(fileKey, tk, schema, on, body, grid);
+      else {
+        for (const k of present) grid.appendChild(field(fileKey, [k], obj[k], schema));
+        body.appendChild(grid);
+        if (addable.length) {
+          const sub = {};
+          for (const k of g.keys) if (k in obj) sub[k] = true;
+          const fake = { fields: {}, exclude: [] };
+          for (const k of addable) fake.fields[k] = schema.fields[k];
+          body.appendChild(missingKnown(fileKey, [], sub, fake));
+        }
       }
       const count = present.reduce((n, k) => n + (Array.isArray(obj[k]) ? obj[k].length : 0), 0);
-      det.append(el('summary', g.title, count ? el('span.count', '· ' + fmtNum(count) + ' itens') : null), body);
+      const sum = el('div.group-sum');
+      const refreshSum = () => drawSummary(sum, tk && !on ? [] : summaryItems(fileKey, g.keys, schema, !!tk));
+      refreshSum();
+      det.addEventListener('input', App.debounce(refreshSum, 200));
+      det.addEventListener('change', refreshSum);
+      det.append(el('summary', el('span.group-title', g.title), count ? el('span.count', '· ' + fmtNum(count) + ' itens') : null,
+        tk ? switchButton(on, (v) => setToggle(fileKey, tk, schema, v)) : null, sum), body);
       box.appendChild(det);
     }
     const unknown = Object.keys(obj).filter((k) => !used.has(k));

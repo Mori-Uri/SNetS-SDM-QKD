@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [56](#parte-56) | Parte 56 — launcher 1.20.8: cabeçalho do caso em uma linha, atalhos das seções, resumo das opções e chaves liga/desliga |
 | [55](#parte-55) | Parte 55 — launcher 1.20.7: padrão de aparência por tipo de gráfico, botões de topo/fim, edição automática do launcher |
 | [54](#parte-54) | Parte 54 — otimizações de desempenho sem mudança nos resultados (clássico e QKD) |
 | [53](#parte-53) | Parte 53 — documentação das mudanças de desempenho e save states, verificação contra outras versões |
@@ -39,6 +40,30 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
 
 ---
+
+<a id="parte-56"></a>
+
+## Parte 56 — launcher 1.20.8: cabeçalho do caso em uma linha, atalhos das seções, resumo das opções e chaves liga/desliga
+
+Só na `main`. Só o launcher muda; o simulador, os arquivos dos casos e os resultados não mudam.
+
+### Cabeçalho fixo da página do caso
+
+- Linha 1: pasta e nome do caso (`simulations/Pasta/CASO`), divisória, modo de execução (Clássica/QKD, QTND e núcleo QKD) e, à direita, Abrir pasta, Recarregar e Revisar e salvar. Em telas estreitas a linha quebra; em telas largas a pasta e o resumo do modo encolhem com reticências (o caminho completo fica na dica).
+- Linha 2: as abas.
+- Linha 3 (nova sub-barra): botões das seções da aba, como no estúdio de gráficos (Rede: Topologia e fibra, Geral, Nós, Enlaces…). O clique abre a seção, se estiver fechada, e rola até ela; o botão da seção visível fica destacado. À direita, depois de uma divisória: Formulário/JSON, o arquivo editado com a data e Restaurar original (que agora se habilita assim que o arquivo muda).
+- As três linhas ficam fixas no topo. A aba Resultados mantém a barra própria do estúdio; abas sem seções não mostram a sub-barra.
+- O aviso de alterações ficou curto ("1 alterado"); a lista dos arquivos aparece na dica.
+
+### Formulários
+
+- Cada grupo mostra, logo abaixo do título, um resumo das opções escolhidas no arquivo (ex.: "Arquitetura: MB-SDM", "λ central do QCh: 1.381 nm"), atualizado enquanto se edita. Tabelas (nós, enlaces, núcleos, modulações) continuam só com a contagem de itens.
+- Grupos opcionais com `enabled` (Save states, QoT clássica por banda, Multibanda) têm uma chave liga/desliga no título no lugar dos botões "+ Multibanda", "+ Save State" etc.:
+  - ligar um bloco ausente o adiciona com os valores padrão; desligar grava `enabled: false` e esconde os parâmetros (que ficam no arquivo); "Remover do arquivo" apaga o bloco desligado;
+  - Save states, ligado por padrão mesmo ausente, mostra "Ligado pelo padrão do simulador" e o botão "Gravar os parâmetros no arquivo";
+  - o campo `enabled` deixa de aparecer dentro do grupo; o botão da seção na sub-barra mostra "· off" quando o grupo está desligado.
+  - O bloco `qkd` da aba Rede continua com o seletor Clássica/QKD do cabeçalho.
+- Campos booleanos viram chaves liga/desliga, com o texto "ativado/desativado" acompanhando o estado.
 
 <a id="parte-55"></a>
 
