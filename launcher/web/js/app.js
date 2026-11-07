@@ -77,6 +77,26 @@
     if (App.dirtyFiles().length) { e.preventDefault(); e.returnValue = ''; }
   });
 
+  // Parte 55: botões fixos na tela para ir ao topo e ao fim da página (área principal, ou a página inteira em telas estreitas)
+  (function scrollJump() {
+    const main = document.getElementById('main');
+    const scroller = () => (main && main.scrollHeight > main.clientHeight + 4 && getComputedStyle(main).overflowY !== 'visible'
+      ? main : document.scrollingElement || document.documentElement);
+    const mk = (cls, label, title, where) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn small scroll-jump-btn ' + cls; b.textContent = label; b.title = title;
+      b.setAttribute('aria-label', title);
+      b.addEventListener('click', () => { const sc = scroller(); sc.scrollTo({ top: where(sc), behavior: 'smooth' }); });
+      return b;
+    };
+    const box = document.createElement('div');
+    box.className = 'scroll-jump';
+    const up = mk('up', '↑', 'Voltar ao topo da página', () => 0);
+    const down = mk('down', '↓', 'Ir para o fim da página', (sc) => sc.scrollHeight);
+    box.append(up, down);
+    document.body.appendChild(box);
+  })();
+
   // ================================================================== tree
 
   App.loadTree = async function () {

@@ -63,6 +63,24 @@ final class Figures {
         return out;
     }
 
+    /** Parte 55: appearance defaults of each chart type (line, bars, spectrum maps...), written by the studio. */
+    File stylesFile() {
+        return new File(settings.launcherDir(), "figure-styles.json");
+    }
+
+    String readStyles() throws IOException {
+        File f = stylesFile();
+        return f.isFile() ? new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8) : "{}";
+    }
+
+    void saveStyles(String json) throws IOException {
+        String t = json == null ? "" : json.trim();
+        if (!t.startsWith("{") || t.length() > 2_000_000) {
+            throw new IllegalArgumentException("Padrões de gráfico inválidos");
+        }
+        Files.write(stylesFile().toPath(), t.getBytes(StandardCharsets.UTF_8));
+    }
+
     String read(String name) throws IOException {
         File f = new File(dir(), clean(name) + ".json");
         if (!f.isFile()) {

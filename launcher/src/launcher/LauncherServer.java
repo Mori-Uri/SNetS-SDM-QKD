@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
  */
 public final class LauncherServer {
 
-    static final String VERSION = "1.18.4";
+    static final String VERSION = "1.18.5";
 
     private final Settings settings;
     private final Workspace workspace;
@@ -53,7 +53,7 @@ public final class LauncherServer {
     }
 
     public static void main(String[] args) throws Exception {
-        int port = 8765;
+        int port = Edition.DEFAULT_PORT; // Parte 55: 8765; 8766 na pasta experimental (ver Edition)
         boolean openBrowser = true;
         String project = null;
         File webDir = null;
@@ -104,7 +104,7 @@ public final class LauncherServer {
 
         final String url = "http://localhost:" + port + "/";
         System.out.println("==============================================");
-        System.out.println(" SNetS Launcher " + VERSION);
+        System.out.println(" SNetS Launcher " + VERSION + (Edition.NAME.isEmpty() ? "" : " (" + Edition.NAME + ")"));
         System.out.println(" Projeto:     " + settings.projectRoot().getAbsolutePath());
         System.out.println(" Simulations: " + settings.simulationsDir().getAbsolutePath());
         System.out.println(" Interface:   " + url);
@@ -181,6 +181,8 @@ public final class LauncherServer {
             case "/api/info": {
                 Map<String, Object> m = new LinkedHashMap<String, Object>();
                 m.put("version", VERSION);
+                m.put("edition", Edition.NAME);
+                m.put("simulatorJar", Edition.SIMULATOR_JAR);
                 m.put("settings", settings.toMap());
                 m.put("jars", workspace.listJars());
                 m.put("javaVersion", System.getProperty("java.version"));
@@ -321,7 +323,7 @@ public final class LauncherServer {
                 m.put("compilerInLauncher", inJvm);
                 m.put("javaVersion", System.getProperty("java.version"));
                 m.put("simulationsDir", settings.simulationsDir().getAbsolutePath());
-                m.put("defaultOut", "SNetS-SDM-QKD.jar");
+                m.put("defaultOut", Edition.SIMULATOR_JAR);
                 m.put("jars", workspace.listJars());
                 return m;
             }
@@ -402,6 +404,16 @@ public final class LauncherServer {
                 }
                 Map<String, Object> m = new LinkedHashMap<String, Object>();
                 m.put("text", figures.read(required(q, "name")));
+                return m;
+            }
+            case "/api/figure-styles": {
+                // Parte 55: padrão de aparência por tipo de gráfico (launcher/figure-styles.json)
+                if (post) {
+                    figures.saveStyles(readBody(ex));
+                    return ok();
+                }
+                Map<String, Object> m = new LinkedHashMap<String, Object>();
+                m.put("text", figures.readStyles());
                 return m;
             }
             case "/api/figure/image": {
