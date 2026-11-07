@@ -395,6 +395,7 @@ public final class LauncherServer {
                 return workspace.listFiles(q.get("path"));
             case "/api/runs":
                 return runner.list();
+            case "/api/run/output": // Parte 55: mesmo conteúdo; bloqueadores de anúncio barram URLs com "/log?"
             case "/api/run/log": {
                 int from = q.containsKey("from") ? Integer.parseInt(q.get("from")) : 0;
                 return runner.get(required(q, "id")).toMap(from);

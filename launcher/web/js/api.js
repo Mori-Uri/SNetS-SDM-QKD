@@ -41,7 +41,8 @@
     batch: (cases, mode, jar, jvmArgs, threads, consoleWin, how) => call('POST', 'run/batch', { mode, jar, jvmArgs, threads: threads || null, console: consoleWin === undefined ? null : String(!!consoleWin), fresh: how === 'fresh' ? '1' : null, resume: how === 'resume' ? '1' : null }, cases.join('\n')),
     discardSaved: (path) => call('POST', 'savestate/discard', { path }),
     runs: () => call('GET', 'runs'),
-    runLog: (id, from) => call('GET', 'run/log', { id, from }),
+    // Parte 55: 'run/output' em vez de 'run/log' (extensões de bloqueio de anúncio barram URLs com "/log?")
+    runLog: (id, from) => call('GET', 'run/output', { id, from }),
     cancelRun: (id) => call('POST', 'run/cancel', { id }),
     openFolder: (path) => call('POST', 'open-folder', { path }),
     queue: (cases, jar, jvmArgs) => call('POST', 'queue', { jar, jvmArgs }, cases.join('\n')),

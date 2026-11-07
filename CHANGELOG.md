@@ -65,6 +65,11 @@ Feita igual na `main` (launcher 1.18.5) e na `experimental` (launcher 1.20.7), p
 - `Edition.java` agora é igual nas duas branches e escolhe a edição sozinho: a pasta com o arquivo local `launcher/EDICAO_EXPERIMENTAL` abre como experimental (porta 8766, `SNetS-SDM-QKD-exp.jar`); sem ele, como a main (porta 8765, `SNetS-SDM-QKD.jar`). `-Dsnets.edition=experimental|main` força uma das duas. O merge final não precisa mais mudar o launcher.
 - `.gitignore`: `launcher/EDICAO_EXPERIMENTAL`, `launcher/figure-styles.json` e `launcher/figures/`.
 - `tools/git/ocultar_simulations_locais.bat`: esconde do GitHub Desktop as alterações locais nos casos versionados em `simulations/` (`git update-index --skip-worktree`, vale só para a pasta; `desfazer` volta ao normal).
+- Verificações QKD do "Gerar JAR" corrigidas (as três falhavam desde as Partes 27 e 40; os resultados das simulações não mudam):
+  - `QKDArticleBaseReferenceVerification` e `QKDNativeArticleBaseVerification` procuram a pasta `Dibaj_MF` em `verificacao/QKD_reference` (e no lugar antigo, `simulations/QKD_reference`) a partir da pasta de trabalho e da pasta do JAR;
+  - `QKDExistingSessionProtectionVerification` fixa `qchSlotPolicy: firstfit` no cenário de teste, como foi escrita (desde a Parte 40 o padrão ABNE põe o QCh do núcleo central no meio do espectro).
+  - Com isso o "Gerar JAR" com verificações volta a dar 27 de 27.
+- "Ver saída" das execuções: o navegador pede a saída em `/api/run/output` (o `/api/run/log` continua respondendo). Extensões de bloqueio de anúncio barram endereços com `/log?` (`net::ERR_BLOCKED_BY_CLIENT`), e o launcher mostrava "Sem conexão com o launcher".
 - Testada e depois desfeita: fechar as janelas de execução junto com a aba do launcher. As janelas voltaram ao comportamento anterior (fechar a janela cancela a execução; fechar o navegador não interrompe nada).
 
 ---
