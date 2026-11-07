@@ -278,7 +278,9 @@ public final class QKDExistingSessionProtectionVerification {
                 + "{\"id\":0,\"adjacentCores\":[1]},"
                 + "{\"id\":1,\"adjacentCores\":[0]}],"
                 + "\"guardBand\":0,\"bvtSpectralAmplitude\":1000,"
-                + "\"qkd\":{\"enabled\":true,\"qtndKm\":25.0,\"quantumCoreId\":0}"
+                // Parte 55: o QCh em first fit (slot 1), como esta verificacao foi escrita. Desde a Parte 40 o
+                // padrao e a regra ABNE, que poe o QCh do nucleo central no meio do espectro.
+                + "\"qkd\":{\"enabled\":true,\"qtndKm\":25.0,\"quantumCoreId\":0,\"qchSlotPolicy\":\"firstfit\"}"
                 + "}";
     }
 

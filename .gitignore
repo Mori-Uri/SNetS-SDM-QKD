@@ -233,3 +233,6 @@ tools/regressao/referencias/*/csv/
 launcher/EDICAO_EXPERIMENTAL
 launcher/figure-styles.json
 launcher/figures/
+
+# Gerado na raiz quando as verificações do "Gerar JAR" rodam a partir da pasta do projeto
+/routesByPar.txt

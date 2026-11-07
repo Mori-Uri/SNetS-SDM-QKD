@@ -16,9 +16,7 @@ public final class QKDArticleBaseReferenceVerification {
     private QKDArticleBaseReferenceVerification() { }
 
     public static void main(String[] args) throws Exception {
-        File root = new File(args.length > 0 ? args[0]
-                : (new File("verificacao/QKD_reference/Dibaj_MF").isDirectory() ? "verificacao/QKD_reference/Dibaj_MF"
-                        : "simulations/QKD_reference/Dibaj_MF"));
+        File root = args.length > 0 ? new File(args[0]) : defaultReferenceRoot();
         check(root.isDirectory(), "Reference scenario directory not found: " + root.getAbsolutePath());
 
         ReferenceMultifiberExperiment experiment =
@@ -88,6 +86,32 @@ public final class QKDArticleBaseReferenceVerification {
             result.put(e.getKey(), Integer.valueOf(bestQtnd));
         }
         return result;
+    }
+
+    /**
+     * Parte 55: pasta Dibaj_MF da referencia do artigo-base. Procura a partir da pasta de trabalho e da pasta do JAR
+     * (simulations/), em verificacao/QKD_reference (desde a Parte 27) e no lugar antigo, simulations/QKD_reference.
+     */
+    static File defaultReferenceRoot() {
+        java.util.List<File> bases = new java.util.ArrayList<File>();
+        bases.add(new File(".").getAbsoluteFile());
+        try {
+            File jar = new File(QKDArticleBaseReferenceVerification.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            File d = jar.isFile() ? jar.getParentFile() : jar;
+            if (d != null) {
+                bases.add(d);
+                if (d.getParentFile() != null) bases.add(d.getParentFile());
+            }
+        } catch (Exception ignored) {
+            // sem a pasta do JAR: so a pasta de trabalho
+        }
+        for (File b : bases) {
+            for (String rel : new String[] {"verificacao/QKD_reference/Dibaj_MF", "simulations/QKD_reference/Dibaj_MF", "QKD_reference/Dibaj_MF"}) {
+                File f = new File(b, rel);
+                if (new File(f, "config.json").isFile()) return f;
+            }
+        }
+        return new File("verificacao/QKD_reference/Dibaj_MF");
     }
 
     private static void check(boolean condition, String message) {

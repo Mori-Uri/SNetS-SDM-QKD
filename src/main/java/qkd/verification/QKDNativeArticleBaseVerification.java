@@ -23,9 +23,7 @@ public final class QKDNativeArticleBaseVerification {
     private static final double MAX_MAE_VS_PYTHON = 10.0;
 
     public static void main(String[] args) throws Exception {
-        File root = new File(args.length > 0 ? args[0]
-                : (new File("verificacao/QKD_reference/Dibaj_MF").isDirectory() ? "verificacao/QKD_reference/Dibaj_MF"
-                        : "simulations/QKD_reference/Dibaj_MF")).getAbsoluteFile();
+        File root = (args.length > 0 ? new File(args[0]) : defaultReferenceRoot()).getAbsoluteFile();
         File work = args.length > 1 ? new File(args[1]).getAbsoluteFile()
                 : new File(System.getProperty("java.io.tmpdir"), "snets_native_article_verification");
         check(new File(root, "config.json").isFile(), "Dibaj_MF folder not found: " + root);
@@ -59,6 +57,32 @@ public final class QKDNativeArticleBaseVerification {
         }
         System.out.println("Results: " + QKDNativeReferenceMain.resultsDir(work).getAbsolutePath());
         System.out.println("\nQKD Part 22 native article-base verification: ALL CHECKS PASSED");
+    }
+
+    /**
+     * Parte 55: pasta Dibaj_MF da referencia do artigo-base. Procura a partir da pasta de trabalho e da pasta do JAR
+     * (simulations/), em verificacao/QKD_reference (desde a Parte 27) e no lugar antigo, simulations/QKD_reference.
+     */
+    static File defaultReferenceRoot() {
+        java.util.List<File> bases = new java.util.ArrayList<File>();
+        bases.add(new File(".").getAbsoluteFile());
+        try {
+            File jar = new File(QKDNativeArticleBaseVerification.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            File d = jar.isFile() ? jar.getParentFile() : jar;
+            if (d != null) {
+                bases.add(d);
+                if (d.getParentFile() != null) bases.add(d.getParentFile());
+            }
+        } catch (Exception ignored) {
+            // sem a pasta do JAR: so a pasta de trabalho
+        }
+        for (File b : bases) {
+            for (String rel : new String[] {"verificacao/QKD_reference/Dibaj_MF", "simulations/QKD_reference/Dibaj_MF", "QKD_reference/Dibaj_MF"}) {
+                File f = new File(b, rel);
+                if (new File(f, "config.json").isFile()) return f;
+            }
+        }
+        return new File("verificacao/QKD_reference/Dibaj_MF");
     }
 
     private static void check(boolean c, String m) {
