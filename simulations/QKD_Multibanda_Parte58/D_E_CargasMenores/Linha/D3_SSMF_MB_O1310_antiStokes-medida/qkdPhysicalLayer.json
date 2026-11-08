@@ -1,0 +1,45 @@
+{
+  "source": {
+    "meanPhotonNumber": 0.7,
+    "pulseIntervalPs": 250.0,
+    "qchPowerDbm": -80.0,
+    "qchBandwidthGHz": 12.5
+  },
+  "protocol": {
+    "errorCorrectionInefficiency": 1.16,
+    "misalignmentError": 0.015
+  },
+  "detector": {
+    "detectorEfficiency": 0.3,
+    "darkCountProbability": 1e-08,
+    "detectorGateWindowPs": 100.0,
+    "receiverOpticalEfficiency": 1.0
+  },
+  "fiber": {
+    "attenuationFloorDbPerKm": 0.18,
+    "attenuationQuadraticDbPerKmNm2": 8e-06,
+    "attenuationCenterNm": 1550.0
+  },
+  "crosstalk": {
+    "intercoreCrosstalkEnabled": true,
+    "receiverTransferModel": "receiver_referenced"
+  },
+  "multiband": {
+    "enabled": true,
+    "architecture": "MB",
+    "ramanModel": "fisico",
+    "qchCenterNm": 1310.0,
+    "hostCoreId": 0,
+    "intercoreRaman": true,
+    "bidirectionalFiber": false,
+    "nliModel": "nenhum",
+    "nliGammaPerWKm": 1.2,
+    "nliBeta2Ps2PerKm": -22.317,
+    "nliBeta3Ps3PerKm": 0.1331,
+    "classicalBandStartThz": 191.85,
+    "attenuationModel": "g652d",
+    "waterPeakDbPerKm": 0.0,
+    "temperatureK": 300.0,
+    "antiStokesCorrection": "medida"
+  }
+}

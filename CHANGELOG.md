@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [58](#parte-58) | Parte 58 — casos multibanda: cargas menores, cenário da multinúcleo, trechos longos, fibra bidirecional e NLI |
 | [56](#parte-56) | Parte 56 — launcher 1.20.8: cabeçalho do caso em uma linha, atalhos das seções, resumo das opções e chaves liga/desliga |
 | [55](#parte-55) | Parte 55 — launcher 1.20.7: padrão de aparência por tipo de gráfico, botões de topo/fim, edição automática do launcher |
 | [54](#parte-54) | Parte 54 — otimizações de desempenho sem mudança nos resultados (clássico e QKD) |
@@ -38,6 +39,24 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-58"></a>
+
+## Parte 58 — casos multibanda: cargas menores, cenário da multinúcleo, trechos longos, fibra bidirecional e NLI
+
+Só na `main`. Só casos de simulação e o script que os gera; o simulador não muda. Rodam com o `SNetS-SDM-QKD.jar` da main, que tem a mesma camada multibanda da experimental desde o merge da Parte 55.
+
+- `simulations/QKD_Multibanda_Parte58`: 33 casos para os "próximos testes" da análise multibanda, a partir dos casos da Parte 49. A descrição de cada grupo está no `LEIA-ME.md` da pasta.
+  - **D (8):** fibra escura, 1381 nm sem e com a correção anti-Stokes e 1310 nm, com cargas calibradas para ~0,1 a 5 % de bloqueio clássico (Linha 165–225 E, Losango 240–540 E).
+  - **E (6):** MB-SDM e fibra escura na MCF-7, com 7 vezes a carga do D (mesma carga por núcleo) e na faixa de bloqueio baixo da MCF-7.
+  - **F (8):** cenário do `QKD_Test9` (enlace de 200 km, MCF-7, 300–2400 E, 100 000 × 8 × 10), com fibra escura e MB-SDM a 1381 nm, QTND de 25, 50, 100 e 150 km, para comparar com o núcleo QKD dedicado.
+  - **G (8):** enlace de 200 km em C+L com QoT por banda e ISRS, 1381 × 1310 nm, QTND de 25 a 100 km.
+  - **H (3):** fibra bidirecional e NLI no QCh (Losango), separados e juntos.
+- `tools/casos/gerar_casos_parte58.py`: gera os casos.
+- `.gitignore`: os resultados, os `*.txt` e os save states da pasta nova ficam fora do git, como nas Partes 43 e 49; `docs/IDEIAS_FUTURAS.md` também fica só local.
+- **Conferência:** cada caso rodou num teste curto (800 requisições, 1 carga) sem erro, com o código da main.
 
 ---
 

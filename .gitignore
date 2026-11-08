@@ -225,6 +225,13 @@ tools/regressao/referencias/*/csv/
 /simulations/QKD_Multibanda_Parte49/**/*.csv
 /simulations/QKD_Multibanda_Parte49/**/*.txt
 /simulations/QKD_Multibanda_Parte49/**/savestate/
+# Parte 58 - casos multibanda (sem os resultados)
+!/simulations/QKD_Multibanda_Parte58/
+/simulations/QKD_Multibanda_Parte58/**/*.csv
+/simulations/QKD_Multibanda_Parte58/**/*.txt
+/simulations/QKD_Multibanda_Parte58/**/savestate/
+# ideias futuras: arquivo local, fora do git
+/docs/IDEIAS_FUTURAS.md
 
 # Parte 55: arquivos locais do launcher (não vão para o git e não aparecem no GitHub Desktop)
 # - EDICAO_EXPERIMENTAL: marca a pasta da branch experimental (porta 8766, SNetS-SDM-QKD-exp.jar); ver launcher/src/launcher/Edition.java
