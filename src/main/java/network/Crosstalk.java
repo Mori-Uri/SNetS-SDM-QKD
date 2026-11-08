@@ -904,6 +904,22 @@ public class Crosstalk implements Serializable {
 	 * @return boolean
 	 */
 	public boolean isIntersection(int[] spectrum1, int[] spectrum2) {
+		if (simulator.PerfChecks.ENABLED) {
+			// Parte 57 (desempenho): two bands of slots [a0, a1] and [b0, b1] share a slot exactly when
+			// max(a0, b0) <= min(a1, b1). An empty band (start after the end) shares nothing, as in the original
+			// loop below. Same answer, without building a list of boxed slots at every call.
+			final boolean fast = spectrum1[0] <= spectrum1[1] && spectrum2[0] <= spectrum2[1]
+					&& Math.max(spectrum1[0], spectrum2[0]) <= Math.min(spectrum1[1], spectrum2[1]);
+			if (simulator.PerfChecks.VERIFY && fast != isIntersectionOriginal(spectrum1, spectrum2)) {
+				throw new IllegalStateException("snets.verifyPerf: isIntersection difere");
+			}
+			return fast;
+		}
+		return isIntersectionOriginal(spectrum1, spectrum2);
+	}
+
+	/** The original test of isIntersection (Parte 57: kept for -Dsnets.noPerfCache and -Dsnets.verifyPerf). */
+	private boolean isIntersectionOriginal(int[] spectrum1, int[] spectrum2) {
 		ArrayList<Integer> slots2 = new ArrayList<Integer>();
 
 		for(int i=spectrum2[0]; i<=spectrum2[1]; i++) {

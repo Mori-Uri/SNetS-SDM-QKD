@@ -136,6 +136,30 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 * @return the requiredBitRate
 	 */
 	public double getRequiredBitRate() {
+		if (simulator.PerfChecks.ENABLED && requests instanceof TrackedRequestList) {
+			// Parte 57 (desempenho): the sum is kept while the list of requests (same list, same stamp) and the bit
+			// rates of the requests (global counter of RequestForConnection.setRequiredBitRate) do not change. When
+			// anything changes it is summed again, over the same list in the same order: the same value, bit for bit.
+			final TrackedRequestList list = (TrackedRequestList) requests;
+			final long stamp = list.stamp();
+			final long rates = RequestForConnection.bitRateChanges();
+			if (rateCacheValid && rateCacheList == list && rateCacheStamp == stamp && rateCacheRates == rates) {
+				if (simulator.PerfChecks.VERIFY) simulator.PerfChecks.same(rateCacheValue, requiredBitRateOriginal(), "taxa do circuito");
+				return rateCacheValue;
+			}
+			final double v = requiredBitRateOriginal();
+			rateCacheList = list;
+			rateCacheStamp = stamp;
+			rateCacheRates = rates;
+			rateCacheValue = v;
+			rateCacheValid = true;
+			return v;
+		}
+		return requiredBitRateOriginal();
+	}
+
+	/** The original sum of getRequiredBitRate (Parte 57). */
+	private double requiredBitRateOriginal() {
 		double res = 0.0;
 
 		for (RequestForConnection r : requests) {
@@ -144,6 +168,24 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 
 		return res;
 	}
+
+	/** Parte 57: sum of the bit rates kept by getRequiredBitRate; not saved in save states. */
+	private transient boolean rateCacheValid;
+	private transient TrackedRequestList rateCacheList;
+	private transient long rateCacheStamp;
+	private transient long rateCacheRates;
+	private transient double rateCacheValue;
+
+	/**
+	 * Parte 57 (desempenho): power consumption of the transponder of this circuit, kept by
+	 * EnergyConsumption.computeTransponderPowerConsumption with the inputs it was computed from.
+	 */
+	transient boolean powerCacheValid;
+	transient Object powerCacheRoute;
+	transient Object powerCacheModulation;
+	transient int powerCacheSa0;
+	transient int powerCacheSa1;
+	transient double powerCacheValue;
 
 	/**
 	 * Compute the residual capacity of circuit in terms of bit rate

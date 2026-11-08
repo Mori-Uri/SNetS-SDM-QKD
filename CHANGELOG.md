@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [57](#parte-57) | Parte 57 — otimizações de desempenho, etapa 1: crosstalk, taxa do circuito, energia e utilização do espectro |
 | [55](#parte-55) | Parte 55 — launcher 1.20.7: padrão de aparência por tipo de gráfico, botões de topo/fim, edição automática do launcher |
 | [54](#parte-54) | Parte 54 — otimizações de desempenho sem mudança nos resultados (clássico e QKD) |
 | [53](#parte-53) | Parte 53 — documentação das mudanças de desempenho e save states, verificação contra outras versões |
@@ -37,6 +38,46 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-57"></a>
+
+## Parte 57 — otimizações de desempenho, etapa 1: crosstalk, taxa do circuito, energia e utilização do espectro
+
+Só na branch `experimental`. Os algoritmos não foram alterados (nem `GPRMCSA.java`, nem `CSBASDM.java`, nem os demais): as mudanças ficam na camada física, no circuito e nas métricas, que todos os algoritmos usam. Cada valor reaproveitado é o mesmo que o código original calcularia, e as somas em ponto flutuante seguem a mesma ordem, então os resultados não mudam bit a bit. A análise que levou a estas mudanças está em `docs/ANALISE_DESEMPENHO_PARTE57.md`.
+
+### Simulador
+
+- `Crosstalk.isIntersection`: duas faixas de slots se cruzam quando `max(inícios) ≤ min(fins)`. Antes, cada chamada montava uma lista com os slots de uma faixa e procurava os da outra.
+- `Circuit.getRequiredBitRate`: a soma das taxas das requisições fica guardada no circuito enquanto a lista de requisições e as taxas não mudam. Um contador em `RequestForConnection.setRequiredBitRate` e outro em `TrackedRequestList` avisam as mudanças.
+- `EnergyConsumption.computeTransponderPowerConsumption`: o consumo do transponder fica guardado no circuito com a rota, a modulação e os slots de que depende.
+- Modelo GN (`PhysicalLayer.getGnli2`): a tabela de `arcsinh` da thread é lida uma vez por laço, não uma vez por chamada.
+- `SpectrumUtilization`: durante a simulação, as somas ficam em vetores indexados pelo enlace e pelo núcleo, sem montar o nome do enlace nem usar `HashMap` a cada requisição. Os mapas recebem os valores quando são lidos, com as chaves na mesma ordem de antes.
+- Os mesmos interruptores da Parte 54 valem para estas mudanças: `-Dsnets.noPerfCache=true` usa o caminho original e `-Dsnets.verifyPerf=true` compara cada valor com o cálculo original.
+
+### Verificação
+
+- **Com 1 thread, JAR antigo × novo, CSV a CSV:** C01, C02, Q01, Q07, Q09 e M02 com todos os CSVs idênticos byte a byte.
+- **Teste_EX e Teste_Ex_QKD reduzidos:** mesmos valores. Só a ordem das linhas "por par" muda em 3 CSVs, porque essas tabelas são impressas a partir de um `HashMap` (diferença já conhecida e aceita pela regressão).
+- **Regressão dos 17 casos (com as threads de cada caso), contra uma referência nova gerada com o JAR antigo:** só `ConsumedEnergy.csv` difere, no último dígito. Isso já acontece entre duas execuções do JAR antigo: com várias threads, a ordem de criação dos circuitos muda a ordem da soma. Com 1 thread, esse CSV é idêntico. No M01, numa das execuções, a média de OSNR do `PhysicalLayerStatistics.csv` também mudou: é o sorteio sem semente do núcleo de um circuito bloqueado no `spcsav2` (o mesmo motivo dos CSVs que o M01 já ignora). Repetido duas vezes com o JAR novo, o valor voltou a ser o da referência.
+- **Modo `-Dsnets.verifyPerf=true` nos 17 casos:** nenhuma diferença entre os valores reaproveitados e o cálculo original.
+
+### Tempo
+
+| Caso | Parte 54 | Parte 57 | Redução |
+|---|---|---|---|
+| Teste_EX reduzido | 143 s | 100 s | −30 % |
+| Teste_Ex_QKD reduzido | 103 s | 83 s | −19 % |
+
+Antes da Parte 54 eram 258 s e 202 s.
+
+### Arquivos
+
+- Alterados:
+  - `network/Crosstalk.java`, `network/Circuit.java`, `network/TrackedRequestList.java`, `network/EnergyConsumption.java` e `network/PhysicalLayer.java`;
+  - `request/RequestForConnection.java` e `measurement/SpectrumUtilization.java`.
+- Documentação: `docs/ANALISE_DESEMPENHO_PARTE57.md`.
 
 ---
 

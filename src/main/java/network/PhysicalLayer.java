@@ -1164,7 +1164,8 @@ public class PhysicalLayer implements Serializable {
 
 		//Paper: Impairment-Aware Manycast Routing, Modulation Level, and Spectrum Assignment in Elastic Optical Networks (2019)
 		double ro = (((Math.PI * Math.PI) / 2.0) * beta21 * BsI * BsI) / (2.0 * alfaCampo);
-		double ro2 = E * arcsinh(ro);
+		final ArcsinhMemo memo = arcsinhMemo(); // Parte 57
+		double ro2 = E * arcsinh(ro, memo);
 		double gsci = Gi * Gi * Gi * ro2;
 		double gxci = 0.0;
 
@@ -1213,7 +1214,7 @@ public class PhysicalLayer implements Serializable {
 
 				double nm1 = (Math.PI * Math.PI * beta21 * BsI * d1) / (2.0 * alfaCampo);
 				double nm2 = (Math.PI * Math.PI * beta21 * BsI * d2) / (2.0 * alfaCampo);
-				double pnm =  E * (arcsinh(nm1) - arcsinh(nm2));
+				double pnm =  E * (arcsinh(nm1, memo) - arcsinh(nm2, memo)); // Parte 57: same arcsinh, table read once
 				gxci += Gi * Gj * Gj * pnm;
 
 				//Paper: Impairment-Aware Manycast Routing, Modulation Level, and Spectrum Assignment in Elastic Optical Networks (2019)
@@ -1276,7 +1277,17 @@ public class PhysicalLayer implements Serializable {
 		// Parte 54 (desempenho): the arguments of arcsinh in the GN model depend only on the bandwidths of two circuits
 		// and on the distance between them, so the same values come back millions of times. They are kept in a small
 		// table per thread, keyed by the exact bits of x. Same function, same input: the same result, bit for bit.
-		final ArcsinhMemo m = ARCSINH_MEMO.get();
+		return arcsinh(x, ARCSINH_MEMO.get());
+	}
+
+	/** Parte 57: the table of the current thread, read once by the GN loop instead of once per arcsinh. */
+	private static ArcsinhMemo arcsinhMemo() {
+		return simulator.PerfChecks.ENABLED ? ARCSINH_MEMO.get() : null;
+	}
+
+	/** Parte 57: arcsinh with the table of the current thread already in hand (null: caches off). */
+	private static double arcsinh(double x, ArcsinhMemo m){
+		if (m == null) return arcsinhCompute(x);
 		final long bits = Double.doubleToRawLongBits(x);
 		int h = (int) (bits ^ (bits >>> 32));
 		h ^= (h >>> 16);

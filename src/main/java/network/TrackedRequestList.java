@@ -33,7 +33,19 @@ public class TrackedRequestList extends ArrayList<RequestForConnection> {
         owners.add(circuit);
     }
 
+    /** Parte 57: changes made through the methods below (ArrayList.set does not move modCount). */
+    private int changes;
+
+    /**
+     * Parte 57: a number that changes whenever the content or the order of the list may have changed: the changes
+     * made through this class, plus ArrayList's modCount (which also covers sort and the iterator's remove).
+     */
+    long stamp() {
+        return ((long) changes << 32) ^ (modCount & 0xffffffffL);
+    }
+
     private void changed() {
+        changes++;
         for (int i = 0; i < owners.size(); i++) {
             owners.get(i).physicalChange();
         }

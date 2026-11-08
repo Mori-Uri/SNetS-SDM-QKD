@@ -84,7 +84,21 @@ public class RequestForConnection implements Serializable {
         return requiredBitRate;
     }
 
+    /**
+     * Parte 57 (desempenho): number of calls of {@link #setRequiredBitRate} in this JVM. A circuit keeps the sum of
+     * the bit rates of its requests only while this counter and its list of requests do not change (see
+     * {@code Circuit.getRequiredBitRate}). The bit rate is set when a request is created, before it joins a circuit,
+     * so the sum is kept for the whole life of the circuit in practice.
+     */
+    private static final java.util.concurrent.atomic.AtomicLong BIT_RATE_CHANGES = new java.util.concurrent.atomic.AtomicLong();
+
+    /** Parte 57: see {@link #BIT_RATE_CHANGES}. */
+    public static long bitRateChanges() {
+        return BIT_RATE_CHANGES.get();
+    }
+
     public void setRequiredBitRate(double requiredBitRate) {
+        BIT_RATE_CHANGES.incrementAndGet(); // Parte 57: invalidates the bit rate kept by the circuits
         this.requiredBitRate = requiredBitRate;
     }
 
