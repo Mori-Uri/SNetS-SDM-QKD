@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [59](#parte-59) | Parte 59 — desempenho etapa 2 (multibanda e C+L), animação dos gráficos e launcher como aplicativo (1.21.0) |
 | [57](#parte-57) | Parte 57 — otimizações de desempenho, etapa 1: crosstalk, taxa do circuito, energia e utilização do espectro |
 | [55](#parte-55) | Parte 55 — launcher 1.20.7: padrão de aparência por tipo de gráfico, botões de topo/fim, edição automática do launcher |
 | [54](#parte-54) | Parte 54 — otimizações de desempenho sem mudança nos resultados (clássico e QKD) |
@@ -38,6 +39,82 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-59"></a>
+
+## Parte 59 — desempenho etapa 2 (multibanda e C+L), animação dos gráficos e launcher como aplicativo (1.21.0)
+
+Só na branch `experimental`. Os algoritmos não foram alterados. Os resultados não mudam: cada valor reaproveitado é o mesmo que o código original calcularia, e as somas seguem a mesma ordem.
+
+### Simulador: desempenho, etapa 2
+
+- **Raman espontâneo do QCh** (`qkd/physical/QKDPhysicalLayer`):
+  - a seção de Raman e o comprimento efetivo de cada circuito clássico dependem só dos slots dele, do λ e da perda do QCh, do comprimento do trecho e do tipo de termo (direto, contrapropagante, entre núcleos); ficam guardados por essas entradas, em vez de recalcular `expm1` e o espectro de Raman a cada avaliação;
+  - a soma por circuito, antes num `TreeMap<Integer, Double>`, usa vetores ordenados pelo id, com as mesmas somas na mesma ordem.
+- **Modelo GN com QoT por banda (C+L)** (`network/GnPairCache`, `PhysicalLayer.getGnli2`): os dois termos que um circuito j soma ao NLI de um circuito i ficam guardados no circuito i enquanto nenhum dos dois muda de frequência, largura ou modulação. Só vale com a QoT clássica por banda: na banda C sozinha, a memória de `arcsinh` da Parte 54 já atende quase todas as chamadas.
+- **ISRS** (`PhysicalLayer.aseBand`): as bordas da banda e a potência total do enlace são lidas uma vez para as duas perdas de ISRS de cada enlace.
+- **Lista de circuitos com o circuito em teste** (`PhysicalLayer.getCircuitList`, `Core`): a cópia do conjunto do núcleo com o circuito em teste é guardada no núcleo e reaproveitada por todos os circuitos já ativos, enquanto nenhum circuito entra ou sai.
+- **Taxa do circuito** (correção da Parte 57): a soma guardada só é descartada quando muda a taxa de uma requisição que já está num circuito (`RequestForConnection.markInTrackedList`). Antes, cada requisição nova gerada invalidava as somas de todos os circuitos.
+- Os interruptores de sempre valem: `-Dsnets.noPerfCache=true` (caminho original) e `-Dsnets.verifyPerf=true` (compara cada valor reaproveitado com o cálculo original).
+
+**Tempo, JAR da Parte 57 × Parte 59, 1 thread, mesma máquina:**
+
+| Caso | Parte 57 | Parte 59 | Redução |
+|---|---|---|---|
+| Teste_EX reduzido (clássico, banda C) | 92 s | 82 s | −11 % |
+| Teste_Ex_QKD reduzido (QKD, banda C) | 79 s | 72 s | −9 % |
+| Losango, fibra comum, 1381 nm (D2 da Parte 58, curto) | 19,9 s | 14,2 s | −29 % |
+| Losango, MCF-7, MB-SDM, 7× a carga (E2 da Parte 58, curto) | 82 s | 41 s | −50 % |
+| Losango, C+L com QoT por banda e ISRS (B4 da Parte 49, curto) | 61 s | 29 s | −53 % |
+
+Os casos "curtos" têm 4 000 a 20 000 requisições e 1 carga. Na banda C o tempo varia uns 5 % de uma execução para outra.
+
+**Verificação:**
+
+- **CSV a CSV, 1 thread:** C01, C02, Q01, Q07, Q09, M02 e M03 idênticos byte a byte ao JAR da Parte 57.
+- **Casos de tempo:** D2 e E2 idênticos, com só a ordem das linhas "por par" mudando, como na Parte 57. No B4 o bloqueio total é o mesmo; só a divisão entre as causas e a fragmentação externa mudam. É o sorteio sem semente do `spcsav2`: o próprio JAR da Parte 57 rodado duas vezes muda os mesmos três CSVs.
+- **Modo `-Dsnets.verifyPerf=true`:** nenhuma diferença nos 17 casos de regressão e nos casos de C+L (B4) e MB-SDM (E2).
+- **Regressão dos 17 casos contra a referência gerada com o JAR anterior à Parte 57:** todos idênticos ou equivalentes. Só o último dígito do `ConsumedEnergy.csv` muda, como já acontece com várias threads.
+
+### Launcher: animação dos gráficos
+
+- Botão **"Animação…"** no estúdio de gráficos (e na aba Resultados), para qualquer tipo de gráfico. Cada quadro é a figura aberta, com as mesmas configurações, num ponto de carga.
+  - **Modo acumulado** (gráficos com a carga no eixo x: linhas × carga e dispersão "um ponto por carga"): cada quadro acrescenta a próxima carga. **Modo instantâneo**: só a carga do quadro.
+  - **Eixos fixos** (limites de todos os quadros; nos mapas, a mesma escala de cores) ou **adaptáveis**. Limites definidos à mão valem nos dois modos.
+  - **Título da carga:** "Carga 3", "1.200 E", os dois ou um texto livre com `{n}` e `{erl}`, acima, abaixo ou num canto do gráfico, com tamanho próprio.
+  - **Pontos de carga** escolhidos, **tempo por quadro** (0,25 a 5 s ou outro valor), último quadro mais longo e repetição em ciclo.
+  - **Prévia** com reproduzir, pausar e quadro a quadro.
+  - **Salvar** em GIF (codificador próprio, sem internet), MP4 ou WebM (gravados pelo navegador, em tempo real), na resolução 1×, 2× ou 3×, com os quadros separados em PNG e/ou SVG se quiser. Destino: download ou `launcher/figures`.
+  - As escolhas ficam guardadas na figura (`anim`).
+- O servidor aceita GIF, MP4 e WebM em `/api/figure/image` (até 200 MB).
+
+### Launcher: aplicativo
+
+- **`SNetS-Launcher.bat`** abre o launcher sem janela de console (`javaw`), com ícone na **bandeja do sistema** e a interface numa **janela própria** (Edge ou Chrome em modo aplicativo, sem abas). As mensagens vão para `launcher/launcher.log`. O jeito antigo, com console, ficou em `SNetS-Launcher-console.bat`.
+- **Ícone na bandeja:** abrir a janela, simulações em execução, "Encerrar quando as simulações terminarem" e "Encerrar tudo" (as simulações gravam o estado e param, como no Cancelar). Avisa quando uma simulação termina.
+- **Ao fechar a janela** (Configurações › Aplicativo): continuar na bandeja com as simulações rodando (padrão), encerrar quando as simulações terminarem, ou encerrar tudo.
+- **Botão "Encerrar…"** no topo: encerrar tudo agora, encerrar quando as simulações terminarem, ou só fechar a janela.
+- **Uma instância só:** abrir o launcher de novo, com ele já rodando, só abre a janela.
+- **Atualizações pelo GitHub:**
+  - o launcher procura a Release mais nova da sua edição (tags `main-v<versão>` e `exp-v<versão>`) ao abrir e em Configurações › Aplicativo;
+  - numa pasta que é clone do git, avisa para atualizar pelo GitHub Desktop;
+  - fora do git, baixa o zip para `launcher/.update/`, e o `.bat` o aplica na próxima abertura;
+  - repositório privado: token em Configurações, guardado só em `launcher-settings.properties`;
+  - `.github/workflows/release.yml` gera o zip ao enviar uma tag.
+- `.gitignore`: `launcher/launcher-settings.properties` e `launcher/.update/` (o `launcher.log` já entrava em `*.log`).
+
+### Arquivos
+
+- **Simulador** (`src/main/java`):
+  - novo: `network/GnPairCache.java`;
+  - alterados: `network/PhysicalLayer.java`, `Core.java`, `Circuit.java` e `TrackedRequestList.java`;
+  - alterados: `request/RequestForConnection.java` e `qkd/physical/QKDPhysicalLayer.java`.
+- **Launcher:**
+  - novos: `src/launcher/AppShell.java`, `src/launcher/AppUpdate.java`, `web/js/animation.js` e `SNetS-Launcher-console.bat`;
+  - alterados: `LauncherServer.java`, `Settings.java`, `Figures.java`, `web/index.html`, `web/styles.css`, `web/js/app.js`, `web/js/api.js`, `web/js/figures.js`, `web/js/figrender.js`, `SNetS-Launcher.bat` e `snets-launcher.jar`.
+- **Outros:** `.github/workflows/release.yml`, `.gitignore` e `docs/ANALISE_DESEMPENHO_PARTE57.md` (seção 10).
 
 ---
 

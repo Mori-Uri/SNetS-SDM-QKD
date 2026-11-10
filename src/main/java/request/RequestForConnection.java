@@ -92,13 +92,25 @@ public class RequestForConnection implements Serializable {
      */
     private static final java.util.concurrent.atomic.AtomicLong BIT_RATE_CHANGES = new java.util.concurrent.atomic.AtomicLong();
 
+    /**
+     * Parte 59: true once this request joined the list of requests of a circuit (TrackedRequestList). Only then a new
+     * bit rate can change the sum kept by a circuit. The generators set the bit rate of a new request before it
+     * joins a circuit, so those calls no longer invalidate the sums of all circuits.
+     */
+    private boolean inTrackedList;
+
+    /** Parte 59: called by TrackedRequestList when this request joins a circuit. */
+    public void markInTrackedList() {
+        inTrackedList = true;
+    }
+
     /** Parte 57: see {@link #BIT_RATE_CHANGES}. */
     public static long bitRateChanges() {
         return BIT_RATE_CHANGES.get();
     }
 
     public void setRequiredBitRate(double requiredBitRate) {
-        BIT_RATE_CHANGES.incrementAndGet(); // Parte 57: invalidates the bit rate kept by the circuits
+        if (inTrackedList) BIT_RATE_CHANGES.incrementAndGet(); // Parte 57/59: invalidates the bit rate kept by the circuits
         this.requiredBitRate = requiredBitRate;
     }
 

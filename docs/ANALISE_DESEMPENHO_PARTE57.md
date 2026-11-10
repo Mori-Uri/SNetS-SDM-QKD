@@ -151,3 +151,36 @@ Ficam para uma próxima etapa:
 - **G:** perfil detalhado do controle QKD, que pesava 26 % do Teste_Ex_QKD na análise.
 
 Todas seguem as mesmas regras: resultado idêntico, conferido por `verifyPerf` e pela regressão.
+
+## 10. Etapa 2 implementada (Parte 59)
+
+A análise da etapa 2 mediu também os casos multibanda. Neles o tempo estava em outro lugar:
+
+- **Raman do QCh** (`expm1` por circuito e por trecho): 32 a 70 % do tempo nos casos MB e MB-SDM.
+- **Modelo GN com a QoT por banda (C+L):** 56 %, porque os argumentos de `arcsinh` mudam com a banda de cada circuito e a memória da Parte 54 quase não acertava.
+
+O que foi feito, sem tocar nos algoritmos, está no `CHANGELOG.md` (Parte 59):
+
+- cache do fator de Raman de cada circuito;
+- soma do Raman sem `TreeMap`;
+- termos do GN por par de circuitos (só com a QoT por banda);
+- bordas do ISRS lidas uma vez por enlace;
+- cópia da lista do núcleo com o circuito em teste reaproveitada;
+- correção da invalidação da taxa do circuito.
+
+| Caso | Parte 57 | Parte 59 |
+|---|---|---|
+| Teste_EX reduzido | 92 s | 82 s (−11 %) |
+| Teste_Ex_QKD reduzido | 79 s | 72 s (−9 %) |
+| MB, fibra comum (D2, curto) | 19,9 s | 14,2 s (−29 %) |
+| MB-SDM, MCF-7 (E2, curto) | 82 s | 41 s (−50 %) |
+| C+L com QoT por banda (B4, curto) | 61 s | 29 s (−53 %) |
+
+Na banda C os termos do GN por par não ajudam: a memória de `arcsinh` já atende quase todas as chamadas. Por isso esses termos só são usados com a QoT por banda.
+
+O que ainda pesa na banda C:
+
+- o laço do GN, que soma todos os circuitos do núcleo para cada circuito ativo a cada nova alocação;
+- as métricas por requisição (energia e utilização).
+
+Reduzir mais o GN exigiria somas incrementais, que mudam os últimos dígitos (seção 5).

@@ -169,6 +169,9 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 		return res;
 	}
 
+	/** Parte 59: GN terms of the other circuits on this one (see GnPairCache); not saved in save states. */
+	transient GnPairCache gnPairs;
+
 	/** Parte 57: sum of the bit rates kept by getRequiredBitRate; not saved in save states. */
 	private transient boolean rateCacheValid;
 	private transient TrackedRequestList rateCacheList;

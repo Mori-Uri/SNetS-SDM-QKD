@@ -1,0 +1,30 @@
+# Parte 59: versoes para a atualizacao automatica do launcher.
+# Ao enviar uma tag main-v<versao> (branch main) ou exp-v<versao> (branch experimental), por exemplo
+#   git tag exp-v1.21.0 && git push origin exp-v1.21.0
+# esta acao cria uma Release com o zip dos arquivos do repositorio naquela tag (sem a pasta simulations,
+# exceto os JARs e os .bat dela). O launcher procura a Release mais nova da sua edicao e oferece baixar.
+name: Release
+on:
+  push:
+    tags: ['main-v*', 'exp-v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Zip dos arquivos da tag
+        run: |
+          Z="$RUNNER_TEMP/SNetS-SDM-QKD-${GITHUB_REF_NAME}.zip"
+          zip -qr "$Z" . -x '.git/*' -x 'simulations/*'
+          zip -q "$Z" simulations/*.jar simulations/*.bat
+          # a experimental e identificada pelo arquivo local launcher/EDICAO_EXPERIMENTAL (fora do git)
+          if [[ "$GITHUB_REF_NAME" == exp-* ]]; then touch launcher/EDICAO_EXPERIMENTAL; zip -q "$Z" launcher/EDICAO_EXPERIMENTAL; fi
+          unzip -l "$Z" | tail -1
+          mv "$Z" .
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: SNetS-SDM-QKD-${{ github.ref_name }}.zip
+          generate_release_notes: true

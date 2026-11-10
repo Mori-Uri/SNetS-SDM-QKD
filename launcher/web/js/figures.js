@@ -1561,7 +1561,8 @@
       const pts = [];
       if (by === 'LoadPoint') {
         const fx = autoFilters(px, X.xMetric, null, X.fx), fy = autoFilters(py, X.yMetric, null, X.fy);
-        for (const lp of px.lps.filter((l) => py.lps.includes(l))) {
+        const lpWanted = (l) => !(Array.isArray(X.lps) && X.lps.length) || X.lps.includes(l); // Parte 59: animation
+        for (const lp of px.lps.filter((l) => py.lps.includes(l) && lpWanted(l))) {
           const sx = stats(repsAt(px, X.xMetric, lp, fx)), sy = stats(repsAt(py, X.yMetric, lp, fy));
           if (!Number.isFinite(sx.mean) || !Number.isFinite(sy.mean)) continue;
           const erl = cd.loads ? cd.loads.base + lp * cd.loads.inc : null;
@@ -2017,6 +2018,7 @@
       } } }, 'Baixar PNG'),
       el('button.btn.small', { type: 'button', title: 'Grava SVG e PNG em launcher/figures', on: { click: () => saveImages(Number(pngScale.value)) } }, 'Gravar imagens na pasta'),
       el('button.btn.small', { type: 'button', on: { click: () => { if (S.table) App.downloadText(nextName(fname(), 'csv'), toCsv(S.table), 'text/csv'); } } }, 'Dados (CSV)'),
+      el('button.btn.small', { type: 'button', title: 'Animação ao longo dos pontos de carga (GIF, MP4, WebM ou quadros separados)', on: { click: () => { if (App.anim) App.anim.open(); } } }, 'Animação…'),
       el('button.btn.small.ghost', { type: 'button', title: 'Os downloads repetidos saem como nome(1), nome(2)…; isto recomeça a contagem', on: { click: resetDownloadNames } }, 'Zerar numeração'),
       el('button.btn.small.ghost', { type: 'button', title: 'Abrir launcher/figures', on: { click: () => App.api.openFiguresFolder().catch((e) => App.toast(e.message, 'err')) } }, 'Abrir pasta'));
     return bar;
@@ -4081,5 +4083,66 @@
     return box;
   }
 
-  App.figures = { render, renderInto, openWith, invalidate, parseCsv, buildModel, newSpec, TEMPLATES, buildReport, _report: RP, _state: S };
+  // ---------------------------------------------------------------- Parte 59: animation (js/animation.js)
+
+  /** Builds and draws one frame of an animation: the figure of spec, with optional fixed axis domains. */
+  async function renderFrame(spec, domains) {
+    const saved = S.spec;
+    S.spec = spec; // applyStyle reads the spec of the state
+    try {
+      const m0 = await buildModel(spec);
+      if (!m0 || m0.empty) return { empty: (m0 && m0.empty) || 'Sem dados.' };
+      applyStyle(m0);
+      const m = viewModel(m0, spec);
+      if (nothingVisible(m)) return { empty: 'Nada a desenhar.' };
+      const put = (x) => {
+        if (!domains) return;
+        if (domains.y) x.yDomain = domains.y;
+        if (domains.x) x.xDomain = domains.x;
+        // colour scale of the maps (topology, spectrum): the same in every frame
+        if (domains.range && x.range && Number.isFinite(domains.range[0])) x.range = Object.assign({}, x.range, { min: domains.range[0], max: domains.range[1] });
+      };
+      put(m);
+      if (m.kind === 'panels') m.panels.forEach((p) => put(p.model));
+      return { model: m, svg: R().render(m, spec.style) };
+    } finally {
+      S.spec = saved;
+    }
+  }
+
+  /** Values on the axes of a model (for fixed axes over all the frames). */
+  function modelDomain(m) {
+    const out = { x: [], y: [], range: [] };
+    const visit = (mm) => {
+      if (!mm) return;
+      if (mm.range && Number.isFinite(mm.range.min) && Number.isFinite(mm.range.max)) out.range.push(mm.range.min, mm.range.max);
+      if (mm.kind === 'panels') { mm.panels.forEach((p) => visit(p.model)); return; }
+      if (mm.kind === 'line') {
+        for (const sr of mm.series) {
+          if (sr.style && sr.style.visible === false) continue;
+          for (const pt of sr.points) {
+            if (!Number.isFinite(pt.mean)) continue;
+            out.x.push(pt.x);
+            if (Number.isFinite(pt.ci)) out.y.push(pt.mean - pt.ci, pt.mean + pt.ci); else out.y.push(pt.mean);
+          }
+        }
+      } else if (mm.kind === 'bars') {
+        const series = mm.series.filter((sr) => !(sr.style && sr.style.visible === false));
+        for (const cat of mm.categories) {
+          let tot = 0;
+          for (const sr of series) {
+            const v = sr.values[cat.key];
+            if (!v || !Number.isFinite(v.mean)) continue;
+            if (mm.stacked) tot += Math.max(0, v.mean); else out.y.push(Number.isFinite(v.ci) ? v.mean + v.ci : v.mean, v.mean);
+          }
+          if (mm.stacked && !mm.normalize) out.y.push(tot);
+        }
+      }
+    };
+    visit(m);
+    return out;
+  }
+
+  App.figures = { render, renderInto, openWith, invalidate, parseCsv, buildModel, newSpec, TEMPLATES, buildReport, _report: RP, _state: S,
+    _anim: { renderFrame, modelDomain, state: S, nextName, persistDraft } };
 })(window.App);

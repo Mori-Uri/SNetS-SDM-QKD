@@ -135,7 +135,7 @@ final class Figures {
         byte[] bytes;
         if ("svg".equals(e)) {
             bytes = body.getBytes(StandardCharsets.UTF_8);
-        } else if ("png".equals(e) || "pdf".equals(e)) {
+        } else if ("png".equals(e) || "pdf".equals(e) || "gif".equals(e) || "mp4".equals(e) || "webm".equals(e)) { // Parte 59: animations
             String b = body.trim();
             int comma = b.indexOf(',');
             if (b.startsWith("data:") && comma > 0) {
@@ -145,7 +145,7 @@ final class Figures {
         } else {
             throw new IllegalArgumentException("Formato de imagem não suportado: " + ext);
         }
-        if (bytes.length > 60_000_000) {
+        if (bytes.length > 200_000_000) { // Parte 59: animations
             throw new IllegalArgumentException("Imagem grande demais");
         }
         File d = dir();

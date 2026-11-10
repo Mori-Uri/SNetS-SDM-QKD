@@ -51,8 +51,18 @@ public class TrackedRequestList extends ArrayList<RequestForConnection> {
         }
     }
 
+    /** Parte 59: marks the requests that join this list (see RequestForConnection.markInTrackedList). */
+    private static void mark(RequestForConnection e) {
+        if (e != null) e.markInTrackedList();
+    }
+
+    private static void markAll(Collection<? extends RequestForConnection> c) {
+        for (RequestForConnection e : c) mark(e);
+    }
+
     @Override
     public boolean add(RequestForConnection e) {
+        mark(e);
         final boolean r = super.add(e);
         changed();
         return r;
@@ -60,12 +70,14 @@ public class TrackedRequestList extends ArrayList<RequestForConnection> {
 
     @Override
     public void add(int index, RequestForConnection e) {
+        mark(e);
         super.add(index, e);
         changed();
     }
 
     @Override
     public boolean addAll(Collection<? extends RequestForConnection> c) {
+        markAll(c);
         final boolean r = super.addAll(c);
         changed();
         return r;
@@ -73,6 +85,7 @@ public class TrackedRequestList extends ArrayList<RequestForConnection> {
 
     @Override
     public boolean addAll(int index, Collection<? extends RequestForConnection> c) {
+        markAll(c);
         final boolean r = super.addAll(index, c);
         changed();
         return r;
@@ -80,6 +93,7 @@ public class TrackedRequestList extends ArrayList<RequestForConnection> {
 
     @Override
     public RequestForConnection set(int index, RequestForConnection e) {
+        mark(e);
         final RequestForConnection r = super.set(index, e);
         changed();
         return r;
@@ -123,6 +137,7 @@ public class TrackedRequestList extends ArrayList<RequestForConnection> {
     @Override
     public void replaceAll(UnaryOperator<RequestForConnection> operator) {
         super.replaceAll(operator);
+        markAll(this);
         changed();
     }
 

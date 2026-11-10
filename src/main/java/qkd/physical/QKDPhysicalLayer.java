@@ -1367,7 +1367,7 @@ public final class QKDPhysicalLayer implements java.io.Serializable {
         final int candidateCore = candidate != null && candidateTraversesLink(candidate, link)
                 ? qkd.metrics.BlockingDetailRecorder.rawCore(candidate) : Integer.MIN_VALUE;
 
-        final java.util.TreeMap<Integer, Double> terms = new java.util.TreeMap<Integer, Double>();
+        final RamanTerms terms = new RamanTerms();
         // same link (co-propagating): forward
         collectLinkRamanTerms(terms, link, host.getId(), candidateCore, candidate, mb, qchNm, alphaQ, lengthKm,
                 resolver, equalLoss, couplingPerKm, false);
@@ -1381,8 +1381,7 @@ public final class QKDPhysicalLayer implements java.io.Serializable {
                         alphaQ, lengthKm, resolver, equalLoss, couplingPerKm, true);
             }
         }
-        double sum = 0.0;
-        for (Double v : terms.values()) sum += v.doubleValue();
+        final double sum = terms.sum();
         final double lambdaQm = qchNm * 1e-9;
         final double filterNm = lambdaQm * lambdaQm * parameters.getQchBandwidthHz()
                 / parameters.getSpeedOfLightMPerS() * 1e9;
@@ -1390,7 +1389,7 @@ public final class QKDPhysicalLayer implements java.io.Serializable {
     }
 
     /** Host core of {@code link} (same core) and, in MBSDM with intercoreRaman, its adjacent classical cores. */
-    private void collectLinkRamanTerms(java.util.TreeMap<Integer, Double> terms, Link link, int hostCoreId,
+    private void collectLinkRamanTerms(RamanTerms terms, Link link, int hostCoreId,
             int candidateCore, Circuit candidate, qkd.multiband.MultiBandSettings mb, double qchNm, double alphaQ,
             double lengthKm, LaunchPowerResolver resolver, boolean equalLoss, double couplingPerKm,
             boolean backward) {
@@ -1416,7 +1415,7 @@ public final class QKDPhysicalLayer implements java.io.Serializable {
      * Forward: G = forward (exact or L e^{-a_c L}) or intercore forward ([CAI20] eq. 11). Backward (Parte 44):
      * G = (1 - e^{-(a_c+a_q) L})/(a_c+a_q) ([ERAERDS10] eq. 3) or intercore backward ([CAI20] eq. 18).
      */
-    private void collectRamanTerms(java.util.TreeMap<Integer, Double> terms, Core core, Circuit candidate,
+    private void collectRamanTerms(RamanTerms terms, Core core, Circuit candidate,
             qkd.multiband.MultiBandSettings mb, double qchNm, double alphaQ, double lengthKm,
             LaunchPowerResolver resolver, boolean equalLoss, double couplingPerKm, boolean backward) {
         final ArrayList<Circuit> circuits = new ArrayList<Circuit>();
@@ -1427,6 +1426,16 @@ public final class QKDPhysicalLayer implements java.io.Serializable {
             if (c == null) continue;
             final int[] band = c.getSpectrumAssigned();
             if (band == null) continue;
+            if (simulator.PerfChecks.ENABLED) {
+                // Parte 59 (desempenho): the cross section and the effective length of a circuit depend only on its
+                // slots, the QCh wavelength and loss, the span length and the kind of term (forward, backward,
+                // intercore). They are kept by these inputs and the term is formed as below: P * rho * G.
+                final double[] f = ramanFactors(band[0], band[1], slotWidth, mb, qchNm, alphaQ, lengthKm,
+                        equalLoss, couplingPerKm, backward);
+                final double term = resolver.resolve(c) * f[0] * f[1];
+                terms.add(c.getId() == null ? Integer.MAX_VALUE : c.getId().intValue(), term);
+                continue;
+            }
             final double fHz = mb.slotCentreHz(band[0], band[1], slotWidth);
             final double lambdaC = parameters.getSpeedOfLightMPerS() / fHz * 1e9;
             final double alphaC = parameters.attenuationDbPerKm(lambdaC)
@@ -1446,9 +1455,162 @@ public final class QKDPhysicalLayer implements java.io.Serializable {
                 g = qkd.multiband.SpontaneousRamanModel.forwardLengthKm(alphaC, alphaQ, lengthKm);
             }
             final double term = resolver.resolve(c) * mb.getRaman().crossSectionPerKmNm(lambdaC, qchNm) * g;
-            final Integer key = c.getId() == null ? Integer.valueOf(Integer.MAX_VALUE) : c.getId();
-            final Double previous = terms.get(key);
-            terms.put(key, Double.valueOf(previous == null ? term : previous.doubleValue() + term));
+            terms.add(c.getId() == null ? Integer.MAX_VALUE : c.getId().intValue(), term);
+        }
+    }
+
+    /**
+     * Parte 59: cross section rho and effective length G of the SpRS of a circuit on slots [b0, b1], computed by the
+     * same code as collectRamanTerms (original path) and kept by their inputs. f[0] = rho, f[1] = G.
+     */
+    private double[] ramanFactorsOriginal(int b0, int b1, double slotWidth, qkd.multiband.MultiBandSettings mb,
+            double qchNm, double alphaQ, double lengthKm, boolean equalLoss, double couplingPerKm, boolean backward) {
+        final double fHz = mb.slotCentreHz(b0, b1, slotWidth);
+        final double lambdaC = parameters.getSpeedOfLightMPerS() / fHz * 1e9;
+        final double alphaC = parameters.attenuationDbPerKm(lambdaC)
+                * qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
+        final double g;
+        if (backward) {
+            g = couplingPerKm > 0.0
+                    ? qkd.multiband.SpontaneousRamanModel.intercoreBackwardLengthKm(alphaC, alphaQ, couplingPerKm,
+                            lengthKm)
+                    : qkd.multiband.SpontaneousRamanModel.backwardLengthKm(alphaC, alphaQ, lengthKm);
+        } else if (couplingPerKm > 0.0) {
+            g = qkd.multiband.SpontaneousRamanModel.intercoreForwardLengthKm(alphaC, alphaQ, couplingPerKm,
+                    lengthKm);
+        } else if (equalLoss) {
+            g = qkd.multiband.SpontaneousRamanModel.forwardLengthPaperKm(alphaC, lengthKm);
+        } else {
+            g = qkd.multiband.SpontaneousRamanModel.forwardLengthKm(alphaC, alphaQ, lengthKm);
+        }
+        return new double[] { mb.getRaman().crossSectionPerKmNm(lambdaC, qchNm), g };
+    }
+
+    /** Parte 59: key of the factors of one circuit (see ramanFactors). */
+    private static final class RamanFactorKey {
+        final int b0, b1;
+        final long slotWidth, qch, alphaQ, length, coupling;
+        final boolean equalLoss, backward;
+        final Object settings;
+        final int hash;
+
+        RamanFactorKey(int b0, int b1, double slotWidth, Object settings, double qch, double alphaQ, double length,
+                boolean equalLoss, double coupling, boolean backward) {
+            this.b0 = b0;
+            this.b1 = b1;
+            this.slotWidth = Double.doubleToRawLongBits(slotWidth);
+            this.settings = settings;
+            this.qch = Double.doubleToRawLongBits(qch);
+            this.alphaQ = Double.doubleToRawLongBits(alphaQ);
+            this.length = Double.doubleToRawLongBits(length);
+            this.equalLoss = equalLoss;
+            this.coupling = Double.doubleToRawLongBits(coupling);
+            this.backward = backward;
+            long h = b0 * 31L + b1;
+            h = h * 31L + this.slotWidth;
+            h = h * 31L + this.qch;
+            h = h * 31L + this.alphaQ;
+            h = h * 31L + this.length;
+            h = h * 31L + this.coupling;
+            h = h * 31L + (equalLoss ? 1 : 0) + (backward ? 2 : 0);
+            h = h * 31L + System.identityHashCode(settings);
+            this.hash = (int) (h ^ (h >>> 32));
+        }
+
+        @Override
+        public int hashCode() {
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof RamanFactorKey)) return false;
+            final RamanFactorKey k = (RamanFactorKey) o;
+            return b0 == k.b0 && b1 == k.b1 && slotWidth == k.slotWidth && qch == k.qch && alphaQ == k.alphaQ
+                    && length == k.length && coupling == k.coupling && equalLoss == k.equalLoss
+                    && backward == k.backward && settings == k.settings;
+        }
+    }
+
+    /**
+     * Parte 59: factors already computed by this evaluator (one per simulation; not shared between threads). Not
+     * saved in save states: it is rebuilt after a restore.
+     */
+    private transient java.util.HashMap<RamanFactorKey, double[]> ramanFactorCache;
+
+    /** Parte 59: rho and G of a circuit (see ramanFactorsOriginal), from the cache when the inputs repeat. */
+    private double[] ramanFactors(int b0, int b1, double slotWidth, qkd.multiband.MultiBandSettings mb, double qchNm,
+            double alphaQ, double lengthKm, boolean equalLoss, double couplingPerKm, boolean backward) {
+        final RamanFactorKey key = new RamanFactorKey(b0, b1, slotWidth, mb, qchNm, alphaQ, lengthKm, equalLoss,
+                couplingPerKm, backward);
+        if (ramanFactorCache == null) ramanFactorCache = new java.util.HashMap<RamanFactorKey, double[]>();
+        double[] f = ramanFactorCache.get(key);
+        if (f == null) {
+            f = ramanFactorsOriginal(b0, b1, slotWidth, mb, qchNm, alphaQ, lengthKm, equalLoss, couplingPerKm,
+                    backward);
+            if (ramanFactorCache.size() > 500000) ramanFactorCache.clear(); // bound the memory
+            ramanFactorCache.put(key, f);
+        } else if (simulator.PerfChecks.VERIFY) {
+            final double[] g = ramanFactorsOriginal(b0, b1, slotWidth, mb, qchNm, alphaQ, lengthKm, equalLoss,
+                    couplingPerKm, backward);
+            simulator.PerfChecks.same(f[0], g[0], "secao de Raman");
+            simulator.PerfChecks.same(f[1], g[1], "comprimento efetivo do Raman");
+        }
+        return f;
+    }
+
+    /**
+     * Parte 59: the SpRS terms of a span keyed by circuit id. Terms with the same id are added in the order they
+     * arrive, and the sum goes over the ids in increasing order, as with the TreeMap&lt;Integer, Double&gt; used
+     * before (same additions, same order, same result). Without the caches the TreeMap itself is used.
+     */
+    static final class RamanTerms {
+        private final java.util.TreeMap<Integer, Double> map =
+                simulator.PerfChecks.ENABLED && !simulator.PerfChecks.VERIFY ? null : new java.util.TreeMap<Integer, Double>();
+        private int[] ids = new int[16];
+        private double[] vals = new double[16];
+        private int n;
+
+        void add(int id, double term) {
+            if (map != null) {
+                final Integer key = Integer.valueOf(id);
+                final Double previous = map.get(key);
+                map.put(key, Double.valueOf(previous == null ? term : previous.doubleValue() + term));
+                if (!simulator.PerfChecks.ENABLED) return;
+            }
+            if (n == ids.length) {
+                ids = java.util.Arrays.copyOf(ids, n * 2);
+                vals = java.util.Arrays.copyOf(vals, n * 2);
+            }
+            ids[n] = id;
+            vals[n] = term;
+            n++;
+        }
+
+        double sum() {
+            double original = 0.0;
+            if (map != null) {
+                for (Double v : map.values()) original += v.doubleValue();
+                if (!simulator.PerfChecks.ENABLED) return original;
+            }
+            // order by id, and by arrival among equal ids: (id, position) packed in a long and sorted
+            final long[] order = new long[n];
+            for (int i = 0; i < n; i++) order[i] = ((long) ids[i] << 32) | i;
+            java.util.Arrays.sort(order);
+            double sum = 0.0;
+            int i = 0;
+            while (i < n) {
+                final int id = ids[(int) order[i]];
+                double v = vals[(int) order[i]];
+                i++;
+                while (i < n && ids[(int) order[i]] == id) {
+                    v = v + vals[(int) order[i]];
+                    i++;
+                }
+                sum += v;
+            }
+            if (map != null) simulator.PerfChecks.same(sum, original, "soma do Raman");
+            return sum;
         }
     }
 
