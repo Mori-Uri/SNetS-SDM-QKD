@@ -525,7 +525,16 @@
         fld('Formato', sel(a, 'format', FORMATS, false)),
         fld('Resolução', sel(a, 'scale', [[1, '1× (tamanho da figura)'], [2, '2×'], [3, '3×']], false, true)),
         fld('Quadros separados', sel(a, 'frames', [['none', 'Não'], ['png', 'PNG'], ['svg', 'SVG'], ['both', 'PNG e SVG']], false)),
-        fld('Destino', sel(a, 'dest', [['download', 'Baixar pelo navegador'], ['folder', 'Gravar em launcher/figures']], false)));
+        fld('Destino', sel(a, 'dest', [['download', 'Baixar pelo navegador'], ['folder', 'Gravar na pasta das imagens']], false)));
+      if (a.dest === 'folder') {
+        const cur = (App.state.info && App.state.info.settings && App.state.info.settings.imagesDir) || 'launcher/figures';
+        box.append(el('div.toolbar', { style: { margin: 0 } }, el('span.small.mono.anim-folder', { title: cur }, cur),
+          el('button.btn.small', { type: 'button', on: { click: async () => {
+            const d = await App.pickFolder(cur, 'Pasta das imagens e animações');
+            if (!d) return;
+            try { await App.api.saveSettings({ imagesDir: d }); if (App.state.info) App.state.info.settings.imagesDir = d; drawControls(); } catch (e) { App.toast(e.message, 'err'); }
+          } } }, 'Escolher pasta…')));
+      }
       if ((a.format === 'mp4' || a.format === 'webm') && !videoMime(a.format)) {
         box.append(el('div.notice.warn', 'Este navegador não grava ' + a.format.toUpperCase() + '. Use ' + (a.format === 'mp4' ? 'WebM ou GIF.' : 'GIF.')));
       }
@@ -538,7 +547,7 @@
           if (!dlg.frames.length) await rebuild();
           const files = await exportAll(a, dlg.frames, (t) => { status.textContent = t; });
           status.textContent = 'Salvo: ' + files.join(', ');
-          App.toast(a.dest === 'folder' ? 'Animação gravada em launcher/figures' : 'Animação baixada', 'ok');
+          App.toast(a.dest === 'folder' ? 'Animação gravada na pasta das imagens' : 'Animação baixada', 'ok');
         } catch (e) { App.toast(e.message, 'err'); status.textContent = ''; }
         saveBtn.disabled = false;
       });

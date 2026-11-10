@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
  */
 public final class LauncherServer {
 
-    static final String VERSION = "1.21.0";
+    static final String VERSION = "1.21.1";
 
     private final Settings settings;
     private final Workspace workspace;
@@ -240,10 +240,10 @@ public final class LauncherServer {
                 Map<String, String> body = query(readBody(ex));
                 for (String key : new String[] {"projectRoot", "simulationsDir", "javaCommand", "defaultJar",
                     "jvmArgs", "runConsole", "javacCommand", "appWindow", "closePolicy", "tray", "updateCheck",
-                    "updateToken", "updateRepo"}) {
+                    "updateToken", "updateRepo", "imagesDir"}) {
                     if (body.containsKey(key)) {
                         String v = body.get(key);
-                        if (("projectRoot".equals(key) || "simulationsDir".equals(key)) && v != null
+                        if (("projectRoot".equals(key) || "simulationsDir".equals(key) || "imagesDir".equals(key)) && v != null
                                 && !v.trim().isEmpty() && !new File(v.trim()).isDirectory()) {
                             throw new IllegalArgumentException("Pasta não encontrada: " + v);
                         }
@@ -283,6 +283,14 @@ public final class LauncherServer {
                 requirePost(post);
                 Map<String, Object> m = ok();
                 m.put("file", update.download(required(q, "asset")));
+                return m;
+            }
+            case "/api/pick": { // Parte 60: folder or file chosen in the file explorer
+                requirePost(post);
+                Map<String, Object> m = ok();
+                String chosen = Picker.pick(q.get("mode"), q.get("start"), q.get("title"));
+                m.put("path", chosen);
+                m.put("cancelled", chosen == null);
                 return m;
             }
             case "/api/tree":
@@ -542,7 +550,7 @@ public final class LauncherServer {
             }
             case "/api/figures/open-folder": {
                 requirePost(post);
-                java.io.File d = figures.dir();
+                java.io.File d = figures.imagesDir(); // Parte 60
                 if (!d.isDirectory()) {
                     d.mkdirs();
                 }

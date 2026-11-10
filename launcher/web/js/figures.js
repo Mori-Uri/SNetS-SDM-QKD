@@ -1978,7 +1978,7 @@
 
   function toolbar() {
     const bar = el('div.toolbar.fig-toolbar');
-    const savedSel = el('select.input', { style: { maxWidth: '230px' } });
+    const savedSel = el('select.input', { style: { maxWidth: '180px' } });
     const fillSaved = () => {
       clear(savedSel).append(el('option', { value: '' }, S.saved.length ? 'Abrir figura salva…' : 'Nenhuma figura salva'),
         S.saved.map((f) => el('option', { value: f.name }, f.name)));
@@ -1997,30 +1997,46 @@
         App.toast('Figura "' + n + '" aberta', 'ok');
       } catch (e) { App.toast(e.message, 'err'); }
     });
-    const pngScale = el('select.input', { title: 'Resolução do PNG', style: { width: 'auto' } },
-      [[1, 'PNG 1×'], [2, 'PNG 2×'], [3, 'PNG 3× (≈300 dpi)'], [4, 'PNG 4×']].map(([v, l]) => el('option', { value: v }, l)));
+    const pngScale = el('select.input', { title: 'Resolução do PNG (3× ≈ 300 dpi numa coluna de artigo)', style: { width: 'auto' } },
+      [[1, 'PNG 1×'], [2, 'PNG 2×'], [3, 'PNG 3×'], [4, 'PNG 4×']].map(([v, l]) => el('option', { value: v }, l)));
     pngScale.value = '3';
     const fname = () => (S.savedName || (S.spec.style.title || S.spec.template || 'figura')).replace(/[^\w\-. ()+À-ÿ]+/g, '_').slice(0, 80) || 'figura';
-    bar.append(
+    // Parte 60: Figura | Imagem: PNG, .SVG, .PNG, gravar, dados | Animação ... pasta e numeração à direita
+    const imagesFolder = () => (App.state.info && App.state.info.settings && App.state.info.settings.imagesDir) || 'launcher/figures';
+    const pickImages = async () => {
+      const d = await App.pickFolder(imagesFolder(), 'Pasta das imagens e animações');
+      if (!d) return;
+      try {
+        await App.api.saveSettings({ imagesDir: d });
+        if (App.state.info) App.state.info.settings.imagesDir = d;
+        App.toast('Imagens e animações vão para ' + d, 'ok');
+      } catch (e) { App.toast(e.message, 'err'); }
+    };
+    bar.append(el('div.fig-group',
       el('button.btn.small', { type: 'button', on: { click: () => newDialog() } }, 'Nova'),
       savedSel,
       el('button.btn.small.primary', { type: 'button', on: { click: () => saveDialog(false) } }, 'Salvar'),
-      el('button.btn.small', { type: 'button', on: { click: () => saveDialog(true) } }, 'Salvar como…'),
-      el('span.sep'),
-      el('button.btn.small', { type: 'button', on: { click: () => { if (S.svg) App.downloadText(nextName(fname(), 'svg'), R().serialize(S.svg), 'image/svg+xml'); } } }, 'Baixar SVG'),
+      el('button.btn.small', { type: 'button', on: { click: () => saveDialog(true) } }, 'Salvar como…')),
+      el('div.fig-group.fig-group-sep',
+      el('span.fig-bar-title.fig-bar-sub', 'Imagem'),
       pngScale,
-      el('button.btn.small', { type: 'button', on: { click: async () => {
+      el('button.btn.small', { type: 'button', title: 'Baixar a figura em SVG', on: { click: () => { if (S.svg) App.downloadText(nextName(fname(), 'svg'), R().serialize(S.svg), 'image/svg+xml'); } } }, '.SVG'),
+      el('button.btn.small', { type: 'button', title: 'Baixar a figura em PNG, na resolução escolhida', on: { click: async () => {
         if (!S.svg) return;
         try {
           const url = await R().toPng(S.svg, Number(pngScale.value));
           const a = el('a', { href: url, download: nextName(fname(), 'png') }); document.body.appendChild(a); a.click(); a.remove();
         } catch (e) { App.toast(e.message, 'err'); }
-      } } }, 'Baixar PNG'),
-      el('button.btn.small', { type: 'button', title: 'Grava SVG e PNG em launcher/figures', on: { click: () => saveImages(Number(pngScale.value)) } }, 'Gravar imagens na pasta'),
-      el('button.btn.small', { type: 'button', on: { click: () => { if (S.table) App.downloadText(nextName(fname(), 'csv'), toCsv(S.table), 'text/csv'); } } }, 'Dados (CSV)'),
-      el('button.btn.small', { type: 'button', title: 'Animação ao longo dos pontos de carga (GIF, MP4, WebM ou quadros separados)', on: { click: () => { if (App.anim) App.anim.open(); } } }, 'Animação…'),
-      el('button.btn.small.ghost', { type: 'button', title: 'Os downloads repetidos saem como nome(1), nome(2)…; isto recomeça a contagem', on: { click: resetDownloadNames } }, 'Zerar numeração'),
-      el('button.btn.small.ghost', { type: 'button', title: 'Abrir launcher/figures', on: { click: () => App.api.openFiguresFolder().catch((e) => App.toast(e.message, 'err')) } }, 'Abrir pasta'));
+      } } }, '.PNG'),
+      el('button.btn.small', { type: 'button', title: 'Grava SVG e PNG na pasta das imagens (' + imagesFolder() + ')', on: { click: () => saveImages(Number(pngScale.value)) } }, 'Gravar imagens na pasta'),
+      el('button.btn.small', { type: 'button', on: { click: () => { if (S.table) App.downloadText(nextName(fname(), 'csv'), toCsv(S.table), 'text/csv'); } } }, 'Dados (CSV)')),
+      el('div.fig-group.fig-group-sep',
+      el('span.fig-bar-title.fig-bar-sub', 'Animação'),
+      el('button.btn.small', { type: 'button', title: 'Animação ao longo dos pontos de carga (GIF, MP4, WebM ou quadros separados)', on: { click: () => { if (App.anim) App.anim.open(); } } }, 'Gerar animação')),
+      el('div.fig-group.fig-group-end',
+      el('button.btn.small.ghost', { type: 'button', title: 'Abrir a pasta das imagens (' + imagesFolder() + ')', on: { click: () => App.api.openFiguresFolder().catch((e) => App.toast(e.message, 'err')) } }, 'Abrir pasta'),
+      el('button.btn.small.ghost', { type: 'button', title: 'Escolher no explorador a pasta onde as imagens e animações são gravadas', on: { click: pickImages } }, 'Escolher pasta…'),
+      el('button.btn.small.ghost', { type: 'button', title: 'Os downloads repetidos saem como nome(1), nome(2)…; isto recomeça a contagem', on: { click: resetDownloadNames } }, 'Zerar numeração')));
     return bar;
   }
 

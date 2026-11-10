@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [60](#parte-60) | Parte 60 — launcher 1.21.1: escolher pastas no explorador, X nas janelas, janela que se adapta ao tamanho e barra do estúdio reorganizada |
 | [59](#parte-59) | Parte 59 — desempenho etapa 2 (multibanda e C+L), animação dos gráficos e launcher como aplicativo (1.21.0) |
 | [57](#parte-57) | Parte 57 — otimizações de desempenho, etapa 1: crosstalk, taxa do circuito, energia e utilização do espectro |
 | [55](#parte-55) | Parte 55 — launcher 1.20.7: padrão de aparência por tipo de gráfico, botões de topo/fim, edição automática do launcher |
@@ -39,6 +40,34 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-60"></a>
+
+## Parte 60 — launcher 1.21.1: escolher pastas no explorador, X nas janelas, janela que se adapta ao tamanho e barra do estúdio reorganizada
+
+Só na branch `experimental`. Só o launcher muda.
+
+- **Escolher no explorador de arquivos:** os campos de pasta e de programa têm um botão "Procurar…", que abre o explorador do Windows (`/api/pick`, `launcher/src/launcher/Picker.java`). Em Configurações: pasta do projeto, pasta simulations, pasta das imagens e animações, java e javac.
+- **Pasta das imagens e animações** (nova, em Configurações): onde "Gravar imagens na pasta" e a animação gravam os arquivos. O padrão continua `launcher/figures`. Também dá para escolher pelo botão "Escolher pasta…" do estúdio e pelo destino da animação. As figuras salvas (`.json`) continuam em `launcher/figures`.
+- **X para fechar** no topo de todas as janelas de diálogo (Configurações, Salvar figura etc.). Uma janela mais alta que a tela rola por dentro, com o X e os botões sempre à vista.
+- **Janela de qualquer tamanho:**
+  - a barra do topo quebra em duas linhas em vez de sobrepor o nome e os botões, e o caminho da pasta encolhe com reticências;
+  - as abas do caso quebram em linhas em vez da barra de rolagem;
+  - em janelas baixas (até 640 px), o cabeçalho do caso rola junto com a página;
+  - sem rolagem horizontal da página inteira.
+- **Barra do estúdio de gráficos**, em grupos que quebram juntos:
+  - figura (Nova, figuras salvas, Salvar, Salvar como…);
+  - **Imagem** (PNG 1× a 4×, .SVG, .PNG, Gravar imagens na pasta, Dados (CSV));
+  - **Animação** (Gerar animação);
+  - à direita, Abrir pasta, Escolher pasta… e Zerar numeração.
+
+### Arquivos
+
+- `launcher/src/launcher/Picker.java` (novo), `LauncherServer.java`, `Settings.java` e `Figures.java`.
+- `launcher/web/index.html`, `styles.css`, `js/app.js`, `js/api.js`, `js/util.js`, `js/figures.js` e `js/animation.js`.
+- `launcher/snets-launcher.jar`.
 
 ---
 

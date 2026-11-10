@@ -604,3 +604,36 @@ tr.bulk-tpl td { background: var(--accent-soft); }
 .quit-options { display: flex; flex-direction: column; gap: 8px; }
 .app-closed { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: flex; align-items: center; justify-content: center; }
 .app-closed-box { max-width: 520px; padding: 24px; text-align: center; }
+
+/* Parte 60: escolher pasta/arquivo, X das janelas e janela do aplicativo em qualquer tamanho */
+.input-browse { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.input-browse .input { flex: 1 1 auto; }
+.modal form { max-height: calc(100vh - 32px); grid-template-rows: auto minmax(0, 1fr) auto auto; }
+.modal #modalBody { overflow: auto; min-height: 0; padding-right: 2px; }
+.modal-head { display: flex; align-items: center; gap: 8px; }
+.modal-head h2 { flex: 1 1 auto; margin: 0; }
+.modal-x { font-size: 15px; line-height: 1; }
+.fig-bar-sub { font-size: 15px; cursor: default; }
+.anim-folder { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; color: var(--fg-3); }
+.topbar { flex-wrap: wrap; row-gap: 6px; }
+.brand { flex: 1 1 260px; }
+.brand > div { min-width: 0; }
+.brand-name { white-space: nowrap; }
+.brand-sub { max-width: 100%; }
+.topbar-actions { flex-wrap: wrap; justify-content: flex-end; gap: 4px 6px; min-width: 0; }
+.tabs { flex-wrap: wrap; overflow-x: visible; }
+@media (max-width: 1250px) { .topbar-actions .btn { padding: 5px 9px; } }
+@media (max-width: 860px) {
+  .topbar-actions { justify-content: flex-start; }
+  .tab { padding: 6px 8px; }
+}
+@media (max-height: 640px) {
+  .case-sticky { position: static; }
+  .results-studio .fig-stickybar { top: 0; }
+  .case-head { padding: 8px 0 6px; }
+}
+@media (max-width: 700px) { .topbar-actions .btn { padding: 4px 7px; font-size: 13px; } .topbar { padding: 6px 10px; } }
+.fig-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.fig-group-sep { border-left: 1px solid var(--border); padding-left: 10px; }
+.fig-group-end { margin-left: auto; }
+.fig-toolbar { row-gap: 8px; column-gap: 10px; }

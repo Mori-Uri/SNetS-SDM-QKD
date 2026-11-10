@@ -28,6 +28,12 @@ final class Figures {
         return new File(settings.launcherDir(), "figures");
     }
 
+    /** Parte 60: folder of the exported images and animations (Configurações; default launcher/figures). */
+    File imagesDir() {
+        String d = settings.get("imagesDir", "");
+        return d.isEmpty() ? dir() : new File(d);
+    }
+
     private static String clean(String name) {
         String n = name == null ? "" : name.trim();
         if (n.toLowerCase().endsWith(".json")) {
@@ -56,8 +62,8 @@ final class Figures {
             String base = n.substring(0, n.length() - 5);
             m.put("name", base);
             m.put("mtime", f.lastModified());
-            m.put("svg", new File(dir(), base + ".svg").isFile());
-            m.put("png", new File(dir(), base + ".png").isFile());
+            m.put("svg", new File(imagesDir(), base + ".svg").isFile());
+            m.put("png", new File(imagesDir(), base + ".png").isFile());
             out.add(m);
         }
         return out;
@@ -111,7 +117,7 @@ final class Figures {
      */
     String uniqueName(String name, String exts) {
         String n = clean(name);
-        File d = dir();
+        File d = imagesDir();
         String[] es = exts == null || exts.trim().isEmpty() ? new String[] {"svg", "png"} : exts.toLowerCase().split("[,; ]+");
         for (int k = 0; k < 100000; k++) {
             String c = k == 0 ? n : n + "(" + k + ")";
@@ -148,7 +154,7 @@ final class Figures {
         if (bytes.length > 200_000_000) { // Parte 59: animations
             throw new IllegalArgumentException("Imagem grande demais");
         }
-        File d = dir();
+        File d = imagesDir();
         if (!d.isDirectory() && !d.mkdirs()) {
             throw new IOException("Não foi possível criar " + d);
         }
@@ -159,8 +165,9 @@ final class Figures {
 
     void delete(String name) throws IOException {
         String n = clean(name);
-        for (String e : new String[] {".json", ".svg", ".png", ".pdf"}) {
-            Files.deleteIfExists(new File(dir(), n + e).toPath());
+        Files.deleteIfExists(new File(dir(), n + ".json").toPath());
+        for (String e : new String[] {".svg", ".png", ".pdf"}) {
+            Files.deleteIfExists(new File(imagesDir(), n + e).toPath());
         }
     }
 }

@@ -29,6 +29,7 @@
     saveSettings: (s) => call('POST', 'settings', null, new URLSearchParams(s).toString()),
     // Parte 59: application (window, tray, close policy, updates)
     appExit: (mode) => call('POST', 'app/exit', { mode }),
+    pick: (mode, start, title) => call('POST', 'pick', { mode, start, title }), // Parte 60
     updateCheck: () => call('GET', 'app/update-check'),
     updateDownload: (asset) => call('POST', 'app/update-download', { asset }),
     tree: () => call('GET', 'tree'),

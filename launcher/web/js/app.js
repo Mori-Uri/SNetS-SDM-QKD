@@ -758,6 +758,7 @@
     const java = el('input.input.mono', { type: 'text', value: s.javaCommandSetting, placeholder: s.javaCommand });
     const javac = el('input.input.mono', { type: 'text', value: s.javacCommandSetting || '', placeholder: 'automático (JDK do launcher, JAVA_HOME ou PATH)' });
     const jvm = el('input.input.mono', { type: 'text', value: s.jvmArgs, placeholder: 'ex.: -Xmx8g' });
+    const imgs = el('input.input.mono', { type: 'text', value: s.imagesDirSetting || '', placeholder: s.imagesDir || 'launcher/figures' }); // Parte 60
     const jar = el('select.input', el('option', { value: '' }, '(automático: SNetS-SDM-QKD.jar, se existir)'),
       (st.info.jars || []).map((j) => el('option', { value: j.path }, j.name + ' · ' + j.location)));
     jar.value = s.defaultJar || '';
@@ -774,12 +775,13 @@
     const token = el('input.input.mono', { type: 'password', value: '', placeholder: s.updateTokenSet ? '(definido; deixe vazio para manter)' : 'só para repositório privado' });
     const clearToken = el('input', { type: 'checkbox' });
     App.modal('Configurações', el('div.form-grid',
-      el('div.field', el('div.flabel', 'Pasta do projeto SNetS'), proj, el('div.help', 'Vazio = pasta acima do launcher. Usada para achar o código-fonte (catálogo de algoritmos) e target/.')),
-      el('div.field', el('div.flabel', 'Pasta simulations'), sims, el('div.help', 'Vazio = <projeto>/simulations.')),
+      el('div.field', el('div.flabel', 'Pasta do projeto SNetS'), App.browseField(proj, 'folder', 'Pasta do projeto SNetS'), el('div.help', 'Vazio = pasta acima do launcher. Usada para achar o código-fonte (catálogo de algoritmos) e target/.')),
+      el('div.field', el('div.flabel', 'Pasta simulations'), App.browseField(sims, 'folder', 'Pasta simulations'), el('div.help', 'Vazio = <projeto>/simulations.')),
+      el('div.field', el('div.flabel', 'Pasta das imagens e animações'), App.browseField(imgs, 'folder', 'Pasta das imagens e animações'), el('div.help', 'Onde "Gravar imagens na pasta" e a animação gravam os arquivos. Vazio = launcher/figures.')),
       el('div.field', el('div.flabel', 'JAR padrão'), jar),
-      el('div.field', el('div.flabel', 'Comando java'), java, el('div.help', 'Vazio = o mesmo Java que está rodando o launcher (' + st.info.javaVersion + ').')),
+      el('div.field', el('div.flabel', 'Comando java'), App.browseField(java, 'file', 'java.exe'), el('div.help', 'Vazio = o mesmo Java que está rodando o launcher (' + st.info.javaVersion + ').')),
       el('div.field', el('div.flabel', 'Argumentos da JVM padrão'), jvm),
-      el('div.field', el('div.flabel', 'Comando javac (para Gerar JAR)'), javac, el('div.help', 'Ex.: C:\\Program Files\\Eclipse Adoptium\\jdk-21\\bin\\javac.exe. Vazio = procurar sozinho.')),
+      el('div.field', el('div.flabel', 'Comando javac (para Gerar JAR)'), App.browseField(javac, 'file', 'javac.exe'), el('div.help', 'Ex.: C:\\Program Files\\Eclipse Adoptium\\jdk-21\\bin\\javac.exe. Vazio = procurar sozinho.')),
       el('label.check', consoleCb, ' Abrir uma janela de console para cada execução (fechar a janela cancela a execução)'),
       !s.consoleSupported ? el('div.help', 'Janelas de console por execução só existem no Windows.') : null,
       el('h3', { style: { margin: '10px 0 0', fontSize: '14px' } }, 'Aplicativo'),
@@ -793,7 +795,7 @@
         el('div.help', 'Só é preciso se o repositório for privado (token com leitura de conteúdo). Fica em launcher-settings.properties, fora do git.')),
       el('div', el('button.btn.small', { type: 'button', on: { click: () => App.checkUpdate(true) } }, 'Procurar atualização agora')),
       el('p.muted.small', { style: { margin: 0 } }, 'Salvo em ', el('code', s.launcherDir + (s.launcherDir.includes('\\') ? '\\' : '/') + 'launcher-settings.properties'))), async () => {
-      const extra = { appWindow: appWin.checked ? 'true' : 'false', tray: trayCb.checked ? 'true' : 'false', closePolicy: closeSel.value,
+      const extra = { imagesDir: imgs.value, appWindow: appWin.checked ? 'true' : 'false', tray: trayCb.checked ? 'true' : 'false', closePolicy: closeSel.value,
         updateCheck: updCb.checked ? 'true' : 'false', updateRepo: repo.value };
       if (token.value.trim()) extra.updateToken = token.value.trim();
       else if (clearToken.checked) extra.updateToken = '';

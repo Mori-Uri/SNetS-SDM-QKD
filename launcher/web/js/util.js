@@ -272,7 +272,37 @@ window.App = window.App || {};
     return wrap;
   }
 
+  /**
+   * Parte 60: a text input with a "Procurar…" button that opens the file explorer of the computer (folder or file).
+   * The chosen path goes into the input (input and change events are dispatched).
+   */
+  function browseField(input, mode, title) {
+    const btn = el('button.btn.small', { type: 'button', title: mode === 'file' ? 'Escolher o arquivo no explorador' : 'Escolher a pasta no explorador' }, 'Procurar…');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        const r = await App.api.pick(mode || 'folder', input.value || input.placeholder || '', title || '');
+        if (r && r.path) {
+          input.value = r.path;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      } catch (e) { toast(e.message, 'err'); }
+      btn.disabled = false;
+    });
+    return el('div.input-browse', input, btn);
+  }
+
+  /** Parte 60: asks for a folder in the file explorer; returns the path or null. */
+  async function pickFolder(start, title) {
+    try {
+      const r = await App.api.pick('folder', start || '', title || '');
+      return r && r.path ? r.path : null;
+    } catch (e) { toast(e.message, 'err'); return null; }
+  }
+
   Object.assign(App, {
+    browseField, pickFolder,
     el, clear, svg, toast, modal, fmtNum, fmtSci, fmtBytes, fmtDate, fmtDuration, fmtBitRate,
     deepClone, deepEqual, isPlainObject, getPath, setPath, downloadText, copyText, debounce,
     parseNumber, caseNameOf, keepScroll, allNoneButtons, picker,

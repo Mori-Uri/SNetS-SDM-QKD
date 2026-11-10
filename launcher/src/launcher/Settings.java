@@ -156,6 +156,9 @@ final class Settings {
         m.put("updateCheck", !"false".equalsIgnoreCase(get("updateCheck", "true")));
         m.put("updateRepo", get("updateRepo", "Mori-Uri/SNetS-SDM-QKD"));
         m.put("updateTokenSet", !get("updateToken", "").isEmpty());
+        // Parte 60: folder of the exported images and animations
+        m.put("imagesDirSetting", get("imagesDir", ""));
+        m.put("imagesDir", get("imagesDir", "").isEmpty() ? new File(launcherDir, "figures").getAbsolutePath() : get("imagesDir", ""));
         return m;
     }
 }
