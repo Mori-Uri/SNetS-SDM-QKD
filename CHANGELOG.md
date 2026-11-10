@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [61](#parte-61) | Parte 61 — launcher 1.21.2: uma só barra de rolagem nas janelas, "Salvar como…" na mesma linha e ícone do aplicativo na bandeja e no atalho |
 | [60](#parte-60) | Parte 60 — launcher 1.21.1: escolher pastas no explorador, X nas janelas, janela que se adapta ao tamanho e barra do estúdio reorganizada |
 | [59](#parte-59) | Parte 59 — desempenho etapa 2 (multibanda e C+L), animação dos gráficos e launcher como aplicativo (1.21.0) |
 | [57](#parte-57) | Parte 57 — otimizações de desempenho, etapa 1: crosstalk, taxa do circuito, energia e utilização do espectro |
@@ -42,6 +43,16 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
 
 ---
+
+<a id="parte-61"></a>
+## Parte 61 — launcher 1.21.2: uma só barra de rolagem nas janelas, "Salvar como…" na mesma linha e ícone do aplicativo na bandeja e no atalho
+
+Ajustes pedidos depois de testar a Parte 60 (branch experimental).
+
+- **Uma só barra de rolagem nas janelas de diálogo:** a janela (Configurações etc.) não rola mais por fora; só o conteúdo rola, com o título, o X e os botões sempre à vista (`launcher/web/styles.css`).
+- **Estúdio de gráficos:** o primeiro grupo (Nova, figura salva, Salvar, Salvar como…) fica sempre numa linha; a lista de figuras encolhe quando falta espaço (`figures.js`, `styles.css`).
+- **Ícone do aplicativo:** o ícone da bandeja do sistema passa a ser o mesmo da janela da interface (disco azul-petróleo com sete pontos). A janela do "Procurar…" usa o mesmo ícone (`AppShell.java`, `Picker.java`).
+- **Atalho com ícone:** um `.bat` não pode ter ícone próprio; por isso, ao abrir no Windows, o launcher grava `launcher/snets-launcher.ico` e, se ainda não existir, cria em `launcher/` o atalho `SNetS Launcher.lnk` (`SNetS Launcher (experimental).lnk` nesta edição), que roda `SNetS-Launcher.bat` minimizado. O atalho pode ser copiado para a Área de Trabalho ou fixado na barra de tarefas. Para recriá-lo, apague-o e abra o launcher; `-Dsnets.shortcut=false` desliga. O ícone e o atalho são locais (`.gitignore`).
 
 <a id="parte-60"></a>
 

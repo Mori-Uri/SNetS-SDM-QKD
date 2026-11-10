@@ -2,7 +2,6 @@ package launcher;
 
 import java.awt.CheckboxMenuItem;
 import java.awt.Color;
-import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.GraphicsEnvironment;
 import java.awt.Image;
@@ -11,9 +10,14 @@ import java.awt.PopupMenu;
 import java.awt.RenderingHints;
 import java.awt.SystemTray;
 import java.awt.TrayIcon;
+import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -61,6 +65,7 @@ final class AppShell {
 
     void start() {
         installTray();
+        ensureShortcut(settings.launcherDir()); // Parte 61
         Thread t = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -117,21 +122,133 @@ final class AppShell {
         }
     }
 
-    /** A small round icon drawn here (no image file needed): blue for the main edition, orange for experimental. */
+    /** Parte 61: the tray shows the same icon as the window of the interface (favicon of index.html). */
     private static Image drawIcon() {
-        int s = 64;
-        BufferedImage img = new BufferedImage(s, s, BufferedImage.TYPE_INT_ARGB);
+        return appIcon(64);
+    }
+
+    /**
+     * Parte 61: the icon of the interface (the favicon of index.html, drawn in a 32x32 box): a teal disc with a white
+     * dot in the middle and six light dots around it (the same in both editions).
+     */
+    static BufferedImage appIcon(int size) {
+        BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        g.setColor(Edition.NAME.isEmpty() ? new Color(0x0f, 0x6e, 0x8c) : new Color(0xd9, 0x6a, 0x12));
-        g.fillOval(2, 2, s - 4, s - 4);
+        g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+        double k = size / 32.0;
+        g.setColor(new Color(0x15, 0x5e, 0x75));
+        g.fill(circle(16, 16, 14, k));
+        g.setColor(new Color(0xa5, 0xf3, 0xfc));
+        double[][] dots = { { 16, 8.5 }, { 16, 23.5 }, { 9.5, 12.2 }, { 22.5, 12.2 }, { 9.5, 19.8 }, { 22.5, 19.8 } };
+        for (double[] d : dots) {
+            g.fill(circle(d[0], d[1], 3, k));
+        }
         g.setColor(Color.WHITE);
-        g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 40));
-        int w = g.getFontMetrics().stringWidth("S");
-        g.drawString("S", (s - w) / 2, 47);
+        g.fill(circle(16, 16, 3, k));
         g.dispose();
         return img;
+    }
+
+    private static Ellipse2D circle(double cx, double cy, double r, double k) {
+        return new Ellipse2D.Double((cx - r) * k, (cy - r) * k, 2 * r * k, 2 * r * k);
+    }
+
+    static List<Image> appIcons() {
+        List<Image> list = new ArrayList<Image>();
+        for (int n : new int[] { 16, 24, 32, 48, 64 }) list.add(appIcon(n));
+        return list;
+    }
+
+    /** Parte 61: Windows icon file (PNG images inside an .ico, accepted since Windows Vista). */
+    static void writeIco(File out) throws IOException {
+        int[] sizes = { 16, 24, 32, 48, 64, 128, 256 };
+        List<byte[]> pngs = new ArrayList<byte[]>();
+        for (int n : sizes) {
+            ByteArrayOutputStream b = new ByteArrayOutputStream();
+            javax.imageio.ImageIO.write(appIcon(n), "png", b);
+            pngs.add(b.toByteArray());
+        }
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        DataOutputStream o = new DataOutputStream(bos);
+        o.writeShort(0);
+        o.writeShort(Short.reverseBytes((short) 1));
+        o.writeShort(Short.reverseBytes((short) sizes.length));
+        int offset = 6 + 16 * sizes.length;
+        for (int i = 0; i < sizes.length; i++) {
+            int n = sizes[i];
+            o.writeByte(n >= 256 ? 0 : n);
+            o.writeByte(n >= 256 ? 0 : n);
+            o.writeByte(0);
+            o.writeByte(0);
+            o.writeShort(Short.reverseBytes((short) 1));
+            o.writeShort(Short.reverseBytes((short) 32));
+            o.writeInt(Integer.reverseBytes(pngs.get(i).length));
+            o.writeInt(Integer.reverseBytes(offset));
+            offset += pngs.get(i).length;
+        }
+        for (byte[] b : pngs) o.write(b);
+        o.flush();
+        try (FileOutputStream f = new FileOutputStream(out)) {
+            f.write(bos.toByteArray());
+        }
+    }
+
+    /**
+     * Parte 61: a .bat file cannot have its own icon, so the launcher keeps next to it a shortcut with the icon of the
+     * interface ("SNetS Launcher.lnk"; "SNetS Launcher (experimental).lnk" in that edition). It runs SNetS-Launcher.bat
+     * minimized and can be copied to the desktop or pinned to the taskbar. Created only when missing (delete it to
+     * have it made again); -Dsnets.shortcut=false turns this off.
+     */
+    static void ensureShortcut(final File launcherDir) {
+        if (!Settings.isWindows() || "false".equalsIgnoreCase(System.getProperty("snets.shortcut", "true"))) return;
+        final File bat = new File(launcherDir, "SNetS-Launcher.bat");
+        if (!bat.isFile()) return;
+        final File ico = new File(launcherDir, "snets-launcher.ico");
+        final File lnk = new File(launcherDir, "SNetS Launcher" + (Edition.NAME.isEmpty() ? "" : " (" + Edition.NAME + ")") + ".lnk");
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    writeIco(ico); // always rewritten: cheap, and follows changes of the drawing
+                    if (lnk.isFile()) return;
+                    String cmd = System.getenv("ComSpec");
+                    if (cmd == null || cmd.isEmpty()) cmd = "cmd.exe";
+                    String ps = "$s=(New-Object -ComObject WScript.Shell).CreateShortcut(" + q(lnk) + ");"
+                            + "$s.TargetPath=" + q(cmd) + ";"
+                            + "$s.Arguments=" + q("/c \"\"" + bat.getAbsolutePath() + "\"\"") + ";"
+                            + "$s.WorkingDirectory=" + q(launcherDir) + ";"
+                            + "$s.IconLocation=" + q(ico.getAbsolutePath() + ",0") + ";"
+                            + "$s.WindowStyle=7;"
+                            + "$s.Description='SNetS Launcher';"
+                            + "$s.Save()";
+                    Process pr = new ProcessBuilder("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                            "-Command", ps).redirectErrorStream(true).start();
+                    ByteArrayOutputStream outp = new ByteArrayOutputStream();
+                    byte[] buf = new byte[2048];
+                    int n;
+                    while ((n = pr.getInputStream().read(buf)) > 0) outp.write(buf, 0, n);
+                    if (pr.waitFor() == 0 && lnk.isFile()) {
+                        System.out.println("[launcher] atalho com ícone criado: " + lnk.getAbsolutePath());
+                    } else {
+                        System.out.println("[launcher] não foi possível criar o atalho: " + outp.toString("UTF-8").trim());
+                    }
+                } catch (Exception e) {
+                    System.out.println("[launcher] não foi possível criar o atalho: " + e);
+                }
+            }
+        }, "snets-shortcut");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private static String q(File f) {
+        return q(f.getAbsolutePath());
+    }
+
+    /** PowerShell single-quoted string. */
+    private static String q(String v) {
+        return "'" + v.replace("'", "''") + "'";
     }
 
     private void notice(String text) {

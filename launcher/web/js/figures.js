@@ -2012,7 +2012,7 @@
         App.toast('Imagens e animações vão para ' + d, 'ok');
       } catch (e) { App.toast(e.message, 'err'); }
     };
-    bar.append(el('div.fig-group',
+    bar.append(el('div.fig-group.fig-group-main',
       el('button.btn.small', { type: 'button', on: { click: () => newDialog() } }, 'Nova'),
       savedSel,
       el('button.btn.small.primary', { type: 'button', on: { click: () => saveDialog(false) } }, 'Salvar'),

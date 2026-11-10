@@ -608,7 +608,8 @@ tr.bulk-tpl td { background: var(--accent-soft); }
 /* Parte 60: escolher pasta/arquivo, X das janelas e janela do aplicativo em qualquer tamanho */
 .input-browse { display: flex; gap: 6px; align-items: center; min-width: 0; }
 .input-browse .input { flex: 1 1 auto; }
-.modal form { max-height: calc(100vh - 32px); grid-template-rows: auto minmax(0, 1fr) auto auto; }
+.modal { max-height: calc(100vh - 32px); overflow: hidden; } /* Parte 61: only the body of the window scrolls */
+.modal form { max-height: calc(100vh - 34px); grid-template-rows: auto minmax(0, 1fr) auto auto; }
 .modal #modalBody { overflow: auto; min-height: 0; padding-right: 2px; }
 .modal-head { display: flex; align-items: center; gap: 8px; }
 .modal-head h2 { flex: 1 1 auto; margin: 0; }
@@ -636,4 +637,7 @@ tr.bulk-tpl td { background: var(--accent-soft); }
 .fig-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
 .fig-group-sep { border-left: 1px solid var(--border); padding-left: 10px; }
 .fig-group-end { margin-left: auto; }
+.fig-group .btn { white-space: nowrap; } /* Parte 61 */
+.fig-group-main { flex-wrap: nowrap; }
+.fig-group-main select { flex: 0 1 180px; min-width: 80px; }
 .fig-toolbar { row-gap: 8px; column-gap: 10px; }
