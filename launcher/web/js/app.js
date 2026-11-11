@@ -751,8 +751,22 @@
     }, 'Gerar JAR');
   }
 
+  /** Parte 62: aplica o tema da interface e guarda uma cópia local (lida pelo index.html antes do primeiro desenho). */
+  function applyTheme(t) {
+    const v = /^(blue|gray|black|light)$/.test(t || '') ? t : 'blue';
+    document.documentElement.setAttribute('data-theme', v);
+    try { localStorage.setItem('snets.theme', v); } catch (e) { /* sem armazenamento */ }
+  }
+  App.applyTheme = applyTheme;
+
   function settingsDialog() {
     const s = st.info.settings;
+    const themeSel = el('select.input', [['blue', 'Azul (padrão)'], ['gray', 'Cinza escuro'], ['black', 'Preto (AMOLED)'], ['light', 'Claro']]
+      .map(([v, t]) => el('option', { value: v }, t)));
+    themeSel.value = s.theme || 'blue';
+    themeSel.addEventListener('change', () => applyTheme(themeSel.value)); // prévia na hora
+    let themeSaved = false;
+    document.getElementById('modal').addEventListener('close', () => { if (!themeSaved) applyTheme(s.theme); }, { once: true });
     const proj = el('input.input.mono', { type: 'text', value: s.projectRootSetting, placeholder: s.projectRoot });
     const sims = el('input.input.mono', { type: 'text', value: s.simulationsDirSetting, placeholder: s.simulationsDir });
     const java = el('input.input.mono', { type: 'text', value: s.javaCommandSetting, placeholder: s.javaCommand });
@@ -784,6 +798,8 @@
       el('div.field', el('div.flabel', 'Comando javac (para Gerar JAR)'), App.browseField(javac, 'file', 'javac.exe'), el('div.help', 'Ex.: C:\\Program Files\\Eclipse Adoptium\\jdk-21\\bin\\javac.exe. Vazio = procurar sozinho.')),
       el('label.check', consoleCb, ' Abrir uma janela de console para cada execução (fechar a janela cancela a execução)'),
       !s.consoleSupported ? el('div.help', 'Janelas de console por execução só existem no Windows.') : null,
+      el('h3', { style: { margin: '10px 0 0', fontSize: '14px' } }, 'Aparência'),
+      el('div.field', el('div.flabel', 'Tema da interface'), themeSel, el('div.help', 'A mudança aparece na hora; Cancelar volta ao tema anterior. Os gráficos exportados não mudam.')),
       el('h3', { style: { margin: '10px 0 0', fontSize: '14px' } }, 'Aplicativo'),
       el('label.check', appWin, ' Abrir em janela própria (Edge ou Chrome sem abas); desligado = navegador padrão'),
       el('label.check', trayCb, ' Ícone na bandeja do sistema (vale ao reabrir o launcher)'),
@@ -795,11 +811,12 @@
         el('div.help', 'Só é preciso se o repositório for privado (token com leitura de conteúdo). Fica em launcher-settings.properties, fora do git.')),
       el('div', el('button.btn.small', { type: 'button', on: { click: () => App.checkUpdate(true) } }, 'Procurar atualização agora')),
       el('p.muted.small', { style: { margin: 0 } }, 'Salvo em ', el('code', s.launcherDir + (s.launcherDir.includes('\\') ? '\\' : '/') + 'launcher-settings.properties'))), async () => {
-      const extra = { imagesDir: imgs.value, appWindow: appWin.checked ? 'true' : 'false', tray: trayCb.checked ? 'true' : 'false', closePolicy: closeSel.value,
+      const extra = { theme: themeSel.value, imagesDir: imgs.value, appWindow: appWin.checked ? 'true' : 'false', tray: trayCb.checked ? 'true' : 'false', closePolicy: closeSel.value,
         updateCheck: updCb.checked ? 'true' : 'false', updateRepo: repo.value };
       if (token.value.trim()) extra.updateToken = token.value.trim();
       else if (clearToken.checked) extra.updateToken = '';
       await App.api.saveSettings(Object.assign({ projectRoot: proj.value, simulationsDir: sims.value, javaCommand: java.value, jvmArgs: jvm.value, defaultJar: jar.value, runConsole: consoleCb.checked ? 'true' : 'false', javacCommand: javac.value }, extra));
+      themeSaved = true;
       await init(true);
       App.toast('Configurações salvas', 'ok');
     }, 'Salvar');
@@ -848,6 +865,7 @@
     try {
       const [info, catalog] = await Promise.all([App.api.info(), App.api.catalog()]);
       st.info = info; st.catalog = catalog;
+      applyTheme(info.settings && info.settings.theme); // Parte 62
     } catch (e) {
       App.toast(e.message, 'err');
       return;

@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
  */
 public final class LauncherServer {
 
-    static final String VERSION = "1.21.2";
+    static final String VERSION = "1.22.0";
 
     private final Settings settings;
     private final Workspace workspace;
@@ -239,7 +239,7 @@ public final class LauncherServer {
                 requirePost(post);
                 Map<String, String> body = query(readBody(ex));
                 for (String key : new String[] {"projectRoot", "simulationsDir", "javaCommand", "defaultJar",
-                    "jvmArgs", "runConsole", "javacCommand", "appWindow", "closePolicy", "tray", "updateCheck",
+                    "jvmArgs", "runConsole", "javacCommand", "theme", "appWindow", "closePolicy", "tray", "updateCheck",
                     "updateToken", "updateRepo", "imagesDir"}) {
                     if (body.containsKey(key)) {
                         String v = body.get(key);

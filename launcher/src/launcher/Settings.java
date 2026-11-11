@@ -151,6 +151,7 @@ final class Settings {
         m.put("javaCommandSetting", get("javaCommand", ""));
         // Parte 59: application
         m.put("appWindow", !"false".equalsIgnoreCase(get("appWindow", "true")));
+        m.put("theme", get("theme", "blue")); // Parte 62: blue, gray, black ou light
         m.put("closePolicy", get("closePolicy", "tray"));
         m.put("tray", !"false".equalsIgnoreCase(get("tray", "true")));
         m.put("updateCheck", !"false".equalsIgnoreCase(get("updateCheck", "true")));

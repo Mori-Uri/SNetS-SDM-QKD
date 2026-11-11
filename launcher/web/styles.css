@@ -33,7 +33,7 @@
   --radius: 8px;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme]) {
     color-scheme: dark;
     --bg: #0f1619; --surface: #162024; --surface-2: #1b272c; --surface-3: #233238;
     --border: #2a3a40; --border-strong: #3a4e55;
@@ -48,7 +48,7 @@
     --grid: #2b2b2a;
   }
 }
-:root[data-theme="dark"] {
+:root[data-theme="blue"] {
   color-scheme: dark;
   --bg: #0f1619; --surface: #162024; --surface-2: #1b272c; --surface-3: #233238;
   --border: #2a3a40; --border-strong: #3a4e55;
@@ -61,6 +61,35 @@
   --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
   --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767;
   --grid: #2b2b2a;
+}
+/* Parte 62: tema escolhido em Configurações > Aparência (azul = padrão, cinza, preto e claro) */
+:root[data-theme="gray"] {
+  color-scheme: dark;
+  --bg: #262624; --surface: #30302e; --surface-2: #383835; --surface-3: #42423e;
+  --border: #46463f; --border-strong: #5c5c54;
+  --fg: #f0eee6; --fg-2: #c3c1b8; --fg-3: #9c9a91;
+  --accent: #2aa7c4; --accent-fg: #0b1a1e; --accent-soft: #1f3a41; --accent-ink: #86d6ea;
+  --ok: #5cc285; --ok-soft: #1f3327; --warn: #e3a646; --warn-soft: #3a2f1a; --err: #f2766a; --err-soft: #3f2220;
+  --add-bg: #1f3327; --del-bg: #3f2220; --code-bg: #1d1d1b; --code-fg: #e0ded6;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+  --chart-surface: #2b2b29;
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+  --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767;
+  --grid: #3a3a37;
+}
+:root[data-theme="black"] {
+  color-scheme: dark;
+  --bg: #000000; --surface: #0a0a0a; --surface-2: #121212; --surface-3: #1a1a1a;
+  --border: #262626; --border-strong: #3a3a3a;
+  --fg: #ececec; --fg-2: #b0b0b0; --fg-3: #858585;
+  --accent: #22a3c3; --accent-fg: #000000; --accent-soft: #0b2a31; --accent-ink: #7fd3e8;
+  --ok: #4cc27a; --ok-soft: #0d2416; --warn: #e3a646; --warn-soft: #2a1f0b; --err: #f2766a; --err-soft: #2c1210;
+  --add-bg: #0d2416; --del-bg: #2c1210; --code-bg: #000000; --code-fg: #d5e3e8;
+  --shadow: 0 1px 2px rgba(0,0,0,.6), 0 4px 16px rgba(0,0,0,.5);
+  --chart-surface: #0a0a0a;
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+  --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767;
+  --grid: #222222;
 }
 
 * { box-sizing: border-box; }
@@ -559,7 +588,7 @@ tr.bulk-tpl td { background: var(--accent-soft); }
 
 /* Parte 52: interrupted executions (saved progress) */
 .state.saved { background: #fff1d6; color: #9a3412; }
-:root[data-theme="dark"] .state.saved { background: #3a2a10; color: #f5b971; }
+:root[data-theme="blue"] .state.saved, :root[data-theme="gray"] .state.saved, :root[data-theme="black"] .state.saved { background: #3a2a10; color: #f5b971; }
 .tree-item .badge.badge-saved { color: #b45309; font-weight: 600; }
 .case-saved { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; padding: 8px 12px; border: 1px solid #f0c36d; background: #fff7e6; border-radius: var(--radius); }
 .case-saved[hidden] { display: none; }
@@ -576,11 +605,11 @@ tr.bulk-tpl td { background: var(--accent-soft); }
 .saved-section { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 10px; }
 .saved-card .top label.check { min-width: 0; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .case-saved { background: #3a2a10; border-color: #8a6420; }
-  :root:not([data-theme="light"]) .saved-grid td.saved-cell.part { background: #3a2a10; color: #f5b971; }
+  :root:not([data-theme]) .case-saved { background: #3a2a10; border-color: #8a6420; }
+  :root:not([data-theme]) .saved-grid td.saved-cell.part { background: #3a2a10; color: #f5b971; }
 }
-:root[data-theme="dark"] .case-saved { background: #3a2a10; border-color: #8a6420; }
-:root[data-theme="dark"] .saved-grid td.saved-cell.part { background: #3a2a10; color: #f5b971; }
+:root[data-theme="blue"] .case-saved, :root[data-theme="gray"] .case-saved, :root[data-theme="black"] .case-saved { background: #3a2a10; border-color: #8a6420; }
+:root[data-theme="blue"] .saved-grid td.saved-cell.part, :root[data-theme="gray"] .saved-grid td.saved-cell.part, :root[data-theme="black"] .saved-grid td.saved-cell.part { background: #3a2a10; color: #f5b971; }
 
 /* Parte 59: animação da figura (js/animation.js) */
 .anim-overlay { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, .45); display: flex; align-items: center; justify-content: center; padding: 16px; }

@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [62](#parte-62) | Parte 62 — launcher 1.22.0: tema da interface (azul, cinza, preto e claro) e casos de conferência antes do merge |
 | [61](#parte-61) | Parte 61 — launcher 1.21.2: uma só barra de rolagem nas janelas, "Salvar como…" na mesma linha e ícone do aplicativo na bandeja e no atalho |
 | [60](#parte-60) | Parte 60 — launcher 1.21.1: escolher pastas no explorador, X nas janelas, janela que se adapta ao tamanho e barra do estúdio reorganizada |
 | [59](#parte-59) | Parte 59 — desempenho etapa 2 (multibanda e C+L), animação dos gráficos e launcher como aplicativo (1.21.0) |
@@ -43,6 +44,18 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
 
 ---
+
+<a id="parte-62"></a>
+## Parte 62 — launcher 1.22.0: tema da interface (azul, cinza, preto e claro) e casos de conferência antes do merge
+
+- **Tema da interface** em Configurações > Aparência: Azul (padrão, o escuro de antes), Cinza escuro, Preto (AMOLED) e
+  Claro. A mudança aparece na hora e Cancelar volta ao tema anterior. Fica em `launcher-settings.properties` (`theme`),
+  com uma cópia local no navegador para a janela já abrir com o tema certo. Antes o launcher seguia o tema do sistema;
+  agora usa sempre o escolhido (`styles.css`, `index.html`, `app.js`, `Settings.java`, `LauncherServer.java`).
+- **Casos de conferência** `simulations/Regressao_Parte62` (11 casos reduzidos, iguais na main e na experimental):
+  multinúcleo (Test9 e Test10), multibanda 1381 e 1310 nm, MB-SDM, enlace de 200 km, C+L com ISRS e fibra única com
+  NLI. Servem para conferir que os simuladores das duas branches dão os mesmos resultados antes do merge. São locais
+  (`.gitignore`).
 
 <a id="parte-61"></a>
 ## Parte 61 — launcher 1.21.2: uma só barra de rolagem nas janelas, "Salvar como…" na mesma linha e ícone do aplicativo na bandeja e no atalho
