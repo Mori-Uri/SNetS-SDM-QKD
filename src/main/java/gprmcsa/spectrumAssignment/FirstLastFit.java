@@ -26,7 +26,7 @@ public class FirstLastFit implements SpectrumAssignmentAlgorithmInterface {
 
 	private Double largerBand; // bandwidth used to select between FirstFit or LastFit
 
-    /**
+	/**
      * Returns the assign spectrum.
      * @param numberOfSlots the numberOfSlots.
      * @param circuit the circuit.
@@ -34,18 +34,18 @@ public class FirstLastFit implements SpectrumAssignmentAlgorithmInterface {
      * @param indexCore the indexCore.
      * @return true if the condition is met; false otherwise.
      */
-    @Override
-    public boolean assignSpectrum(int numberOfSlots, Circuit circuit, ControlPlane cp, int indexCore) {
-        List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), indexCore);
+	@Override
+	public boolean assignSpectrum(int numberOfSlots, Circuit circuit, ControlPlane cp, int indexCore) {
+		List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), indexCore);
 
-        int chosen[] = policy(numberOfSlots, composition, circuit, cp);
-        circuit.setSpectrumAssigned(chosen);
+		int chosen[] = policy(numberOfSlots, composition, circuit, cp);
+		circuit.setSpectrumAssigned(chosen);
 
-        if (chosen == null)
-        	return false;
+		if (chosen == null)
+			return false;
 
-        return true;
-    }
+		return true;
+	}
 
 	/**
 	 * Applies the FirstFit policy to a certain list of free bands and returns the chosen band
@@ -56,6 +56,7 @@ public class FirstLastFit implements SpectrumAssignmentAlgorithmInterface {
 	 */
 	public static int[] firstFit(int numberOfSlots, List<int[]> freeSpectrumBands){
 		int chosen[] = null;
+
 		for (int[] band : freeSpectrumBands) {
 			if(band[1] - band[0] + 1 >= numberOfSlots){
 				chosen = band.clone();
@@ -63,6 +64,7 @@ public class FirstLastFit implements SpectrumAssignmentAlgorithmInterface {
 				break;
 			}
 		}
+
 		return chosen;
 	}
 
@@ -77,14 +79,17 @@ public class FirstLastFit implements SpectrumAssignmentAlgorithmInterface {
 		int chosen[] = null;
 		int band[] = null;
 		int i;
+
 		for (i = freeSpectrumBands.size()-1; i >= 0; i--) {
 			band = freeSpectrumBands.get(i);
+
 			if(band[1] - band[0] + 1 >= numberOfSlots){
 				chosen = band.clone();
 				chosen[0] = chosen[1] - numberOfSlots + 1;//it is not necessary to allocate the entire band, only the number of slots necessary
 				break;
 			}
 		}
+
 		return chosen;
 	}
 
@@ -99,7 +104,9 @@ public class FirstLastFit implements SpectrumAssignmentAlgorithmInterface {
 	@Override
 	public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp){
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
+
 		if(numberOfSlots> maxAmplitude) return null;
+
 		if(largerBand == null){
 			Map<String, String> uv = cp.getMesh().getOthersConfig().getVariables();
 			largerBand = Double.parseDouble((String)uv.get("largerBand"));

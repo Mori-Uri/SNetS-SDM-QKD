@@ -58,19 +58,21 @@ public class DataSetManager {
 		try {
 			//To create the DataSet folder
 			File fileFolder = new File(dataSetFolder);
+
 			if (!fileFolder.exists()) { //Check if the folder does not exist before trying to create it
 				fileFolder.mkdirs();
 			}
 
 			CSVWriter csvWriter = csvWriters.get(dataSetPath);
-            if (csvWriter == null) {
+
+			if (csvWriter == null) {
 				Writer writer = Files.newBufferedWriter(Paths.get(dataSetPath));
 				csvWriter = new CSVWriter(writer, charSeparator, CSVWriter.NO_QUOTE_CHARACTER, CSVWriter.DEFAULT_ESCAPE_CHARACTER, CSVWriter.DEFAULT_LINE_END);
 
 				//Adding the header
-	    		String dataSetHeader = dataSetList.get(0).getHeader();
-	    		csvWriter.writeNext(dataSetHeader.split(strSeparator), false);
-            }
+				String dataSetHeader = dataSetList.get(0).getHeader();
+				csvWriter.writeNext(dataSetHeader.split(strSeparator), false);
+			}
 
 			for (int i = 0; i < dataSetList.size(); i++) {
 				String[] line = dataSetList.get(i).dataSetToString().split(strSeparator);

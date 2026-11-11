@@ -80,9 +80,11 @@ public class SpectrumSizeStatistics extends Measurement {
 		numberRequests++;
 		int qSlots = circuit.getModulation().requiredSlots(circuit.getRequiredBitRate());
 		Integer aux = this.numberReqPerSlotReq.get(qSlots);
+
 		if(aux==null){
 			aux = 0;
 		}
+
 		aux++;
 		this.numberReqPerSlotReq.put(qSlots, aux);
 	}
@@ -109,6 +111,7 @@ public class SpectrumSizeStatistics extends Measurement {
 
 		// Increase the number of requests generated
 		Integer aux = this.numberRequestsPerLink.get(l);
+
 		if(aux == null) aux = 0;
 		aux++;
 		this.numberRequestsPerLink.put(l, aux);
@@ -116,11 +119,14 @@ public class SpectrumSizeStatistics extends Measurement {
 		// Increase the number of requisitions generated with this requested range size
 		int qSlots = circuit.getModulation().requiredSlots(circuit.getRequiredBitRate());
 		HashMap<Integer, Integer> hashAux = numberReqPerSlotReqPerLink.get(l);
+
 		if(hashAux==null){
 			hashAux = new HashMap<Integer, Integer>();
 			numberReqPerSlotReqPerLink.put(l, hashAux);
 		}
+
 		aux = hashAux.get(qSlots);
+
 		if(aux==null) aux = 0;
 		aux++;
 		hashAux.put(qSlots, aux);
@@ -185,6 +191,7 @@ public class SpectrumSizeStatistics extends Measurement {
 		try{
 			double d = this.numberReqPerSlotReqPerLink.get(link).get(tamanhoFaixaReq);
 			double n = this.numberRequestsPerLink.get(link);
+
 			return d/n;
 		}catch(NullPointerException npe){
 			return 0.0;

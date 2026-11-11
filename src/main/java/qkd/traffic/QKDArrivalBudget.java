@@ -15,32 +15,35 @@ import java.io.Serializable;
  * {@code simulation.qkdExactRequestCount = true}.</p>
  */
 public final class QKDArrivalBudget implements Serializable {
-    private static final long serialVersionUID = 1L;
-    private int limit = -1;
-    private int scheduled;
+	private static final long serialVersionUID = 1L;
+	private int limit = -1;
+	private int scheduled;
 
-    /** Sets the maximum number of arrivals (negative = unlimited). */
-    public synchronized void setLimit(int limit) {
-        this.limit = limit;
-    }
+	/** Sets the maximum number of arrivals (negative = unlimited). */
+	public synchronized void setLimit(int limit) {
+		this.limit = limit;
+	}
 
-    public synchronized int getLimit() {
-        return limit;
-    }
+	public synchronized int getLimit() {
+		return limit;
+	}
 
-    /** Returns true when one more arrival may be scheduled, consuming it. */
-    public synchronized boolean tryAcquire() {
-        if (limit < 0) {
-            return true;
-        }
-        if (scheduled >= limit) {
-            return false;
-        }
-        scheduled++;
-        return true;
-    }
+	/** Returns true when one more arrival may be scheduled, consuming it. */
+	public synchronized boolean tryAcquire() {
+		if (limit < 0) {
+			return true;
+		}
 
-    public synchronized int getScheduled() {
-        return scheduled;
-    }
+		if (scheduled >= limit) {
+			return false;
+		}
+
+		scheduled++;
+
+		return true;
+	}
+
+	public synchronized int getScheduled() {
+		return scheduled;
+	}
 }

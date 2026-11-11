@@ -17,89 +17,89 @@ import util.RandGenerator;
  */
 public class RequestGenerator implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private Pair pair;
-    private double bandwidth;
-    private double holdRate;
-    private double arrivedRate;
-    private double incLoad;
-    private double atualTimeHours;
-    private RandGenerator randGenerator;
+	private Pair pair;
+	private double bandwidth;
+	private double holdRate;
+	private double arrivedRate;
+	private double incLoad;
+	private double atualTimeHours;
+	private RandGenerator randGenerator;
 
-    public RequestGenerator(Pair pair, double bandwidth, double holdRate,
-            double arrivedRate, double incLoad, RandGenerator randGenerator) {
-        this.pair = pair;
-        this.bandwidth = bandwidth;
-        this.holdRate = holdRate;
-        this.arrivedRate = arrivedRate;
-        this.incLoad = incLoad;
-        this.atualTimeHours = 0.0;
-        this.randGenerator = randGenerator;
-    }
+	public RequestGenerator(Pair pair, double bandwidth, double holdRate,
+			double arrivedRate, double incLoad, RandGenerator randGenerator) {
+		this.pair = pair;
+		this.bandwidth = bandwidth;
+		this.holdRate = holdRate;
+		this.arrivedRate = arrivedRate;
+		this.incLoad = incLoad;
+		this.atualTimeHours = 0.0;
+		this.randGenerator = randGenerator;
+	}
 
-    public void scheduleNextRequest(EventMachine eventMachine,
-            ArriveRequestForConexionListener listener) {
+	public void scheduleNextRequest(EventMachine eventMachine,
+			ArriveRequestForConexionListener listener) {
 
-        RequestForConnection request = new RequestForConnection();
+		RequestForConnection request = new RequestForConnection();
 
-        double arriveTime = randGenerator.negexp(arrivedRate);
-        atualTimeHours += arriveTime;
-        request.setTimeOfRequestHours(atualTimeHours);
+		double arriveTime = randGenerator.negexp(arrivedRate);
+		atualTimeHours += arriveTime;
+		request.setTimeOfRequestHours(atualTimeHours);
 
-        double holdTime = randGenerator.negexp(getHoldRate());
-        double finalizeTime = request.getTimeOfRequestHours() + holdTime;
-        request.setTimeOfFinalizeHours(finalizeTime);
+		double holdTime = randGenerator.negexp(getHoldRate());
+		double finalizeTime = request.getTimeOfRequestHours() + holdTime;
+		request.setTimeOfFinalizeHours(finalizeTime);
 
-        request.setPair(pair);
-        request.setRequiredBitRate(bandwidth);
-        request.setRequestGenerator(this);
+		request.setPair(pair);
+		request.setRequiredBitRate(bandwidth);
+		request.setRequestGenerator(this);
 
-        Event event = new Event(request, listener, atualTimeHours);
-        eventMachine.insert(event);
-    }
+		Event event = new Event(request, listener, atualTimeHours);
+		eventMachine.insert(event);
+	}
 
-    public double getArrivedRate() {
-        return arrivedRate;
-    }
+	public double getArrivedRate() {
+		return arrivedRate;
+	}
 
-    public double getHoldRate() {
-        return holdRate;
-    }
+	public double getHoldRate() {
+		return holdRate;
+	}
 
-    public void setArrivedRate(double arrivedRate) {
-        this.arrivedRate = arrivedRate;
-    }
+	public void setArrivedRate(double arrivedRate) {
+		this.arrivedRate = arrivedRate;
+	}
 
-    public void setHoldRate(double holdRate) {
-        this.holdRate = holdRate;
-    }
+	public void setHoldRate(double holdRate) {
+		this.holdRate = holdRate;
+	}
 
-    public double getIncLoad() {
-        return incLoad;
-    }
+	public double getIncLoad() {
+		return incLoad;
+	}
 
-    public void setIncLoad(double incLoad) {
-        this.incLoad = incLoad;
-    }
+	public void setIncLoad(double incLoad) {
+		this.incLoad = incLoad;
+	}
 
-    public Pair getPair() {
-        return pair;
-    }
+	public Pair getPair() {
+		return pair;
+	}
 
-    public void setPair(Pair pair) {
-        this.pair = pair;
-    }
+	public void setPair(Pair pair) {
+		this.pair = pair;
+	}
 
-    public double getBandwidth() {
-        return bandwidth;
-    }
+	public double getBandwidth() {
+		return bandwidth;
+	}
 
-    public void setBandwidth(double bandwidth) {
-        this.bandwidth = bandwidth;
-    }
+	public void setBandwidth(double bandwidth) {
+		this.bandwidth = bandwidth;
+	}
 
-    public void incArrivedRate(int mult) {
-        arrivedRate = arrivedRate + mult * incLoad;
-    }
+	public void incArrivedRate(int mult) {
+		arrivedRate = arrivedRate + mult * incLoad;
+	}
 }

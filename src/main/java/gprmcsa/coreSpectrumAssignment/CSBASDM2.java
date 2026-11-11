@@ -1,8 +1,6 @@
 package gprmcsa.coreSpectrumAssignment;
 
-
 import java.util.List;
-
 
 import network.Circuit;
 import network.ControlPlane;
@@ -42,32 +40,32 @@ public class CSBASDM2 implements CoreAndSpectrumAssignmentAlgorithmInterface {
 
 		int chosenCore = coreAssignment();
 		int chosen[] = null;
-    	List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), chosenCore);
+		List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), chosenCore);
 
-    	//System.out.println("\n\n Testes");
-    	//System.out.println("core "+chosenCore);
+		//System.out.println("\n\n Testes");
+		//System.out.println("core "+chosenCore);
 
-    	if(chosenCore == 0) {
-    		//System.out.println("Medium Fit selected \n");
-    		chosen = policy(numberOfSlots, composition, circuit, cp);
-    	}else if(chosenCore%2 == 0) {
-    		//System.out.println("Last Fit selected \n");
-    		chosen = policy1(numberOfSlots, composition, circuit, cp);
-    	}else if(chosenCore%2 == 1) {
-    		//System.out.println("First Fit selected \n");
-    		chosen = policy2(numberOfSlots, composition, circuit, cp);
-    	}
+		if(chosenCore == 0) {
+			//System.out.println("Medium Fit selected \n");
+			chosen = policy(numberOfSlots, composition, circuit, cp);
+		}else if(chosenCore%2 == 0) {
+			//System.out.println("Last Fit selected \n");
+			chosen = policy1(numberOfSlots, composition, circuit, cp);
+		}else if(chosenCore%2 == 1) {
+			//System.out.println("First Fit selected \n");
+			chosen = policy2(numberOfSlots, composition, circuit, cp);
+		}
 
-    	//System.out.println("Core: "+chosenCore);
-    	//System.out.println("spectrum: "+chosen[0]+"-"+chosen[1]);
-        circuit.setSpectrumAssigned(chosen);
-        circuit.setIndexCore(chosenCore);
+		//System.out.println("Core: "+chosenCore);
+		//System.out.println("spectrum: "+chosen[0]+"-"+chosen[1]);
+		circuit.setSpectrumAssigned(chosen);
+		circuit.setIndexCore(chosenCore);
 
-        if (chosen == null) {
-        	return false;
-        }
+		if (chosen == null) {
+			return false;
+		}
 
-        return true;
+		return true;
 	}
 
 	/**
@@ -80,6 +78,7 @@ public class CSBASDM2 implements CoreAndSpectrumAssignmentAlgorithmInterface {
 			if (contCentralCore == 0) {
 				contCentralCore = QUANTCENTRALCORE;
 				coreOfTheTime++;
+
 				return 0;
 			}else {
 				contCentralCore--;
@@ -88,17 +87,20 @@ public class CSBASDM2 implements CoreAndSpectrumAssignmentAlgorithmInterface {
 		}
 
 		if (coreOfTheTime == numberOfCores -1) {
-    		coreOfTheTime = 0;
-    		return numberOfCores -1;
-    	}else {
-    		int temp = coreOfTheTime;
-    		coreOfTheTime++;
-    		return temp;
-    	}
+			coreOfTheTime = 0;
+
+			return numberOfCores -1;
+		}else {
+			int temp = coreOfTheTime;
+			coreOfTheTime++;
+
+			return temp;
+		}
 	}
 
 	//"medium fit
 	//policy for central core
+
 	/**
 	 * Returns the policy.
 	 * @param numberOfSlots the numberOfSlots.
@@ -111,30 +113,31 @@ public class CSBASDM2 implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int reference = circuit.getRoute().getLink(0).getCore(0).getNumOfSlots()/2;
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-    	for (int[] band : freeSpectrumBands) {
-        	if(chosen == null) {
-        		if (band[1] - band[0] + 1 >= numberOfSlots) {
-                    chosen = band.clone();
-                    chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
-                    break;
-                }
-        	}
-    	}
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-    	if(chosen != null) {
-	    	for (int[] band : freeSpectrumBands) {
-	        	//if(chosen != null) {
+		for (int[] band : freeSpectrumBands) {
+			if(chosen == null) {
+				if (band[1] - band[0] + 1 >= numberOfSlots) {
+					chosen = band.clone();
+					chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
+					break;
+				}
+			}
+		}
 
-		        	for(int i = band[0]; i<=band[1]; i++) {
-		        		if(Math.abs(reference-i) < Math.abs(reference-chosen[0])) {
-		        			if((band[1]-i+1) >= numberOfSlots) {
-		        				chosen[0] = i;
-		        				chosen[1] = i + numberOfSlots - 1;
-		        			}
-		        		}
+		if(chosen != null) {
+			for (int[] band : freeSpectrumBands) {
+				//if(chosen != null) {
+
+					for(int i = band[0]; i<=band[1]; i++) {
+						if(Math.abs(reference-i) < Math.abs(reference-chosen[0])) {
+							if((band[1]-i+1) >= numberOfSlots) {
+								chosen[0] = i;
+								chosen[1] = i + numberOfSlots - 1;
+							}
+						}
 
 		//        		if(i<reference) {
 		//        			if((i+reference)>(chosen[0]+reference)) {
@@ -151,15 +154,16 @@ public class CSBASDM2 implements CoreAndSpectrumAssignmentAlgorithmInterface {
 		//            			}
 		//            		}
 		//        		}
-		        	}
-		      }
-    	}
+					}
+			  }
+		}
 
-        return chosen;
+		return chosen;
 	}
 
 	//Last Fit
 	//policy for 2,4,6 core
+
 	/**
 	 * Returns the policy1.
 	 * @param numberOfSlots the numberOfSlots.
@@ -170,25 +174,27 @@ public class CSBASDM2 implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	 */
 	public int[] policy1(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots>maxAmplitude) return null;
-    	int chosen[] = null;
-        int band[] = null;
 
-        for (int i = freeSpectrumBands.size() - 1; i >= 0; i--) {
-            band = freeSpectrumBands.get(i);
+		if(numberOfSlots>maxAmplitude) return null;
+		int chosen[] = null;
+		int band[] = null;
 
-            if (band[1] - band[0] + 1 >= numberOfSlots) {
-                chosen = band.clone();
-                chosen[0] = chosen[1] - numberOfSlots + 1;//It is not necessary to allocate the entire band, just the amount of slots required
-                break;
-            }
-        }
+		for (int i = freeSpectrumBands.size() - 1; i >= 0; i--) {
+			band = freeSpectrumBands.get(i);
 
-        return chosen;
+			if (band[1] - band[0] + 1 >= numberOfSlots) {
+				chosen = band.clone();
+				chosen[0] = chosen[1] - numberOfSlots + 1;//It is not necessary to allocate the entire band, just the amount of slots required
+				break;
+			}
+		}
+
+		return chosen;
 	}
 
 	//First Fit
 	//policy for 1,3,5 core
+
 	/**
 	 * Returns the policy2.
 	 * @param numberOfSlots the numberOfSlots.
@@ -199,19 +205,20 @@ public class CSBASDM2 implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	 */
 	public int[] policy2(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-        for (int[] band : freeSpectrumBands) {
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-            if (band[1] - band[0] + 1 >= numberOfSlots) {
-                chosen = band.clone();
-                chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
-                break;
-            }
-        }
+		for (int[] band : freeSpectrumBands) {
 
-        return chosen;
+			if (band[1] - band[0] + 1 >= numberOfSlots) {
+				chosen = band.clone();
+				chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
+				break;
+			}
+		}
+
+		return chosen;
 	}
 
 }

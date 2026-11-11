@@ -36,6 +36,7 @@ public class GroomingStatisticsResultManager implements ResultManagerInterface {
 				reps.put(gs.getReplication(), (GroomingStatistics) gs);
 			}
 		}
+
 		loadPoints = new ArrayList<>(gss.keySet());
 		replications = new ArrayList<>(gss.values().iterator().next().keySet());
 	}
@@ -54,6 +55,7 @@ public class GroomingStatisticsResultManager implements ResultManagerInterface {
 		for (Integer rep : replications) { // Checks how many replications have been made and creates the header of each column
 			res.append(sep + "rep" + rep);
 		}
+
 		res.append("\n");
 
 		res.append(resultReqByCircGeneral());
@@ -64,6 +66,7 @@ public class GroomingStatisticsResultManager implements ResultManagerInterface {
 		res.append("\n\n");
 		res.append(resultMaxVirtualHopsGeneral());
 		res.append("\n\n");
+
 		return res.toString();
 	}
 
@@ -74,13 +77,17 @@ public class GroomingStatisticsResultManager implements ResultManagerInterface {
 	 */
 	private String resultReqByCircGeneral(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			res.append("Rate of requests by circuit" + sep + loadPoint + sep + " ");
+
 			for (Integer replic : replications) {
 				res.append(sep + gss.get(loadPoint).get(replic).getReqByCirc());
 			}
+
 			res.append("\n");
 		}
+
 		return res.toString();
 	}
 
@@ -91,13 +98,17 @@ public class GroomingStatisticsResultManager implements ResultManagerInterface {
 	 */
 	private String resultMaxReqByCircGeneral(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			res.append("Maximum requests by circuit" + sep + loadPoint + sep + " ");
+
 			for (Integer replic : replications) {
 				res.append(sep + gss.get(loadPoint).get(replic).getMaxReqByCirc());
 			}
+
 			res.append("\n");
 		}
+
 		return res.toString();
 	}
 
@@ -108,13 +119,17 @@ public class GroomingStatisticsResultManager implements ResultManagerInterface {
 	 */
 	private String resultVirtualHopsGeneral(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			res.append("Virtual hops" + sep + loadPoint + sep + " ");
+
 			for (Integer replic : replications) {
 				res.append(sep + gss.get(loadPoint).get(replic).getVirtualHops());
 			}
+
 			res.append("\n");
 		}
+
 		return res.toString();
 	}
 
@@ -125,13 +140,17 @@ public class GroomingStatisticsResultManager implements ResultManagerInterface {
 	 */
 	private String resultMaxVirtualHopsGeneral(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			res.append("Maximum virtual hops" + sep + loadPoint + sep + " ");
+
 			for (Integer replic : replications) {
 				res.append(sep + gss.get(loadPoint).get(replic).getMaxVirtualHops());
 			}
+
 			res.append("\n");
 		}
+
 		return res.toString();
 	}
 

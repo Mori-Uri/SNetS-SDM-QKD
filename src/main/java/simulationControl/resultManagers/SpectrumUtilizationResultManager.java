@@ -42,6 +42,7 @@ public class SpectrumUtilizationResultManager implements ResultManagerInterface 
 				}
 			}
 		}
+
 		SpectrumUtilization ut = (SpectrumUtilization) llms.get(0).get(0);
 		loadPoints = new ArrayList<>(sus.keySet());
 		replications = new ArrayList<>(sus.values().iterator().next().keySet());
@@ -62,6 +63,7 @@ public class SpectrumUtilizationResultManager implements ResultManagerInterface 
 		for (Integer rep : replications) { // Checks how many replications have been made and creates the header of each column
 			res.append(sep + "rep" + rep);
 		}
+
 		res.append("\n");
 
 		res.append(resultUtilizationGeneral());
@@ -89,13 +91,17 @@ public class SpectrumUtilizationResultManager implements ResultManagerInterface 
 	 */
 	private String resultUtilizationGeneral(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			String aux = "Utilization" + sep + loadPoint + sep + "all" + sep + "all" + sep + " - " + sep + " - " + sep + " ";
+
 			for (Integer replic : replications) {
 					aux = aux + sep + sus.get(loadPoint).get(replic).getUtilizationGen();
 			}
+
 			res.append(aux + "\n");
 		}
+
 		return res.toString();
 	}
 
@@ -106,6 +112,7 @@ public class SpectrumUtilizationResultManager implements ResultManagerInterface 
 	 */
 	private String resultUtilizationPerLink(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			String aux = "Utilization Per Link" + sep + loadPoint + sep;
 
@@ -115,9 +122,11 @@ public class SpectrumUtilizationResultManager implements ResultManagerInterface 
 				for (Integer replic : replications) {
 					aux2 = aux2 + sep + sus.get(loadPoint).get(replic).getUtilizationPerLink(link);
 				}
+
 				res.append(aux2 + "\n");
 			}
 		}
+
 		return res.toString();
 	}
 
@@ -128,6 +137,7 @@ public class SpectrumUtilizationResultManager implements ResultManagerInterface 
 	 */
 	private String resultUtilizationPerSlot(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			String aux = "Utilization Per Slot" + sep + loadPoint + sep + "all" + sep + "all" + sep + " - " + sep;
 
@@ -137,10 +147,12 @@ public class SpectrumUtilizationResultManager implements ResultManagerInterface 
 				for (Integer rep : replications) {
 					aux2 = aux2 + sep + sus.get(loadPoint).get(rep).getUtilizationPerSlot(i);
 				}
+
 				res.append(aux2 + "\n");
 			}
 
 		}
+
 		return res.toString();
 	}
 
@@ -151,6 +163,7 @@ public class SpectrumUtilizationResultManager implements ResultManagerInterface 
 	 */
 	private String resultUtilizationPerCore(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			String aux = "Utilization per Core " + sep + loadPoint + sep + "all";
 
@@ -160,9 +173,11 @@ public class SpectrumUtilizationResultManager implements ResultManagerInterface 
 				for (Integer replic : replications) {
 					aux2 = aux2 + sep + sus.get(loadPoint).get(replic).getUtilizationPerCore(core);
 				}
+
 				res.append(aux2 + "\n");
 			}
 		}
+
 		return res.toString();
 	}
 
@@ -173,6 +188,7 @@ public class SpectrumUtilizationResultManager implements ResultManagerInterface 
 	 */
 	private String resultUtilizationPerLinkAndCore(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			String aux = "Utilization per Link and Core" + sep + loadPoint;
 
@@ -185,10 +201,12 @@ public class SpectrumUtilizationResultManager implements ResultManagerInterface 
 					for(Integer rep :  replications){
 						aux3 = aux3 + sep + sus.get(loadPoint).get(rep).getUtilizationForLinkAndCore(link, core);
 					}
+
 					res.append(aux3 + "\n");
 				}
 			}
 		}
+
 		return res.toString();
 	}
 

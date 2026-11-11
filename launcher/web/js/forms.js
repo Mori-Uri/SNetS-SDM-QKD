@@ -295,7 +295,17 @@
     } else if (isPlainObject(value)) {
       node.classList.add('wide');
       const inner = el('div.fields.subobj');
-      for (const k of Object.keys(value)) inner.appendChild(field(fileKey, path.concat([k]), value[k], schema));
+      for (const k of Object.keys(value)) {
+        if (hintFor(schema, path.concat([k])).hiddenInForm) {
+          // The legacy Milliseconds alias remains editable when it is the
+          // only millisecond field present. Never display two equivalent
+          // millisecond controls for the same QKD demand.
+          const aliasMs = path.join('.') === 'qkdKeyDemand' &&
+            k === 'updateIntervalsMilliseconds' && !('updateIntervalsMiliseconds' in value);
+          if (!aliasMs) continue;
+        }
+        inner.appendChild(field(fileKey, path.concat([k]), value[k], schema));
+      }
       node.append(labelNode(key, hint, path), hint.help ? el('div.help', hint.help) : null, inner,
         missingKnown(fileKey, path, value, schema));
     } else if (Array.isArray(value) && (value.length === 0 ? hint.table : value.every(isPlainObject))) {
@@ -341,7 +351,8 @@
     const prefix = path.length ? path.join('.') + '.' : '';
     const keys = Object.keys(schema.fields).filter((k) => k.startsWith(prefix)
       && k.slice(prefix.length).indexOf('.') < 0 && !(k.slice(prefix.length) in obj)
-      && schema.fields[k].default !== undefined && !(schema.exclude || []).includes(k));
+      && schema.fields[k].default !== undefined && !schema.fields[k].hiddenInForm && !(schema.exclude || []).includes(k)
+      && !(k === 'qkdKeyDemand.updateIntervalsMiliseconds' && 'updateIntervalsMilliseconds' in obj));
     if (!keys.length) return null;
     return el('div.toolbar', { style: { margin: '8px 0 0' } },
       el('span.small.muted', 'Campos conhecidos ausentes no arquivo:'),
@@ -366,9 +377,9 @@
     }
     const used = new Set(schema ? (schema.exclude || []) : []);
     for (const g of (schema ? schema.groups : [])) {
-      const present = g.keys.filter((k) => k in obj);
+      const present = g.keys.filter((k) => k in obj && !hintFor(schema, [k]).hiddenInForm);
       present.forEach((k) => used.add(k));
-      const addable = g.keys.filter((k) => !(k in obj) && schema.fields[k] && schema.fields[k].default !== undefined);
+      const addable = g.keys.filter((k) => !(k in obj) && schema.fields[k] && !schema.fields[k].hiddenInForm && schema.fields[k].default !== undefined);
       if (!present.length && !addable.length) continue;
       const det = el('details.group', { open: g.open !== false });
       const body = el('div.group-body');

@@ -26,12 +26,12 @@ import network.ControlPlane;
 public class PABSAlgorithm_v2 implements PowerAssignmentAlgorithmInterface {
 
 	private Double margin;
-    private HashMap<Route, HashMap<Double, HashMap<Modulation, Double>>> powerDatabase; // route, transmission rate e modulation
+	private HashMap<Route, HashMap<Double, HashMap<Modulation, Double>>> powerDatabase; // route, transmission rate e modulation
 
-    final int MAX_ATTEMPTS_COUNTER = 50;
+	final int MAX_ATTEMPTS_COUNTER = 50;
 
-    private int numAttemptsQoTOCounter = 0;
-    private int numAttemptsCounter = 0;
+	private int numAttemptsQoTOCounter = 0;
+	private int numAttemptsCounter = 0;
 
 	/**
 	 * Returns the assign launch power.
@@ -48,6 +48,7 @@ public class PABSAlgorithm_v2 implements PowerAssignmentAlgorithmInterface {
 
 		if(margin == null){
 			Map<String, String> uv = cp.getMesh().getOthersConfig().getVariables();
+
 			if(uv.get("margin") != null) {
 				margin = Double.parseDouble((String)uv.get("margin"));
 			}
@@ -98,59 +99,62 @@ public class PABSAlgorithm_v2 implements PowerAssignmentAlgorithmInterface {
 	 * @param cp ControlPlane
 	 * @return double
 	 */
-    public double PowerAssignmentByBinarySearch(Circuit circuit, Route route, Modulation modulation, int core, int spectrumAssigned[], ControlPlane cp){
+	public double PowerAssignmentByBinarySearch(Circuit circuit, Route route, Modulation modulation, int core, int spectrumAssigned[], ControlPlane cp){
 
-    	if(this.powerDatabase == null) {
-    		this.powerDatabase = new HashMap<Route, HashMap<Double, HashMap<Modulation, Double>>>();
-    	}
+		if(this.powerDatabase == null) {
+			this.powerDatabase = new HashMap<Route, HashMap<Double, HashMap<Modulation, Double>>>();
+		}
 
-		double SNRcurrent = 0.0;
-		double SNRdif = 0.0;
+		double OSNRcurrent = 0.0;
+		double OSNRdif = 0.0;
 		double powerDB = 0.0;
 		double tolPower = 1e-6; // power tolerance
 
 		boolean QoTO = false;
 		boolean XT = false;
 		boolean XTO = false;
-		int attemptsCounter = 0; // Count attempts to reach SNRth
+		int attemptsCounter = 0; // Count attempts to reach OSNRth
 		int attemptsQoTOCounter = 0; // Count attempts to reach acceptable QoTO
 
 		// To save the amount of attempts to reach SNT and QoTO
 		this.numAttemptsQoTOCounter = 0;
 		this.numAttemptsCounter = 0;
 
-		double SNRth = modulation.getSNRthresholdLinear(); //Linear
-		SNRth = SNRth + this.margin; //margin is linear
+		double OSNRth = modulation.getOSNRthresholdLinear(); //Linear
+		OSNRth = OSNRth + this.margin; //margin is linear
 
 		// If the margin value is dB
 		//double marginLinear = PhysicalLayer.ratioOfDB(margin);
-		//SNRth = SNRth + marginLinear;
+		//OSNRth = OSNRth + marginLinear;
 
 		boolean toSaveDB = false;
-    	boolean isPowerDB = false;
+		boolean isPowerDB = false;
 		HashMap<Double, HashMap<Modulation, Double>> trsModsPower = this.powerDatabase.get(route);
-    	if(trsModsPower != null) {
-    		HashMap<Modulation, Double> modsPower = trsModsPower.get(circuit.getRequiredBitRate());
-    		if(modsPower != null) {
-    			Double power = modsPower.get(modulation);
-    			if(power != null) {
-    				powerDB = power;
-    				isPowerDB = true;
-    			}
-    		}
-    	}
+
+		if(trsModsPower != null) {
+			HashMap<Modulation, Double> modsPower = trsModsPower.get(circuit.getRequiredBitRate());
+
+			if(modsPower != null) {
+				Double power = modsPower.get(modulation);
+
+				if(power != null) {
+					powerDB = power;
+					isPowerDB = true;
+				}
+			}
+		}
 
 		double Pmax = cp.getMesh().getPhysicalLayer().computeMaximumPower(circuit, circuit.getRequiredBitRate(), route, 0, route.getNodeList().size() - 1, modulation, core, spectrumAssigned);
 		circuit.setLaunchPowerLinear(Pmax);
-		SNRcurrent = cp.getMesh().getPhysicalLayer().computeSNRSegment(circuit, route, 0, route.getNodeList().size() - 1, modulation, core, spectrumAssigned, null, false);
+		OSNRcurrent = cp.getMesh().getPhysicalLayer().computeOSNRSegment(circuit, route, 0, route.getNodeList().size() - 1, modulation, core, spectrumAssigned, null, false);
 
-		if (SNRcurrent < SNRth) {
+		if (OSNRcurrent < OSNRth) {
 			return Pmax;
 		}
 
 		double Pmin = new EnPAAlgorithm().computePowerByLinearInterpolation(circuit, route, modulation, core, spectrumAssigned, 0.0, cp);
 		circuit.setLaunchPowerLinear(Pmin);
-		SNRcurrent = cp.getMesh().getPhysicalLayer().computeSNRSegment(circuit, route, 0, route.getNodeList().size() - 1, modulation, core, spectrumAssigned, null, false);
+		OSNRcurrent = cp.getMesh().getPhysicalLayer().computeOSNRSegment(circuit, route, 0, route.getNodeList().size() - 1, modulation, core, spectrumAssigned, null, false);
 
 		double Pcurrent = Pmin;
 
@@ -167,11 +171,11 @@ public class PABSAlgorithm_v2 implements PowerAssignmentAlgorithmInterface {
 			}
 
 			circuit.setLaunchPowerLinear(Pcurrent);
-			SNRcurrent = cp.getMesh().getPhysicalLayer().computeSNRSegment(circuit, route, 0, route.getNodeList().size() - 1, modulation, core, spectrumAssigned, null, false);
+			OSNRcurrent = cp.getMesh().getPhysicalLayer().computeOSNRSegment(circuit, route, 0, route.getNodeList().size() - 1, modulation, core, spectrumAssigned, null, false);
 
-			SNRdif = SNRcurrent - SNRth;
+			OSNRdif = OSNRcurrent - OSNRth;
 
-			if (SNRdif >= 0.0) {
+			if (OSNRdif >= 0.0) {
 				XT = cp.isAdmissibleCrosstalk(circuit);
 
 				if (XT) { // XT are acceptable
@@ -179,7 +183,7 @@ public class PABSAlgorithm_v2 implements PowerAssignmentAlgorithmInterface {
 					this.numAttemptsQoTOCounter = attemptsQoTOCounter;
 
 					QoTO = cp.isAdmissibleOSNRInOther(circuit); // Checks the QoT for others circuits
-	                XTO = cp.isAdmissibleCrosstalkInOther(circuit); // Checks the XT for others circuits
+					XTO = cp.isAdmissibleCrosstalkInOther(circuit); // Checks the XT for others circuits
 
 					if (QoTO && XTO) {
 						toSaveDB = true;
@@ -188,7 +192,7 @@ public class PABSAlgorithm_v2 implements PowerAssignmentAlgorithmInterface {
 				}
 			}
 
-			if(SNRdif >= 0.0) {
+			if(OSNRdif >= 0.0) {
 				Pmax = Pcurrent;
 
 			} else {
@@ -196,8 +200,8 @@ public class PABSAlgorithm_v2 implements PowerAssignmentAlgorithmInterface {
 			}
 
 			if (Math.abs(Pmax - Pmin) < tolPower) {
-                break; // converged in power
-            }
+				break; // converged in power
+			}
 
 			if(attemptsCounter > MAX_ATTEMPTS_COUNTER) {
 				break;
@@ -208,18 +212,20 @@ public class PABSAlgorithm_v2 implements PowerAssignmentAlgorithmInterface {
 			// Saves the power in the database
 
 			trsModsPower = this.powerDatabase.get(route);
-	    	if(trsModsPower == null) {
-	    		trsModsPower = new HashMap<Double, HashMap<Modulation,Double>>();
-	    		this.powerDatabase.put(route, trsModsPower);
-	    	}
 
-	    	HashMap<Modulation, Double> modsPower = trsModsPower.get(circuit.getRequiredBitRate());
-    		if(modsPower == null) {
-    			modsPower = new HashMap<Modulation, Double>();
-    			trsModsPower.put(circuit.getRequiredBitRate(), modsPower);
-    		}
+			if(trsModsPower == null) {
+				trsModsPower = new HashMap<Double, HashMap<Modulation,Double>>();
+				this.powerDatabase.put(route, trsModsPower);
+			}
 
-    		modsPower.put(modulation, Pcurrent);
+			HashMap<Modulation, Double> modsPower = trsModsPower.get(circuit.getRequiredBitRate());
+
+			if(modsPower == null) {
+				modsPower = new HashMap<Modulation, Double>();
+				trsModsPower.put(circuit.getRequiredBitRate(), modsPower);
+			}
+
+			modsPower.put(modulation, Pcurrent);
 		}
 
 		return Pcurrent;

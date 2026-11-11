@@ -8,17 +8,17 @@ import java.rmi.RemoteException;
  */
 public interface ServerMInterface extends Remote {
 
-    /**
+	/**
      * Executes the register operation.
      * @param server the server.
      */
-    public void register(ServerSInterface server) throws RemoteException;
+	public void register(ServerSInterface server) throws RemoteException;
 
-    /**
+	/**
      * Returns the simulation bundle request.
      * @param simReqJSON the simReqJSON.
      * @param cpci the cpci.
      * @return the result of the operation.
      */
-    public String simulationBundleRequest(String simReqJSON, ClientProgressCallbackInterface cpci) throws Exception;
+	public String simulationBundleRequest(String simReqJSON, ClientProgressCallbackInterface cpci) throws Exception;
 }

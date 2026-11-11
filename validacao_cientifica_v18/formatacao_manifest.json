@@ -1,0 +1,524 @@
+{
+  "style_reference": "gprmcsa/integrated/KSPXT_v4.java",
+  "files_scanned": 147,
+  "files_changed": 129,
+  "total_blank_lines_added": 2620,
+  "changes": [
+    {
+      "path": "network/AmplifierGainLaw.java",
+      "blank_lines_inserted": 4
+    },
+    {
+      "path": "network/GnModelMath.java",
+      "blank_lines_inserted": 21
+    },
+    {
+      "path": "network/LongitudinalClassicalGN.java",
+      "blank_lines_inserted": 12
+    },
+    {
+      "path": "network/LongitudinalClassicalQoT.java",
+      "blank_lines_inserted": 9
+    },
+    {
+      "path": "qkd/algorithms/QKDAlgorithmFactory.java",
+      "blank_lines_inserted": 6
+    },
+    {
+      "path": "qkd/algorithms/coreSpectrumAssignment/QABNE.java",
+      "blank_lines_inserted": 19
+    },
+    {
+      "path": "qkd/algorithms/coreSpectrumAssignment/QKDFirstFit.java",
+      "blank_lines_inserted": 9
+    },
+    {
+      "path": "qkd/algorithms/integrated/QKDReferenceRMSTA.java",
+      "blank_lines_inserted": 41
+    },
+    {
+      "path": "qkd/analytical/QKDAnalyticalCTMC.java",
+      "blank_lines_inserted": 34
+    },
+    {
+      "path": "qkd/analytical/QKDAnalyticalMain.java",
+      "blank_lines_inserted": 4
+    },
+    {
+      "path": "qkd/analytical/QKDAnalyticalModel.java",
+      "blank_lines_inserted": 40
+    },
+    {
+      "path": "qkd/analytical/QKDAnalyticalSimulation.java",
+      "blank_lines_inserted": 8
+    },
+    {
+      "path": "qkd/capacity/PichClassicalCrosstalk.java",
+      "blank_lines_inserted": 11
+    },
+    {
+      "path": "qkd/capacity/PichClassicalNonlinearity.java",
+      "blank_lines_inserted": 22
+    },
+    {
+      "path": "qkd/capacity/PichModulationSelection.java",
+      "blank_lines_inserted": 2
+    },
+    {
+      "path": "qkd/capacity/PichReceivePowerBudget.java",
+      "blank_lines_inserted": 3
+    },
+    {
+      "path": "qkd/capacity/PichSnrAdmission.java",
+      "blank_lines_inserted": 10
+    },
+    {
+      "path": "qkd/capacity/QKDChannelShare.java",
+      "blank_lines_inserted": 1
+    },
+    {
+      "path": "qkd/capacity/QKDLinkCapacityReservation.java",
+      "blank_lines_inserted": 1
+    },
+    {
+      "path": "qkd/capacity/QKDLinkChannelPhysicalResult.java",
+      "blank_lines_inserted": 8
+    },
+    {
+      "path": "qkd/capacity/QKDPichCircuit.java",
+      "blank_lines_inserted": 8
+    },
+    {
+      "path": "qkd/capacity/QKDPichPool.java",
+      "blank_lines_inserted": 75
+    },
+    {
+      "path": "qkd/capacity/QKDProjectedImpact.java",
+      "blank_lines_inserted": 1
+    },
+    {
+      "path": "qkd/capacity/QKDSharedAllocationResult.java",
+      "blank_lines_inserted": 1
+    },
+    {
+      "path": "qkd/capacity/QKDSharedChannel.java",
+      "blank_lines_inserted": 4
+    },
+    {
+      "path": "qkd/capacity/QKDSharedResourceManager.java",
+      "blank_lines_inserted": 174
+    },
+    {
+      "path": "qkd/control/QKDActiveConnection.java",
+      "blank_lines_inserted": 6
+    },
+    {
+      "path": "qkd/control/QKDControlPlane.java",
+      "blank_lines_inserted": 86
+    },
+    {
+      "path": "qkd/control/QKDExistingSessionImpactEvaluator.java",
+      "blank_lines_inserted": 32
+    },
+    {
+      "path": "qkd/control/QKDExistingSessionImpactResult.java",
+      "blank_lines_inserted": 6
+    },
+    {
+      "path": "qkd/control/QKDProvisioningResult.java",
+      "blank_lines_inserted": 1
+    },
+    {
+      "path": "qkd/control/QKDProvisioningService.java",
+      "blank_lines_inserted": 76
+    },
+    {
+      "path": "qkd/control/QKDSessionImpact.java",
+      "blank_lines_inserted": 2
+    },
+    {
+      "path": "qkd/control/QKDSessionRegistry.java",
+      "blank_lines_inserted": 2
+    },
+    {
+      "path": "qkd/key/QKDKeyDemand.java",
+      "blank_lines_inserted": 3
+    },
+    {
+      "path": "qkd/key/QKDKeyDemandPolicy.java",
+      "blank_lines_inserted": 17
+    },
+    {
+      "path": "qkd/ladder/IndependentBB84.java",
+      "blank_lines_inserted": 3
+    },
+    {
+      "path": "qkd/ladder/LadderArticles.java",
+      "blank_lines_inserted": 33
+    },
+    {
+      "path": "qkd/ladder/LadderIO.java",
+      "blank_lines_inserted": 51
+    },
+    {
+      "path": "qkd/ladder/LadderReport.java",
+      "blank_lines_inserted": 20
+    },
+    {
+      "path": "qkd/ladder/LadderRunner.java",
+      "blank_lines_inserted": 22
+    },
+    {
+      "path": "qkd/ladder/LadderScenario.java",
+      "blank_lines_inserted": 56
+    },
+    {
+      "path": "qkd/ladder/QKDLadderMain.java",
+      "blank_lines_inserted": 266
+    },
+    {
+      "path": "qkd/metrics/BlockingDetailRecorder.java",
+      "blank_lines_inserted": 234
+    },
+    {
+      "path": "qkd/metrics/ObservedClassicalControlPlane.java",
+      "blank_lines_inserted": 2
+    },
+    {
+      "path": "qkd/multiband/AmplifierOperatingPoint.java",
+      "blank_lines_inserted": 2
+    },
+    {
+      "path": "qkd/multiband/ClassicalChannel.java",
+      "blank_lines_inserted": 7
+    },
+    {
+      "path": "qkd/multiband/ClassicalPowerEvolution.java",
+      "blank_lines_inserted": 75
+    },
+    {
+      "path": "qkd/multiband/DirectedAmplifierSnapshotFactory.java",
+      "blank_lines_inserted": 11
+    },
+    {
+      "path": "qkd/multiband/FiberAttenuationModel.java",
+      "blank_lines_inserted": 15
+    },
+    {
+      "path": "qkd/multiband/LinkCalculator.java",
+      "blank_lines_inserted": 24
+    },
+    {
+      "path": "qkd/multiband/MultiBandEdFA.java",
+      "blank_lines_inserted": 17
+    },
+    {
+      "path": "qkd/multiband/MultiBandQkdLinkModel.java",
+      "blank_lines_inserted": 20
+    },
+    {
+      "path": "qkd/multiband/MultiBandSettings.java",
+      "blank_lines_inserted": 14
+    },
+    {
+      "path": "qkd/multiband/NonlinearInterferenceModel.java",
+      "blank_lines_inserted": 44
+    },
+    {
+      "path": "qkd/multiband/OpticalBand.java",
+      "blank_lines_inserted": 1
+    },
+    {
+      "path": "qkd/multiband/RamanGainProfile.java",
+      "blank_lines_inserted": 5
+    },
+    {
+      "path": "qkd/multiband/SpontaneousRamanModel.java",
+      "blank_lines_inserted": 13
+    },
+    {
+      "path": "qkd/network/QKDAlternativeRoutes.java",
+      "blank_lines_inserted": 37
+    },
+    {
+      "path": "qkd/network/QKDLinkPlan.java",
+      "blank_lines_inserted": 9
+    },
+    {
+      "path": "qkd/network/QKDMesh.java",
+      "blank_lines_inserted": 9
+    },
+    {
+      "path": "qkd/network/QKDMeshFactory.java",
+      "blank_lines_inserted": 3
+    },
+    {
+      "path": "qkd/network/QKDNetworkParameters.java",
+      "blank_lines_inserted": 52
+    },
+    {
+      "path": "qkd/network/QKDRoutePlan.java",
+      "blank_lines_inserted": 5
+    },
+    {
+      "path": "qkd/network/QKDRoutePlanner.java",
+      "blank_lines_inserted": 7
+    },
+    {
+      "path": "qkd/network/QKDSpan.java",
+      "blank_lines_inserted": 4
+    },
+    {
+      "path": "qkd/network/QKDTopologyPlan.java",
+      "blank_lines_inserted": 10
+    },
+    {
+      "path": "qkd/network/QKDTopologyPlanner.java",
+      "blank_lines_inserted": 8
+    },
+    {
+      "path": "qkd/physical/BB84DecoyModel.java",
+      "blank_lines_inserted": 11
+    },
+    {
+      "path": "qkd/physical/QKDPhysicalLayer.java",
+      "blank_lines_inserted": 128
+    },
+    {
+      "path": "qkd/physical/QKDPhysicalLayerConfig.java",
+      "blank_lines_inserted": 22
+    },
+    {
+      "path": "qkd/physical/QKDPhysicalParameters.java",
+      "blank_lines_inserted": 10
+    },
+    {
+      "path": "qkd/physical/QKDRoutePhysicalResult.java",
+      "blank_lines_inserted": 5
+    },
+    {
+      "path": "qkd/physical/QKDSpanPhysicalResult.java",
+      "blank_lines_inserted": 3
+    },
+    {
+      "path": "qkd/reference/QKDNativeReferenceMain.java",
+      "blank_lines_inserted": 106
+    },
+    {
+      "path": "qkd/reference/QKDReferenceArticleMain.java",
+      "blank_lines_inserted": 6
+    },
+    {
+      "path": "qkd/reference/QKDReferencePhysicalMain.java",
+      "blank_lines_inserted": 13
+    },
+    {
+      "path": "qkd/reference/ReferenceClassicalAllocator.java",
+      "blank_lines_inserted": 41
+    },
+    {
+      "path": "qkd/reference/ReferenceExperimentConfig.java",
+      "blank_lines_inserted": 11
+    },
+    {
+      "path": "qkd/reference/ReferenceMultifiberExperiment.java",
+      "blank_lines_inserted": 25
+    },
+    {
+      "path": "qkd/reference/ReferenceQuantumTDMAllocator.java",
+      "blank_lines_inserted": 27
+    },
+    {
+      "path": "qkd/reference/ReferenceTopologySpec.java",
+      "blank_lines_inserted": 13
+    },
+    {
+      "path": "qkd/reference/ReferenceTraceLoader.java",
+      "blank_lines_inserted": 7
+    },
+    {
+      "path": "qkd/resource/QKDChannelAllocation.java",
+      "blank_lines_inserted": 4
+    },
+    {
+      "path": "qkd/resource/QKDSession.java",
+      "blank_lines_inserted": 13
+    },
+    {
+      "path": "qkd/resource/QKDSpectrumAllocationResult.java",
+      "blank_lines_inserted": 2
+    },
+    {
+      "path": "qkd/resource/QKDSpectrumAllocator.java",
+      "blank_lines_inserted": 28
+    },
+    {
+      "path": "qkd/resource/SameBandSpectrumGuard.java",
+      "blank_lines_inserted": 11
+    },
+    {
+      "path": "qkd/tools/QKDPhysicalLayerMigration.java",
+      "blank_lines_inserted": 23
+    },
+    {
+      "path": "qkd/traffic/QKDArrivalBudget.java",
+      "blank_lines_inserted": 3
+    },
+    {
+      "path": "qkd/traffic/QKDRequestGenerator.java",
+      "blank_lines_inserted": 9
+    },
+    {
+      "path": "qkd/verification/MultiBandIwcitVerification.java",
+      "blank_lines_inserted": 7
+    },
+    {
+      "path": "qkd/verification/MultiBandLiteratureVerification.java",
+      "blank_lines_inserted": 21
+    },
+    {
+      "path": "qkd/verification/MultiBandNetworkVerification.java",
+      "blank_lines_inserted": 22
+    },
+    {
+      "path": "qkd/verification/MultiBandNliVerification.java",
+      "blank_lines_inserted": 9
+    },
+    {
+      "path": "qkd/verification/MultiBandPhysicsVerification.java",
+      "blank_lines_inserted": 15
+    },
+    {
+      "path": "qkd/verification/QKDAmplifierLongitudinalVerification.java",
+      "blank_lines_inserted": 2
+    },
+    {
+      "path": "qkd/verification/QKDAmplifierOperatingPointVerification.java",
+      "blank_lines_inserted": 3
+    },
+    {
+      "path": "qkd/verification/QKDArticleBaseReferenceVerification.java",
+      "blank_lines_inserted": 11
+    },
+    {
+      "path": "qkd/verification/QKDBoosterIntegratedVerification.java",
+      "blank_lines_inserted": 10
+    },
+    {
+      "path": "qkd/verification/QKDClassicalLongitudinalQoTVerification.java",
+      "blank_lines_inserted": 4
+    },
+    {
+      "path": "qkd/verification/QKDCoreReservationVerification.java",
+      "blank_lines_inserted": 8
+    },
+    {
+      "path": "qkd/verification/QKDCrosstalkPowerVerification.java",
+      "blank_lines_inserted": 4
+    },
+    {
+      "path": "qkd/verification/QKDCrosstalkReceiverVerification.java",
+      "blank_lines_inserted": 3
+    },
+    {
+      "path": "qkd/verification/QKDDiscreteCapacityAndTdmVerification.java",
+      "blank_lines_inserted": 2
+    },
+    {
+      "path": "qkd/verification/QKDDynamicAmplifierVerification.java",
+      "blank_lines_inserted": 2
+    },
+    {
+      "path": "qkd/verification/QKDExistingSessionProtectionVerification.java",
+      "blank_lines_inserted": 5
+    },
+    {
+      "path": "qkd/verification/QKDGnScientificCorrectionsVerification.java",
+      "blank_lines_inserted": 2
+    },
+    {
+      "path": "qkd/verification/QKDKeyDemandVerification.java",
+      "blank_lines_inserted": 4
+    },
+    {
+      "path": "qkd/verification/QKDLongitudinalGNVerification.java",
+      "blank_lines_inserted": 4
+    },
+    {
+      "path": "qkd/verification/QKDNativeArticleBaseVerification.java",
+      "blank_lines_inserted": 2
+    },
+    {
+      "path": "qkd/verification/QKDPhysicalVerification.java",
+      "blank_lines_inserted": 5
+    },
+    {
+      "path": "qkd/verification/QKDPichAdmissionSafetyVerification.java",
+      "blank_lines_inserted": 2
+    },
+    {
+      "path": "qkd/verification/QKDPichIntegratedAdmissionV15Verification.java",
+      "blank_lines_inserted": 2
+    },
+    {
+      "path": "qkd/verification/QKDPichReceiverPowerVerification.java",
+      "blank_lines_inserted": 1
+    },
+    {
+      "path": "qkd/verification/QKDPichSharedClassicalQoTVerification.java",
+      "blank_lines_inserted": 5
+    },
+    {
+      "path": "qkd/verification/QKDPichSnrAdmissionVerification.java",
+      "blank_lines_inserted": 1
+    },
+    {
+      "path": "qkd/verification/QKDPriorityCorrectionsVerification.java",
+      "blank_lines_inserted": 2
+    },
+    {
+      "path": "qkd/verification/QKDQualificationScenarioVerification.java",
+      "blank_lines_inserted": 50
+    },
+    {
+      "path": "qkd/verification/QKDReproducibilityVerification.java",
+      "blank_lines_inserted": 8
+    },
+    {
+      "path": "qkd/verification/QKDRequestGenerationVerification.java",
+      "blank_lines_inserted": 3
+    },
+    {
+      "path": "qkd/verification/QKDRoutePhysicalEvaluationVerification.java",
+      "blank_lines_inserted": 7
+    },
+    {
+      "path": "qkd/verification/QKDRoutePlanningVerification.java",
+      "blank_lines_inserted": 5
+    },
+    {
+      "path": "qkd/verification/QKDSharedAmplifierGainVerification.java",
+      "blank_lines_inserted": 1
+    },
+    {
+      "path": "qkd/verification/QKDSpanGranularityVerification.java",
+      "blank_lines_inserted": 5
+    },
+    {
+      "path": "qkd/verification/QKDSpectrumAllocationVerification.java",
+      "blank_lines_inserted": 5
+    },
+    {
+      "path": "qkd/verification/QKDStages12Verification.java",
+      "blank_lines_inserted": 1
+    },
+    {
+      "path": "qkd/verification/QKDTopologyPlanningVerification.java",
+      "blank_lines_inserted": 14
+    },
+    {
+      "path": "qkd/verification/QKDUnifiedMultibandVerification.java",
+      "blank_lines_inserted": 4
+    }
+  ]
+}

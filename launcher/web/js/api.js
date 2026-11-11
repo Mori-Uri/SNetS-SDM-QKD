@@ -27,11 +27,7 @@
   App.api = {
     info: () => call('GET', 'info'),
     saveSettings: (s) => call('POST', 'settings', null, new URLSearchParams(s).toString()),
-    // Parte 59: application (window, tray, close policy, updates)
-    appExit: (mode) => call('POST', 'app/exit', { mode }),
-    pick: (mode, start, title) => call('POST', 'pick', { mode, start, title }), // Parte 60
-    updateCheck: () => call('GET', 'app/update-check'),
-    updateDownload: (asset) => call('POST', 'app/update-download', { asset }),
+    pick: (mode, start, title) => call('POST', 'pick', { mode, start, title }),
     tree: () => call('GET', 'tree'),
     catalog: () => call('GET', 'catalog'),
     readCase: (path) => call('GET', 'case', { path }),
@@ -46,8 +42,7 @@
     batch: (cases, mode, jar, jvmArgs, threads, consoleWin, how) => call('POST', 'run/batch', { mode, jar, jvmArgs, threads: threads || null, console: consoleWin === undefined ? null : String(!!consoleWin), fresh: how === 'fresh' ? '1' : null, resume: how === 'resume' ? '1' : null }, cases.join('\n')),
     discardSaved: (path) => call('POST', 'savestate/discard', { path }),
     runs: () => call('GET', 'runs'),
-    // Parte 55: 'run/output' em vez de 'run/log' (extensões de bloqueio de anúncio barram URLs com "/log?")
-    runLog: (id, from) => call('GET', 'run/output', { id, from }),
+    runLog: (id, from) => call('GET', 'run/log', { id, from }),
     cancelRun: (id) => call('POST', 'run/cancel', { id }),
     openFolder: (path) => call('POST', 'open-folder', { path }),
     queue: (cases, jar, jvmArgs) => call('POST', 'queue', { jar, jvmArgs }, cases.join('\n')),
@@ -61,9 +56,6 @@
     figures: () => call('GET', 'figures'),
     figure: (name) => call('GET', 'figure', { name }),
     saveFigure: (name, json) => call('POST', 'figure', { name }, json),
-    // Parte 55: padrão de aparência por tipo de gráfico
-    figureStyles: () => call('GET', 'figure-styles'),
-    saveFigureStyles: (json) => call('POST', 'figure-styles', null, json),
     saveFigureImage: (name, ext, body) => call('POST', 'figure/image', { name, ext }, body),
     figureImageName: (name, exts) => call('GET', 'figure/image-name', { name, exts }),
     deleteFigure: (name) => call('POST', 'figure/delete', { name }),

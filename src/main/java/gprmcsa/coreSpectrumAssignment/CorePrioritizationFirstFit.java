@@ -95,27 +95,27 @@ public class CorePrioritizationFirstFit implements CoreAndSpectrumAssignmentAlgo
 		}
 
 		int chosenCore = coreAssignment(circuit);
-    	List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), chosenCore);
+		List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), chosenCore);
 
-        int chosen[] = policy(numberOfSlots, composition, circuit, cp);
-        circuit.setSpectrumAssigned(chosen);
-        circuit.setIndexCore(chosenCore);
+		int chosen[] = policy(numberOfSlots, composition, circuit, cp);
+		circuit.setSpectrumAssigned(chosen);
+		circuit.setIndexCore(chosenCore);
 
-        //System.out.println("Verificao do xt dos neighbors de:"+circuit.getId());
-        //Crosstalk crosstalk = new Crosstalk();
-        //crosstalk.isAdmissibleInOthers(circuit);
-        //System.out.println("--------------------------------\n\n");
+		//System.out.println("Verificao do xt dos neighbors de:"+circuit.getId());
+		//Crosstalk crosstalk = new Crosstalk();
+		//crosstalk.isAdmissibleInOthers(circuit);
+		//System.out.println("--------------------------------\n\n");
 
-       //System.out.println("\n\nCorePrioritization FF");
-       //System.out.println("Selected core: "+chosenCore);
-       //System.out.println("Slot range: "+chosen[0]+"-"+chosen[1]);
+	   //System.out.println("\n\nCorePrioritization FF");
+	   //System.out.println("Selected core: "+chosenCore);
+	   //System.out.println("Slot range: "+chosen[0]+"-"+chosen[1]);
 
-        //imprimeLog(circuit);
+		//imprimeLog(circuit);
 
-        if (chosen == null)
-        	return false;
+		if (chosen == null)
+			return false;
 
-        return true;
+		return true;
 	}
 
 	/**
@@ -128,12 +128,14 @@ public class CorePrioritizationFirstFit implements CoreAndSpectrumAssignmentAlgo
 		escolha = contador;
 
 		if (contador == numberOfCores -1) {
-    		contador = 0;
-    		return coreOfTheTime[escolha];
-    	}else {
-    		contador++;
-    		return coreOfTheTime[escolha];
-    	}
+			contador = 0;
+
+			return coreOfTheTime[escolha];
+		}else {
+			contador++;
+
+			return coreOfTheTime[escolha];
+		}
 	}
 
 	/**
@@ -203,21 +205,22 @@ public class CorePrioritizationFirstFit implements CoreAndSpectrumAssignmentAlgo
 	@Override
 	public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-        for (int[] band : freeSpectrumBands) {
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-            if (band[1] - band[0] + 1 >= numberOfSlots) {
-                chosen = band.clone();
-                chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
-                break;
-            }
-        }
+		for (int[] band : freeSpectrumBands) {
 
-       // System.out.println("test2");
+			if (band[1] - band[0] + 1 >= numberOfSlots) {
+				chosen = band.clone();
+				chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
+				break;
+			}
+		}
 
-        return chosen;
+	   // System.out.println("test2");
+
+		return chosen;
 	}
 
 //	private int returnPrioridade() {

@@ -13,32 +13,33 @@ package qkd.physical;
  */
 public final class BB84DecoyModel implements java.io.Serializable {
 
-    private final QKDPhysicalParameters parameters;
+	private final QKDPhysicalParameters parameters;
 
-    public BB84DecoyModel() {
-        this(new QKDPhysicalParameters());
-    }
+	public BB84DecoyModel() {
+		this(new QKDPhysicalParameters());
+	}
 
-    public BB84DecoyModel(QKDPhysicalParameters parameters) {
-        if (parameters == null) {
-            throw new IllegalArgumentException("parameters cannot be null");
-        }
-        this.parameters = parameters;
-    }
+	public BB84DecoyModel(QKDPhysicalParameters parameters) {
+		if (parameters == null) {
+			throw new IllegalArgumentException("parameters cannot be null");
+		}
 
-    public QKDPhysicalParameters getParameters() {
-        return parameters;
-    }
+		this.parameters = parameters;
+	}
 
-    /**
+	public QKDPhysicalParameters getParameters() {
+		return parameters;
+	}
+
+	/**
      * Evaluates the reference multi-fiber case, where the background is only
      * the detector dark-count probability.
      */
-    public QKDPhysicalResult evaluateMultiFiber(double wavelengthNm, double lengthKm) {
-        return evaluate(wavelengthNm, lengthKm, parameters.getDarkCountProbability());
-    }
+	public QKDPhysicalResult evaluateMultiFiber(double wavelengthNm, double lengthKm) {
+		return evaluate(wavelengthNm, lengthKm, parameters.getDarkCountProbability());
+	}
 
-    /**
+	/**
      * Evaluates one QKD span using an already-combined background probability.
      *
      * @param wavelengthNm quantum-channel wavelength in nm
@@ -48,22 +49,25 @@ public final class BB84DecoyModel implements java.io.Serializable {
      *
      * <p>Refer\u00eancias: Q_mu = 1-(1-p_b)e^{-eta mu}, E_mu, Q_1 e e_1 das Eqs. (12)-(18) de [MOGH21] e eq. (1) de [DIBAJ24]; eta = eta_d 10^{-alpha L/10}; SKR = [Q_1(1-H(e_1)) - f Q_mu H(E_mu)]/T_s (sem o fator 1/2 de peneiramento, como em [DIBAJ24]).</p>
      */
-    public QKDPhysicalResult evaluate(
-            double wavelengthNm,
-            double lengthKm,
-            double backgroundProbability) {
+	public QKDPhysicalResult evaluate(
+			double wavelengthNm,
+			double lengthKm,
+			double backgroundProbability) {
 
-        if (!Double.isFinite(wavelengthNm) || wavelengthNm <= 0.0) {
-            throw new IllegalArgumentException("wavelengthNm must be finite and > 0");
-        }
-        if (!Double.isFinite(lengthKm) || lengthKm < 0.0) {
-            throw new IllegalArgumentException("lengthKm must be finite and >= 0");
-        }
-        requireProbability(backgroundProbability, "backgroundProbability");
-        return evaluateWithAttenuation(attenuationDbPerKm(wavelengthNm), lengthKm, backgroundProbability);
-    }
+		if (!Double.isFinite(wavelengthNm) || wavelengthNm <= 0.0) {
+			throw new IllegalArgumentException("wavelengthNm must be finite and > 0");
+		}
 
-    /**
+		if (!Double.isFinite(lengthKm) || lengthKm < 0.0) {
+			throw new IllegalArgumentException("lengthKm must be finite and >= 0");
+		}
+
+		requireProbability(backgroundProbability, "backgroundProbability");
+
+		return evaluateWithAttenuation(attenuationDbPerKm(wavelengthNm), lengthKm, backgroundProbability);
+	}
+
+	/**
      * Parte 42: same decoy-state BB84 bound with the fibre attenuation given by the caller, so that a
      * wavelength-dependent loss model other than the quadratic C-band fit (e.g. the multi-band G.652.D model of
      * {@code qkd.multiband.FiberAttenuationModel}) can be used. {@link #evaluate(double, double, double)} delegates
@@ -73,87 +77,103 @@ public final class BB84DecoyModel implements java.io.Serializable {
      * @param lengthKm QKD span length in km
      * @param backgroundProbability total background probability p_b per detection window
      */
-    public QKDPhysicalResult evaluateWithAttenuation(double alphaDbPerKm, double lengthKm,
-            double backgroundProbability) {
-        if (!Double.isFinite(alphaDbPerKm) || alphaDbPerKm < 0.0) {
-            throw new IllegalArgumentException("alphaDbPerKm must be finite and >= 0");
-        }
-        if (!Double.isFinite(lengthKm) || lengthKm < 0.0) {
-            throw new IllegalArgumentException("lengthKm must be finite and >= 0");
-        }
-        requireProbability(backgroundProbability, "backgroundProbability");
+	public QKDPhysicalResult evaluateWithAttenuation(double alphaDbPerKm, double lengthKm,
+			double backgroundProbability) {
+		return evaluateWithOpticalLoss(alphaDbPerKm, lengthKm, backgroundProbability, 0.0);
+	}
 
-        final double alpha = alphaDbPerKm;
-        final double eta = parameters.getDetectorEfficiency()
-                * Math.pow(10.0, -alpha * lengthKm / 10.0);
-        final double mu = parameters.getMu();
-        final double pb = backgroundProbability;
-        final double ed = parameters.getPhaseErrorProbability();
+	/** Passive QCh insertion loss in dB, in addition to fibre attenuation.
+     * Separate from detector efficiency and from optical noise transmission. */
+	public QKDPhysicalResult evaluateWithOpticalLoss(double alphaDbPerKm, double lengthKm,
+			double backgroundProbability, double insertionLossDb) {
+		if (!Double.isFinite(insertionLossDb) || insertionLossDb < 0.0)
+			throw new IllegalArgumentException("insertionLossDb must be finite and >= 0");
 
-        final double expSignal = Math.exp(-eta * mu);
-        final double qMu = 1.0 - (1.0 - pb) * expSignal;
-        if (qMu <= 0.0) {
-            return new QKDPhysicalResult(alpha, eta, pb, 0.0, 0.0, 0.0, 0.0,
-                    0.0, 0.0, 0.0);
-        }
+		if (!Double.isFinite(alphaDbPerKm) || alphaDbPerKm < 0.0) {
+			throw new IllegalArgumentException("alphaDbPerKm must be finite and >= 0");
+		}
 
-        final double eMu = (pb / 2.0 + ed * (1.0 - expSignal)) / qMu;
-        final double q1 = mu * Math.exp(-mu) * (pb + eta);
-        final double e1 = (2.0 * eta * ed + pb) / (2.0 * (pb + eta));
+		if (!Double.isFinite(lengthKm) || lengthKm < 0.0) {
+			throw new IllegalArgumentException("lengthKm must be finite and >= 0");
+		}
 
-        // Probabilities can reach exactly 0 or 1 only in limiting cases.
-        final double hEMu = binaryEntropy(eMu);
-        final double hE1 = binaryEntropy(e1);
+		requireProbability(backgroundProbability, "backgroundProbability");
 
-        final double rawSkr = (
-                q1 * (1.0 - hE1)
-                - parameters.getErrorCorrectionInefficiency() * qMu * hEMu
-        ) / parameters.getPulseIntervalS();
+		final double alpha = alphaDbPerKm;
+		final double eta = parameters.getDetectorEfficiency()
+				* Math.pow(10.0, -(alpha * lengthKm + insertionLossDb) / 10.0);
+		final double mu = parameters.getMu();
+		final double pb = backgroundProbability;
+		final double ed = parameters.getPhaseErrorProbability();
 
-        final double skrBps = Math.max(0.0, rawSkr);
+		final double expSignal = Math.exp(-eta * mu);
+		final double qMu = 1.0 - (1.0 - pb) * expSignal;
 
-        return new QKDPhysicalResult(
-                alpha,
-                eta,
-                pb,
-                qMu,
-                eMu,
-                q1,
-                e1,
-                hEMu,
-                hE1,
-                skrBps
-        );
-    }
+		if (qMu <= 0.0) {
+			return new QKDPhysicalResult(alpha, eta, pb, 0.0, 0.0, 0.0, 0.0,
+					0.0, 0.0, 0.0);
+		}
 
-    /**
+		final double eMu = (pb / 2.0 + ed * (1.0 - expSignal)) / qMu;
+		final double q1 = mu * Math.exp(-mu) * (pb + eta);
+		final double e1 = (2.0 * eta * ed + pb) / (2.0 * (pb + eta));
+
+		// Probabilities can reach exactly 0 or 1 only in limiting cases.
+		final double hEMu = binaryEntropy(eMu);
+		final double hE1 = binaryEntropy(e1);
+
+		final double rawSkr = (
+				q1 * (1.0 - hE1)
+				- parameters.getErrorCorrectionInefficiency() * qMu * hEMu
+		) / parameters.getPulseIntervalS();
+
+		final double skrBps = Math.max(0.0, rawSkr);
+
+		return new QKDPhysicalResult(
+				alpha,
+				eta,
+				pb,
+				qMu,
+				eMu,
+				q1,
+				e1,
+				hEMu,
+				hE1,
+				skrBps
+		);
+	}
+
+	/**
      * Wavelength-dependent attenuation fit used by the Python replication.
      */
-    public double attenuationDbPerKm(double wavelengthNm) {
-        return parameters.attenuationDbPerKm(wavelengthNm);
-    }
+	public double attenuationDbPerKm(double wavelengthNm) {
+		return parameters.attenuationDbPerKm(wavelengthNm);
+	}
 
-    /**
+	/**
      * Shannon binary entropy H2(x), with robust endpoint handling.
      */
-    public static double binaryEntropy(double x) {
-        final double eps = 1e-15;
-        if (!Double.isFinite(x) || x < -eps || x > 1.0 + eps) {
-            throw new IllegalArgumentException("binary entropy input must be in [0, 1]: " + x);
-        }
-        if (x <= eps || x >= 1.0 - eps) {
-            return 0.0;
-        }
-        return -x * log2(x) - (1.0 - x) * log2(1.0 - x);
-    }
+	public static double binaryEntropy(double x) {
+		final double eps = 1e-15;
 
-    private static double log2(double x) {
-        return Math.log(x) / Math.log(2.0);
-    }
+		if (!Double.isFinite(x) || x < -eps || x > 1.0 + eps) {
+			throw new IllegalArgumentException("binary entropy input must be in [0, 1]: " + x);
+		}
 
-    private static void requireProbability(double value, String name) {
-        if (!Double.isFinite(value) || value < 0.0 || value > 1.0) {
-            throw new IllegalArgumentException(name + " must be in [0, 1]");
-        }
-    }
+		if (x <= eps || x >= 1.0 - eps) {
+			return 0.0;
+		}
+
+		return -x * log2(x) - (1.0 - x) * log2(1.0 - x);
+	}
+
+	private static double log2(double x) {
+		return Math.log(x) / Math.log(2.0);
+	}
+
+	private static void requireProbability(double value, String name) {
+		if (!Double.isFinite(value) || value < 0.0 || value > 1.0) {
+			throw new IllegalArgumentException(name + " must be in [0, 1]");
+		}
+	}
 }

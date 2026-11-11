@@ -12,32 +12,31 @@ public class LineData implements DataSetInterface {
 	private int request;
 	private String algorithm;
 	private double biteRate;
-    private String route;
-    private int hops;
-    private double distance;
-    private String mod;
-    private String band;
-    private int core;
-    private double osnr;
-    private double deltaOsnr;
-    private double deltaOsnrNeigh;
-    private double xt;
-    private double deltaXT;
-    private double deltaXTAdj;
-    private int overlaps;
-    private double launchPower;
-    private double ut;
-    private double frag;
-    private int wasBlocked;
-    private int blockCause;
+	private String route;
+	private int hops;
+	private double distance;
+	private String mod;
+	private String band;
+	private int core;
+	private double osnr;
+	private double deltaOsnr;
+	private double deltaOsnrNeigh;
+	private double xt;
+	private double deltaXT;
+	private double deltaXTAdj;
+	private int overlaps;
+	private double launchPower;
+	private double ut;
+	private double frag;
+	private int wasBlocked;
+	private int blockCause;
 
-
-    /**
+	/**
 	 * Method that creates the header
 	 *
 	 * @return String
 	 */
-    public String getHeader() {
+	public String getHeader() {
 		StringBuilder buffer = new StringBuilder();
 
 		buffer.append("iteration").append(LineDataManager.strSeparator);
@@ -78,10 +77,10 @@ public class LineData implements DataSetInterface {
 	 *
 	 * @return String
 	 */
-    public String dataSetToString() {
-    	StringBuilder buffer = new StringBuilder();
+	public String dataSetToString() {
+		StringBuilder buffer = new StringBuilder();
 
-    	buffer.append(request).append(LineDataManager.strSeparator);
+		buffer.append(request).append(LineDataManager.strSeparator);
 		buffer.append(algorithm).append(LineDataManager.strSeparator);
 		buffer.append(biteRate).append(LineDataManager.strSeparator);
 
@@ -111,9 +110,9 @@ public class LineData implements DataSetInterface {
 		buffer.append(blockCause).append(LineDataManager.strSeparator);
 
 		return buffer.toString();
-    }
+	}
 
-    /**
+	/**
 	 * This method sets the DataSetStructure
 	 *
 	 * @param cp ControlPlane
@@ -290,6 +289,5 @@ public class LineData implements DataSetInterface {
 	public void setBlockCause(int blockCause) {
 		this.blockCause = blockCause;
 	}
-
 
 }

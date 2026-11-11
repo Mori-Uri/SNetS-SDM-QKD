@@ -18,7 +18,7 @@ public class TranslucentCircuit extends Circuit implements Serializable {
 	protected HashMap<Link, Integer> coreByLink;
 
 	// list of the indexes of the ones that regenerated the signal and the noise
-    protected List<Integer> regeneratorsNodesIndexList;
+	protected List<Integer> regeneratorsNodesIndexList;
 
 	/**
 	 * Creates a new instance of TranslucentCircuit.
@@ -95,6 +95,7 @@ public class TranslucentCircuit extends Circuit implements Serializable {
 	 */
 	public int[] getSpectrumAssignedByLink(Link link){
 		int sa[] = getSpectrumAssignedByLink().get(link);
+
 		return sa;
 	}
 
@@ -107,6 +108,7 @@ public class TranslucentCircuit extends Circuit implements Serializable {
 	 */
 	public Modulation getModulationByLink(Link link){
 		Modulation mod = getModulationByLink().get(link);
+
 		return mod;
 	}
 
@@ -119,6 +121,7 @@ public class TranslucentCircuit extends Circuit implements Serializable {
 	 */
 	public Integer getIndexCoreByLink(Link link){
 		Integer core = getCoreByLink().get(link);
+
 		return core;
 	}
 }

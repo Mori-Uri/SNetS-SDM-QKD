@@ -42,7 +42,6 @@ final class Picker {
                 }
                 final JFrame owner = new JFrame(title == null ? "SNetS Launcher" : title);
                 owner.setUndecorated(true);
-                owner.setIconImages(AppShell.appIcons()); // Parte 61
                 owner.setAlwaysOnTop(true);
                 owner.setSize(1, 1);
                 owner.setLocationRelativeTo(null);

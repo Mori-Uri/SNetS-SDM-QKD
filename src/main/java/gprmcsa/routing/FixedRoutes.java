@@ -22,89 +22,89 @@ import com.google.gson.reflect.TypeToken;
  */
 public class FixedRoutes implements RoutingAlgorithmInterface {
 
-    private static final String DIV = "-";
+	private static final String DIV = "-";
 
-    private ArrayList<String> routeList;
+	private ArrayList<String> routeList;
 
-    private HashMap<String, Route> routesForAllPairs;
+	private HashMap<String, Route> routesForAllPairs;
 
-
-    /**
+	/**
      * Finds the route.
      * @param request the request.
      * @param mesh the mesh.
      * @return true if the condition is met; false otherwise.
      */
-    @Override
-    public boolean findRoute(Circuit request, Mesh mesh) {
-        if (routesForAllPairs == null) {
-        	computeAllRoutes(mesh);
-        }
+	@Override
+	public boolean findRoute(Circuit request, Mesh mesh) {
+		if (routesForAllPairs == null) {
+			computeAllRoutes(mesh);
+		}
 
-        Node source = request.getSource();
-        Node destination = request.getDestination();
+		Node source = request.getSource();
+		Node destination = request.getDestination();
 
-        Route route = routesForAllPairs.get(source.getName() + DIV + destination.getName());
+		Route route = routesForAllPairs.get(source.getName() + DIV + destination.getName());
 
-        if (route != null) {
-            request.setRoute(route);
-            return true;
-        }
+		if (route != null) {
+			request.setRoute(route);
 
-        return false;
-    }
+			return true;
+		}
 
-    /**
+		return false;
+	}
+
+	/**
      * Computes the smallest paths for each pair
      *
      * @param mesh Mesh
      */
-    private void computeAllRoutes(Mesh mesh) {
-        try {
-            String separator = System.getProperty("file.separator");
-            String filePath = mesh.getUtil().projectPath + separator + "routesByPar.txt";
-            String routesListGson = "";
+	private void computeAllRoutes(Mesh mesh) {
+		try {
+			String separator = System.getProperty("file.separator");
+			String filePath = mesh.getUtil().projectPath + separator + "routesByPar.txt";
+			String routesListGson = "";
 
-            Scanner scanner = new Scanner(new File(filePath));
-            while (scanner.hasNext()) {
-                routesListGson += scanner.next();
-            }
+			Scanner scanner = new Scanner(new File(filePath));
+			while (scanner.hasNext()) {
+				routesListGson += scanner.next();
+			}
 
-            Gson gson = new GsonBuilder().create();
-            Type typeTemp = new TypeToken<ArrayList<String>>(){}.getType();
+			Gson gson = new GsonBuilder().create();
+			Type typeTemp = new TypeToken<ArrayList<String>>(){}.getType();
 
-            List<String> routeListTemp = gson.fromJson(routesListGson, typeTemp);
-            routeList = (ArrayList<String>)routeListTemp;
+			List<String> routeListTemp = gson.fromJson(routesListGson, typeTemp);
+			routeList = (ArrayList<String>)routeListTemp;
 
-            scanner.close();
+			scanner.close();
 
-        } catch (Exception e) {
-            System.err.println("The file routesByPar.txt was not found!");
+		} catch (Exception e) {
+			System.err.println("The file routesByPar.txt was not found!");
 
-            e.printStackTrace();
-        }
+			e.printStackTrace();
+		}
 
-        routesForAllPairs = new HashMap<String, Route>();
+		routesForAllPairs = new HashMap<String, Route>();
 
-        for (int i = 0; i < routeList.size(); i++) {
-        	String nodes[] = routeList.get(i).split("-");
-            Vector<Node> route = new Vector<Node>();
+		for (int i = 0; i < routeList.size(); i++) {
+			String nodes[] = routeList.get(i).split("-");
+			Vector<Node> route = new Vector<Node>();
 
-            for(int n = 0; n < nodes.length; n++){
-            	route.add(mesh.searchNode(nodes[n]));
-            }
+			for(int n = 0; n < nodes.length; n++){
+				route.add(mesh.searchNode(nodes[n]));
+			}
 
-            String pair = nodes[0] + DIV + nodes[nodes.length - 1];
-            routesForAllPairs.put(pair, new Route(route));
-        }
-    }
+			String pair = nodes[0] + DIV + nodes[nodes.length - 1];
+			routesForAllPairs.put(pair, new Route(route));
+		}
+	}
 
-    /**
+	/**
 	 * Returns the route list for all pairs
 	 *
 	 * @return Vector<Route>
 	 */
-    public HashMap<String, Route> getRoutesForAllPairs() {
+	public HashMap<String, Route> getRoutesForAllPairs() {
 		return routesForAllPairs;
 	}
 }

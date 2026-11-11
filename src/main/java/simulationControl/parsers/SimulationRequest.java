@@ -8,143 +8,146 @@ package simulationControl.parsers;
 public class SimulationRequest {
 
 	private String path;
-    private String name;
+	private String name;
 
-    private NetworkConfig networkConfig;
-    private TrafficConfig trafficConfig;
-    private SimulationConfig simulationConfig;
-    private PhysicalLayerConfig physicalLayerConfig;
-    private OthersConfig othersConfig;
+	private NetworkConfig networkConfig;
+	private TrafficConfig trafficConfig;
+	private SimulationConfig simulationConfig;
+	private PhysicalLayerConfig physicalLayerConfig;
+	private OthersConfig othersConfig;
 
-    private String status;
-    private Double progress = 0.0;
-    private Result result = new Result();
+	private String status;
+	private Double progress = 0.0;
+	private Result result = new Result();
 
-    /**
+	/**
      * This class represents the results obtained by the performance metrics in the execution of the simulation
      *
      * @author Iallen
      */
-    public static class Result {
-        public final static String FILE_BLOCKING_PROBABILITY = "BlockingProbability.csv";
-        public final static String FILE_BITRATE_BLOCKING_PROBABILITY = "BitRateBlockingProbability.csv";
-        public final static String FILE_EXTERNAL_FRAGMENTATION = "ExternalFragmentation.csv";
-        public final static String FILE_RELATIVE_FRAGMENTATION = "RelativeFragmentation.csv";
-        public final static String FILE_SPECTRUM_UTILIZATION = "SpectrumUtilization.csv";
-        public final static String FILE_TRANSMITTERS_RECEIVERS_REGENERATORS_UTILIZATION = "TransmittersReceiversRegeneratorsUtilization.csv";
-        public final static String FILE_GROOMING_STATISTICS = "GroomingStatistics.csv";
-        public final static String FILE_SPECTRUM_STATISTICS = "SpectrumStatistics.csv";
-        public final static String FILE_MODULATION_UTILIZATION = "ModulationUtilization.csv";
-        public final static String FILE_CONSUMED_ENERGY = "ConsumedEnergy.csv";
-        public final static String FILE_DATASET_INFORMATION = "DataSetInformation.csv";
-        public final static String FILE_PHYSICAL_LAYER_STATISTICS = "PhysicalLayerStatistics.csv";
-        public final static String FILE_QKD_STATISTICS = "QKDStatistics.csv";
-        /** Parte 45: computational cost of the algorithms. */
-        public final static String FILE_ALGORITHM_COST = "AlgorithmCost.csv";
-        public final static String FILE_QKD_METRICS = "QKDMetrics.csv";
-        public final static String FILE_BLOCKING_DETAILS = "BlockingDetails.csv";
-        public final static String FILE_SLOT_UTILIZATION = "SlotUtilization.csv";
-        public final static String FILE_SLOT_BLOCKING = "SlotBlocking.csv";
-        /** Parte 39: channel (CCh, QCh, PICh) that failed in the blocked QKD-protected requests. */
-        public final static String FILE_QKD_CHANNEL_BLOCKING = "QKDChannelBlocking.csv";
-        public final static String FILE_QKD_CHANNEL_SLOT_BLOCKING = "QKDChannelSlotBlocking.csv";
+	public static class Result {
+		public final static String FILE_BLOCKING_PROBABILITY = "BlockingProbability.csv";
+		public final static String FILE_BITRATE_BLOCKING_PROBABILITY = "BitRateBlockingProbability.csv";
+		public final static String FILE_EXTERNAL_FRAGMENTATION = "ExternalFragmentation.csv";
+		public final static String FILE_RELATIVE_FRAGMENTATION = "RelativeFragmentation.csv";
+		public final static String FILE_SPECTRUM_UTILIZATION = "SpectrumUtilization.csv";
+		public final static String FILE_TRANSMITTERS_RECEIVERS_REGENERATORS_UTILIZATION = "TransmittersReceiversRegeneratorsUtilization.csv";
+		public final static String FILE_GROOMING_STATISTICS = "GroomingStatistics.csv";
+		public final static String FILE_SPECTRUM_STATISTICS = "SpectrumStatistics.csv";
+		public final static String FILE_MODULATION_UTILIZATION = "ModulationUtilization.csv";
+		public final static String FILE_CONSUMED_ENERGY = "ConsumedEnergy.csv";
+		public final static String FILE_DATASET_INFORMATION = "DataSetInformation.csv";
+		public final static String FILE_PHYSICAL_LAYER_STATISTICS = "PhysicalLayerStatistics.csv";
+		public final static String FILE_QKD_STATISTICS = "QKDStatistics.csv";
 
-        public String blockingProbability;
-        public String bitRateBlockingProbability;
-        public String externalFragmentation;
-        public String relativeFragmentation;
-        public String spectrumUtilization;
-        public String spectrumStatistics;
-        public String modulationUtilization;
-        public String consumedEnergy;
-        public String transmittersReceiversRegeneratorsUtilization;
-        public String groomingStatistics;
-        public String dataSetInformation;
-        public String physicalLayerStatistics;
-        public String qkdStatistics;
-        /** Parte 45 (activeMetrics.AlgorithmCost). */
-        public String algorithmCost;
-        public String qkdMetrics;
-        public String blockingDetails;
-        public String slotUtilization;
-        public String slotBlocking;
-        public String qkdChannelBlocking;
-        public String qkdChannelSlotBlocking;
-    }
+		/** Parte 45: computational cost of the algorithms. */
+		public final static String FILE_ALGORITHM_COST = "AlgorithmCost.csv";
+		public final static String FILE_QKD_METRICS = "QKDMetrics.csv";
+		public final static String FILE_BLOCKING_DETAILS = "BlockingDetails.csv";
+		public final static String FILE_SLOT_UTILIZATION = "SlotUtilization.csv";
+		public final static String FILE_SLOT_BLOCKING = "SlotBlocking.csv";
 
-    /**
+		/** Parte 39: channel (CCh, QCh, PICh) that failed in the blocked QKD-protected requests. */
+		public final static String FILE_QKD_CHANNEL_BLOCKING = "QKDChannelBlocking.csv";
+		public final static String FILE_QKD_CHANNEL_SLOT_BLOCKING = "QKDChannelSlotBlocking.csv";
+
+		public String blockingProbability;
+		public String bitRateBlockingProbability;
+		public String externalFragmentation;
+		public String relativeFragmentation;
+		public String spectrumUtilization;
+		public String spectrumStatistics;
+		public String modulationUtilization;
+		public String consumedEnergy;
+		public String transmittersReceiversRegeneratorsUtilization;
+		public String groomingStatistics;
+		public String dataSetInformation;
+		public String physicalLayerStatistics;
+		public String qkdStatistics;
+
+		/** Parte 45 (activeMetrics.AlgorithmCost). */
+		public String algorithmCost;
+		public String qkdMetrics;
+		public String blockingDetails;
+		public String slotUtilization;
+		public String slotBlocking;
+		public String qkdChannelBlocking;
+		public String qkdChannelSlotBlocking;
+	}
+
+	/**
      * Return the result
      *
      * @return Result
      */
-    public Result getResult() {
-        return result;
-    }
+	public Result getResult() {
+		return result;
+	}
 
-    /**
+	/**
      * Sets the result
      *
      * @param result Result
      */
-    public void setResult(Result result) {
-        this.result = result;
-    }
+	public void setResult(Result result) {
+		this.result = result;
+	}
 
-    /**
+	/**
      * Returns the networkConfig
      *
      * @return NetworkConfig
      */
-    public NetworkConfig getNetworkConfig() {
-        return networkConfig;
-    }
+	public NetworkConfig getNetworkConfig() {
+		return networkConfig;
+	}
 
-    /**
+	/**
      * Sets the networkConfig
      *
      * @param networkConfig NetworkConfig
      */
-    public void setNetworkConfig(NetworkConfig networkConfig) {
-        this.networkConfig = networkConfig;
-    }
+	public void setNetworkConfig(NetworkConfig networkConfig) {
+		this.networkConfig = networkConfig;
+	}
 
-    /**
+	/**
      * Returns the trafficConfig
      *
      * @return trafficConfig
      */
-    public TrafficConfig getTrafficConfig() {
-        return trafficConfig;
-    }
+	public TrafficConfig getTrafficConfig() {
+		return trafficConfig;
+	}
 
-    /**
+	/**
      * Sets the trafficConfig
      *
      * @param trafficConfig TrafficConfig
      */
-    public void setTrafficConfig(TrafficConfig trafficConfig) {
-        this.trafficConfig = trafficConfig;
-    }
+	public void setTrafficConfig(TrafficConfig trafficConfig) {
+		this.trafficConfig = trafficConfig;
+	}
 
-    /**
+	/**
      * Returns the simulationConfig
      *
      * @return SimulationConfig
      */
-    public SimulationConfig getSimulationConfig() {
-        return simulationConfig;
-    }
+	public SimulationConfig getSimulationConfig() {
+		return simulationConfig;
+	}
 
-    /**
+	/**
      * Sets the simulationConfig
      *
      * @param simulationConfig SimulationConfig
      */
-    public void setSimulationConfig(SimulationConfig simulationConfig) {
-        this.simulationConfig = simulationConfig;
-    }
+	public void setSimulationConfig(SimulationConfig simulationConfig) {
+		this.simulationConfig = simulationConfig;
+	}
 
-    /**
+	/**
      * Returns the physicalLayerConfig
      *
 	 * @return the physicalLayerConfig
@@ -167,73 +170,73 @@ public class SimulationRequest {
      *
      * @return String
      */
-    public String getStatus() {
-        return status;
-    }
+	public String getStatus() {
+		return status;
+	}
 
-    /**
+	/**
      * Sets the status
      *
      * @param status String
      */
-    public void setStatus(String status) {
-        this.status = status;
-    }
+	public void setStatus(String status) {
+		this.status = status;
+	}
 
-    /**
+	/**
      * Returns the name
      *
      * @return String name
      */
-    public String getName() {
-        return name;
-    }
+	public String getName() {
+		return name;
+	}
 
-    /**
+	/**
      * Sets the name.
      * @param name the name.
      */
-    public void setName(String name) {
-        this.name = name;
-    }
+	public void setName(String name) {
+		this.name = name;
+	}
 
-    /**
+	/**
      * Returns the progress
      *
      * @return Double
      */
-    public Double getProgress() {
-        return progress;
-    }
+	public Double getProgress() {
+		return progress;
+	}
 
-    /**
+	/**
      * Sets the progress
      *
      * @param progress Double
      */
-    public void setProgress(Double progress) {
-        this.progress = progress;
-    }
+	public void setProgress(Double progress) {
+		this.progress = progress;
+	}
 
-    /**
+	/**
      * Returns the OthersConfig
      *
      * @return OthersConfig
      */
-    public OthersConfig getOthersConfig() {
-        return othersConfig;
-    }
+	public OthersConfig getOthersConfig() {
+		return othersConfig;
+	}
 
-    /**
+	/**
      * Sets the OthersConfig
      *
      * @param othersConfig OthersConfig
      */
-    public void setOthersConfig(OthersConfig othersConfig) {
-        this.othersConfig = othersConfig;
-    }
+	public void setOthersConfig(OthersConfig othersConfig) {
+		this.othersConfig = othersConfig;
+	}
 
-    /**
+	/**
      * Returns the path
      *
      * @return String

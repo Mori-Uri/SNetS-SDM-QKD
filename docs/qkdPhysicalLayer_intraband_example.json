@@ -1,0 +1,38 @@
+{
+  "source": {
+    "meanPhotonNumber": 0.7,
+    "pulseIntervalPs": 250.0,
+    "qchPowerDbm": -80.0,
+    "qchBandwidthGHz": 12.5
+  },
+  "protocol": {
+    "errorCorrectionInefficiency": 1.16,
+    "misalignmentError": 0.015
+  },
+  "detector": {
+    "detectorEfficiency": 0.3,
+    "darkCountProbability": 1e-08,
+    "detectorGateWindowPs": 100.0,
+    "receiverOpticalEfficiency": 1.0
+  },
+  "pich": {
+    "launchPowerDbm": 0.0
+  },
+  "multiband": {
+    "enabled": true,
+    "architecture": "MBSDM",
+    "ramanModel": "fisico",
+    "qchCenterNm": 1550.0,
+    "hostCoreId": 1,
+    "intercoreRaman": true,
+    "nliModel": "gn",
+    "classicalBandStartThz": 191.3,
+    "attenuationModel": "g652d",
+    "waterPeakDbPerKm": 0.0,
+    "temperatureK": 300.0,
+    "intraband": {
+      "enabled": true,
+      "minimumQchClassicalSeparationGHz": 200.0
+    }
+  }
+}

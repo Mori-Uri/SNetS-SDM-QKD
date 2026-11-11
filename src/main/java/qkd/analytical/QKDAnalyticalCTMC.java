@@ -27,9 +27,9 @@ import java.util.Map;
  */
 public final class QKDAnalyticalCTMC {
 
-    public enum Policy { RANDOM_FIT, FIRST_FIT }
+	public enum Policy { RANDOM_FIT, FIRST_FIT }
 
-    /**
+	/**
      * How the departures of Eq. (3) are weighted. LITERAL: rate mu_d to every distinct
      * successor of T_x^{d,-} (Eq. 3 read word by word; the total departure rate then grows
      * with the number of label combinations, not with the number of requests).
@@ -37,135 +37,170 @@ public final class QKDAnalyticalCTMC {
      * n_d * mu_d, shared equally by the distinct successors (the labels do not say which
      * DCh, CCh and QCh belong together).
      */
-    public enum Departures { LITERAL, PER_REQUEST }
+	public enum Departures { LITERAL, PER_REQUEST }
 
-    public Departures departures = Departures.PER_REQUEST;
+	public Departures departures = Departures.PER_REQUEST;
 
-    final QKDAnalyticalModel model;
-    final Policy policy;
-    final List<QKDAnalyticalModel.State> states = new ArrayList<QKDAnalyticalModel.State>();
-    final Map<QKDAnalyticalModel.State, Integer> index = new HashMap<QKDAnalyticalModel.State, Integer>();
-    /** [state][class] -> successor ids. */
-    int[][][] arr;
-    int[][][] dep;
+	final QKDAnalyticalModel model;
+	final Policy policy;
+	final List<QKDAnalyticalModel.State> states = new ArrayList<QKDAnalyticalModel.State>();
+	final Map<QKDAnalyticalModel.State, Integer> index = new HashMap<QKDAnalyticalModel.State, Integer>();
 
-    public QKDAnalyticalCTMC(QKDAnalyticalModel model, Policy policy, int maxStates) {
-        this.model = model;
-        this.policy = policy;
-        build(maxStates);
-    }
+	/** [state][class] -> successor ids. */
+	int[][][] arr;
+	int[][][] dep;
 
-    private int id(QKDAnalyticalModel.State s, ArrayDeque<QKDAnalyticalModel.State> queue) {
-        Integer i = index.get(s);
-        if (i != null) return i;
-        int n = states.size();
-        states.add(s);
-        index.put(s, n);
-        queue.add(s);
-        return n;
-    }
+	public QKDAnalyticalCTMC(QKDAnalyticalModel model, Policy policy, int maxStates) {
+		this.model = model;
+		this.policy = policy;
+		build(maxStates);
+	}
 
-    private void build(int maxStates) {
-        ArrayDeque<QKDAnalyticalModel.State> queue = new ArrayDeque<QKDAnalyticalModel.State>();
-        id(model.empty(), queue);
-        List<int[][]> a = new ArrayList<int[][]>(), d = new ArrayList<int[][]>();
-        int D = model.classes();
-        while (!queue.isEmpty()) {
-            QKDAnalyticalModel.State s = queue.poll();
-            int[][] as = new int[D][], ds = new int[D][];
-            for (int c = 0; c < D; c++) {
-                List<QKDAnalyticalModel.State> succ = model.arrivals(s, c);
-                if (policy == Policy.FIRST_FIT && succ.size() > 1) succ = succ.subList(0, 1);
-                as[c] = new int[succ.size()];
-                for (int k = 0; k < succ.size(); k++) as[c][k] = id(succ.get(k), queue);
-                List<QKDAnalyticalModel.State> out = model.departures(s, c);
-                ds[c] = new int[out.size()];
-                for (int k = 0; k < out.size(); k++) ds[c][k] = id(out.get(k), queue);
-            }
-            a.add(as);
-            d.add(ds);
-            if (states.size() > maxStates) throw new IllegalStateException("state space larger than " + maxStates);
-        }
-        arr = a.toArray(new int[0][][]);
-        dep = d.toArray(new int[0][][]);
-    }
+	private int id(QKDAnalyticalModel.State s, ArrayDeque<QKDAnalyticalModel.State> queue) {
+		Integer i = index.get(s);
 
-    public int stateCount() { return states.size(); }
+		if (i != null) return i;
+		int n = states.size();
+		states.add(s);
+		index.put(s, n);
+		queue.add(s);
 
-    /** Number of distinct arrival successors of a state for class d (CS-RF), for checks. */
-    public int arrivalSuccessors(QKDAnalyticalModel.State s, int d) {
-        return model.arrivals(s, d).size();
-    }
+		return n;
+	}
 
-    /** Result of one load point. */
-    public static final class Result {
-        public double blockingProbability;
-        public double[] blockingPerClass;
-        public double meanRequests;
-        public int iterations;
-        public double residual;
-    }
+	private void build(int maxStates) {
+		ArrayDeque<QKDAnalyticalModel.State> queue = new ArrayDeque<QKDAnalyticalModel.State>();
+		id(model.empty(), queue);
+		List<int[][]> a = new ArrayList<int[][]>(), d = new ArrayList<int[][]>();
+		int D = model.classes();
+		while (!queue.isEmpty()) {
+			QKDAnalyticalModel.State s = queue.poll();
+			int[][] as = new int[D][], ds = new int[D][];
 
-    /** Rate of each departure transition of class c out of state x. */
-    private double depRate(int x, int c, double[] mu) {
-        int k = dep[x][c].length;
-        if (k == 0) return 0;
-        if (departures == Departures.LITERAL) return mu[c];
-        return mu[c] * model.requestsOfClass(states.get(x), c) / k;
-    }
+			for (int c = 0; c < D; c++) {
+				List<QKDAnalyticalModel.State> succ = model.arrivals(s, c);
 
-    public Result solve(double[] lambda, double[] mu, double tolerance, int maxIterations) {
-        final int n = states.size(), D = model.classes();
-        // incoming transitions: for each target, list of (source, rate)
-        int[] inCount = new int[n];
-        double[] out = new double[n];
-        for (int x = 0; x < n; x++) for (int c = 0; c < D; c++) {
-            int na = arr[x][c].length;
-            if (na > 0) { out[x] += lambda[c]; for (int t : arr[x][c]) inCount[t]++; }
-            out[x] += depRate(x, c, mu) * dep[x][c].length;
-            for (int t : dep[x][c]) inCount[t]++;
-        }
-        int[][] inSrc = new int[n][];
-        double[][] inRate = new double[n][];
-        for (int t = 0; t < n; t++) { inSrc[t] = new int[inCount[t]]; inRate[t] = new double[inCount[t]]; inCount[t] = 0; }
-        for (int x = 0; x < n; x++) for (int c = 0; c < D; c++) {
-            int na = arr[x][c].length;
-            for (int t : arr[x][c]) { inSrc[t][inCount[t]] = x; inRate[t][inCount[t]++] = lambda[c] / na; }
-            double dr = depRate(x, c, mu);
-            for (int t : dep[x][c]) { inSrc[t][inCount[t]] = x; inRate[t][inCount[t]++] = dr; }
-        }
-        double[] pi = new double[n];
-        java.util.Arrays.fill(pi, 1.0 / n);
-        Result r = new Result();
-        for (int it = 1; it <= maxIterations; it++) {
-            double change = 0;
-            for (int t = 0; t < n; t++) {
-                if (out[t] <= 0) continue;
-                double s = 0;
-                for (int k = 0; k < inSrc[t].length; k++) s += inRate[t][k] * pi[inSrc[t][k]];
-                double v = s / out[t];
-                change = Math.max(change, Math.abs(v - pi[t]));
-                pi[t] = v;
-            }
-            double sum = 0;
-            for (double v : pi) sum += v;
-            for (int t = 0; t < n; t++) pi[t] /= sum;
-            r.iterations = it;
-            r.residual = change;
-            if (change < tolerance) break;
-        }
-        double lsum = 0, bp = 0, mean = 0;
-        r.blockingPerClass = new double[D];
-        for (int c = 0; c < D; c++) lsum += lambda[c];
-        for (int t = 0; t < n; t++) {
-            mean += pi[t] * states.get(t).requests();
-            for (int c = 0; c < D; c++) if (arr[t][c].length == 0) {
-                r.blockingPerClass[c] += pi[t];
-                bp += lambda[c] * pi[t];
-            }
-        }
-        r.blockingProbability = bp / lsum;
-        r.meanRequests = mean;
-        return r;
-    }
+				if (policy == Policy.FIRST_FIT && succ.size() > 1) succ = succ.subList(0, 1);
+				as[c] = new int[succ.size()];
+
+				for (int k = 0; k < succ.size(); k++) as[c][k] = id(succ.get(k), queue);
+				List<QKDAnalyticalModel.State> out = model.departures(s, c);
+				ds[c] = new int[out.size()];
+
+				for (int k = 0; k < out.size(); k++) ds[c][k] = id(out.get(k), queue);
+			}
+
+			a.add(as);
+			d.add(ds);
+
+			if (states.size() > maxStates) throw new IllegalStateException("state space larger than " + maxStates);
+		}
+
+		arr = a.toArray(new int[0][][]);
+		dep = d.toArray(new int[0][][]);
+	}
+
+	public int stateCount() { return states.size(); }
+
+	/** Number of distinct arrival successors of a state for class d (CS-RF), for checks. */
+	public int arrivalSuccessors(QKDAnalyticalModel.State s, int d) {
+		return model.arrivals(s, d).size();
+	}
+
+	/** Result of one load point. */
+	public static final class Result {
+		public double blockingProbability;
+		public double[] blockingPerClass;
+		public double meanRequests;
+		public int iterations;
+		public double residual;
+	}
+
+	/** Rate of each departure transition of class c out of state x. */
+	private double depRate(int x, int c, double[] mu) {
+		int k = dep[x][c].length;
+
+		if (k == 0) return 0;
+
+		if (departures == Departures.LITERAL) return mu[c];
+
+		return mu[c] * model.requestsOfClass(states.get(x), c) / k;
+	}
+
+	public Result solve(double[] lambda, double[] mu, double tolerance, int maxIterations) {
+		final int n = states.size(), D = model.classes();
+
+		// incoming transitions: for each target, list of (source, rate)
+		int[] inCount = new int[n];
+		double[] out = new double[n];
+
+		for (int x = 0; x < n; x++) for (int c = 0; c < D; c++) {
+			int na = arr[x][c].length;
+
+			if (na > 0) { out[x] += lambda[c]; for (int t : arr[x][c]) inCount[t]++; }
+			out[x] += depRate(x, c, mu) * dep[x][c].length;
+
+			for (int t : dep[x][c]) inCount[t]++;
+		}
+
+		int[][] inSrc = new int[n][];
+		double[][] inRate = new double[n][];
+
+		for (int t = 0; t < n; t++) { inSrc[t] = new int[inCount[t]]; inRate[t] = new double[inCount[t]]; inCount[t] = 0; }
+		for (int x = 0; x < n; x++) for (int c = 0; c < D; c++) {
+			int na = arr[x][c].length;
+
+			for (int t : arr[x][c]) { inSrc[t][inCount[t]] = x; inRate[t][inCount[t]++] = lambda[c] / na; }
+			double dr = depRate(x, c, mu);
+
+			for (int t : dep[x][c]) { inSrc[t][inCount[t]] = x; inRate[t][inCount[t]++] = dr; }
+		}
+
+		double[] pi = new double[n];
+		java.util.Arrays.fill(pi, 1.0 / n);
+		Result r = new Result();
+
+		for (int it = 1; it <= maxIterations; it++) {
+			double change = 0;
+
+			for (int t = 0; t < n; t++) {
+				if (out[t] <= 0) continue;
+				double s = 0;
+
+				for (int k = 0; k < inSrc[t].length; k++) s += inRate[t][k] * pi[inSrc[t][k]];
+				double v = s / out[t];
+				change = Math.max(change, Math.abs(v - pi[t]));
+				pi[t] = v;
+			}
+
+			double sum = 0;
+
+			for (double v : pi) sum += v;
+
+			for (int t = 0; t < n; t++) pi[t] /= sum;
+			r.iterations = it;
+			r.residual = change;
+
+			if (change < tolerance) break;
+		}
+
+		double lsum = 0, bp = 0, mean = 0;
+		r.blockingPerClass = new double[D];
+
+		for (int c = 0; c < D; c++) lsum += lambda[c];
+
+		for (int t = 0; t < n; t++) {
+			mean += pi[t] * states.get(t).requests();
+
+			for (int c = 0; c < D; c++) if (arr[t][c].length == 0) {
+				r.blockingPerClass[c] += pi[t];
+				bp += lambda[c] * pi[t];
+			}
+		}
+
+		r.blockingProbability = bp / lsum;
+		r.meanRequests = mean;
+
+		return r;
+	}
 }

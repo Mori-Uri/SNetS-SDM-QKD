@@ -1,0 +1,291 @@
+verification,status,tail
+MultiBandIwcitVerification,PASS," otimo 20 km (artigo: 20 km), SKR/Q-TRx 38.7 Mbit/s
+[OK] VMB-10b Fig. 5, MF 1550 nm: QTND otimo 25 km (artigo: 25 km), ganho sobre sem no confiavel 19.2 % (artigo: 15 %)
+[PENDENTE] VMB-10b MB: ganho de +40 % do artigo nao reproduzido por nenhuma convencao de contagem de saltos (ver G1_qkd_multibanda.md, 3.7).
+
+Multi-band IWCIT verification (Parte 45): ALL CHECKS PASSED (1 item pendente, ver acima)"
+MultiBandLiteratureVerification,PASS,"m/30 km: 0.024 x 0.057; 1450 nm/30 km: 0.099 x 0.125; 1392 nm/70 km: 0.030 x 0.056; 1410 nm/70 km: 0.046 x 0.140; 1450 nm/70 km: 0.202 x 0.245; o artigo tem 2 a 5 vezes mais SpRS a 14-20 THz da borda do comb (1392-1450 nm), fora da janela medida da secao de choque; o artigo nao diz como a estendeu.
+
+Multi-band literature verification (Parte 46): ALL CHECKS PASSED (1 item(s) pendente(s), ver acima)"
+MultiBandNetworkVerification,INCOMPLETE_CLASSPATH,"iBandNetworkVerification.main(MultiBandNetworkVerification.java:54)
+Caused by: java.lang.ClassNotFoundException: com.google.gson.Gson
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	... 2 more"
+MultiBandNliVerification,INCOMPLETE_CLASSPATH,"ion.MultiBandNliVerification.main(MultiBandNliVerification.java:51)
+Caused by: java.lang.ClassNotFoundException: com.google.gson.Gson
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	... 2 more"
+MultiBandPhysicsVerification,PASS,"o 0.0%)
+[OK] VMB-8 forward form is continuous at a_q = a_c: 7.53566 (erro 0.0%)
+[OK] VMB-8 backward SpRS saturates at 1/(a_c + a_q): 10.8574 (erro 0.0%)
+[OK] VMB-8 zero length gives zero SpRS
+[OK] VMB-8 h = 0 gives zero intercore SpRS
+[OK] VMB-8 SpRS reduces SKR at 1381 nm/30 km: 43.10 -> 40.91 Mbit/s
+
+Multi-band physics verification (Parte 42): ALL CHECKS PASSED (1 item(s) pendente(s), ver acima)"
+QKDAbneCompatibilityVerification,PASS,"[OK] classical selector csbasdm -> gprmcsa.coreSpectrumAssignment.CSBASDM
+[OK] QKD addon selector qabne -> qkd.algorithms.coreSpectrumAssignment.QABNE
+[OK] factories are namespace-isolated: legacy does not know qabne and QKD addon does not alias csbasdm
+[OK] original CSBASDM/ABNE source is not modified by the QKD addon
+
+QKD Part 18 addon/ABNE isolation verification: ALL CHECKS PASSED"
+QKDAmplifierLongitudinalVerification,PASS,PASS QKDAmplifierLongitudinalVerification
+QKDAmplifierOperatingPointVerification,PASS,PASS QKDAmplifierOperatingPointVerification
+QKDArticleBaseReferenceVerification,INCOMPLETE_CLASSPATH,"renceVerification.main(QKDArticleBaseReferenceVerification.java:25)
+Caused by: java.lang.ClassNotFoundException: com.google.gson.Gson
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	... 3 more"
+QKDBoosterIntegratedVerification,PASS,PASS QKDBoosterIntegratedVerification
+QKDCascadedOsnrVerification,PASS,"ral=false XCIintegral=false L2=95.0 sat=false ASE=false NLI=true P=1.00000000e-09 W SNR=37.21376 dB
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+PASS model=0 SCIintegral=false XCIintegral=false L2=95.0 sat=false ASE=true NLI=false P=0.100000000 W SNR=27.92700 dB
+PASS QKDCascadedOsnrVerification"
+QKDClassicalLongitudinalQoTVerification,PASS,PASS QKDClassicalLongitudinalQoTVerification
+QKDCoexistenceCorrectionsVerification,PASS,PASS QKDCoexistenceCorrectionsVerification
+QKDCoreReservationVerification,INCOMPLETE_CLASSPATH,"ionVerification.main(QKDCoreReservationVerification.java:39)
+Caused by: java.lang.ClassNotFoundException: com.google.gson.GsonBuilder
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	... 4 more"
+QKDCrosstalkPowerVerification,PASS,"0000000000001E-14}
+     contribution[1] = QKDCrosstalkContribution{circuitId=1, core=2, spectrum=[15,24], overlapSlots=5, interfererSlots=10, ISO=0.5, PnW=0.002, hPerM=1.0E-15, linkKm=50.0, contributionW=5.000000000000001E-14}
+[OK] SNetS PXT -> detector noise -> BB84 chain: pXT=2.3408368058950386E-5, QBER=0.015158485793074801, SKR=93.54339669078391 Mbit/s
+QKD Part 2 verification: ALL CHECKS PASSED"
+QKDCrosstalkReceiverVerification,INCOMPLETE_CLASSPATH,"ReceiverVerification.main(QKDCrosstalkReceiverVerification.java:32)
+Caused by: java.lang.ClassNotFoundException: com.google.gson.Gson
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	... 2 more"
+QKDDiscreteCapacityAndTdmVerification,INCOMPLETE_CLASSPATH,"TdmVerification.main(QKDDiscreteCapacityAndTdmVerification.java:34)
+Caused by: java.lang.ClassNotFoundException: com.google.gson.Gson
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	... 1 more"
+QKDDynamicAmplifierVerification,PASS,PASS QKDDynamicAmplifierVerification
+QKDDynamicLifecycleVerification,INCOMPLETE_CLASSPATH,"LifecycleVerification.main(QKDDynamicLifecycleVerification.java:36)
+Caused by: java.lang.ClassNotFoundException: com.google.gson.Gson
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	... 1 more"
+QKDExistingSessionProtectionVerification,INCOMPLETE_CLASSPATH,"Verification.main(QKDExistingSessionProtectionVerification.java:51)
+Caused by: java.lang.ClassNotFoundException: com.google.gson.Gson
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	... 1 more"
+QKDGnScientificCorrectionsVerification,PASS,"[GN] negative NLI clamped to zero in verification: -1.0E-17
+PASS QKDGnScientificCorrectionsVerification
+johannisson_narrow_sci_kernel=0.4321754911205154
+johannisson_80km_nli_psd=1.8400351435006654E-20
+habibi_qpsk_80km_nli_psd=4.0411937110291505E-18
+habibi_64qam_80km_nli_psd=4.301104863082969E-18
+partial_20_over_80_factor=0.3811843005544242"
+QKDIndependentAdmissionVerification,PASS,"[OK] QKD-only admission/release dedicated/ip
+[OK] QKD-only admission/release dedicated/optical
+[OK] QKD-only admission/release tdm/optical"
+QKDJohannissonExactXciVerification,PASS,"l=8.6961% 
+victim=25.0 GHz source=12.5 GHz Eq15=1.608198e-01 Eq16=1.670541e-01 rel=3.8766% 
+victim=25.0 GHz source=25.0 GHz Eq15=3.237372e-01 Eq16=3.364722e-01 rel=3.9338% 
+victim=25.0 GHz source=32.0 GHz Eq15=4.167192e-01 Eq16=4.333221e-01 rel=3.9842% 
+victim=25.0 GHz source=50.0 GHz Eq15=6.652969e-01 Eq16=6.931472e-01 rel=4.1861% 
+PASS QKDJohannissonExactXciVerification: 16 two-dimensional cases"
+QKDJohannissonModeVerification,PASS,"PASS QKDJohannissonModeVerification
+XCI_12.5_GHz integral=0.154628292 logarithmic=0.167054085 difference=8.0359%"
+QKDJohannissonSciModeVerification,PASS,PASS QKDJohannissonSciModeVerification
+QKDJointAdmissionVerification,INCOMPLETE_CLASSPATH,"ntAdmissionVerification.main(QKDJointAdmissionVerification.java:26)
+Caused by: java.lang.ClassNotFoundException: com.google.gson.Gson
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	... 1 more"
+QKDKeyDemandVerification,STALE_BINARY_SOURCE_NOT_REBUILT,"Exception in thread ""main"" java.lang.AssertionError: AES-256 / 64 us: expected=4.0, actual=4.0E-6
+	at qkd.verification.QKDKeyDemandVerification.checkClose(QKDKeyDemandVerification.java:343)
+	at qkd.verification.QKDKeyDemandVerification.verifyReferenceDemandEquation(QKDKeyDemandVerification.java:55)
+	at qkd.verification.QKDKeyDemandVerification.main(QKDKeyDemandVerification.java:41)"
+QKDKeyIntervalSecondsVerification,PASS,"[OK] Single field updateIntervalSeconds, Moghaddam, Dibaj, byBitRate and validation"
+QKDKeyReferenceProfilesVerification,PASS,PASS QKDKeyReferenceProfilesVerification
+QKDLobatoPerLinkPichVerification,PASS,"PASS QKDLobatoPerLinkPichVerification
+ISO AB=0.40 ISO BC=0.60 h=4.1339396e-12 PIchPsd=1.2000000e-15"
+QKDLongitudinalGNVerification,PASS,PASS QKDLongitudinalGNVerification
+QKDLongitudinalXtVerification,PASS,PASS QKDLongitudinalXtVerification first=3.421457070738204E-5 attenuated=2.0843469173516786E-5
+QKDMetricsVerification,INCOMPLETE_CLASSPATH,"ication.QKDMetricsVerification.main(QKDMetricsVerification.java:36)
+Caused by: java.lang.ClassNotFoundException: com.google.gson.Gson
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	... 1 more"
+QKDMoghaddam2021UpgradeVerification,PASS,"[OK] FWM off/on: pBg=1.0E-8 -> 0.9999999999999999; QBER=0.015000067700421373 -> 0.5010769731570325; SKR=9.393337693839823E7 -> 0.0
+[OK] QKD 2021 upgrade: key, grid, PICh and QCh/FWM checks passed"
+QKDNativeArticleBaseVerification,INCOMPLETE_CLASSPATH,"icleBaseVerification.main(QKDNativeArticleBaseVerification.java:32)
+Caused by: java.lang.ClassNotFoundException: com.google.gson.Gson
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	... 2 more"
+QKDPhysicalVerification,PASS,"OK] alpha(1550 nm) = 0.18 dB/km
+[OK] Python reference SKR = 93.93937337526884 Mbit/s
+[OK] additional Python physical-layer reference points
+[OK] QTND reference optimum on 5-km grid = 25 km
+[OK] zero XT reproduces the multi-fiber baseline
+[OK] XT chain: PxtRx=1.0E-13 W -> pXT=2.340836805895038E-5 -> QBER=0.015158485793074801 -> SKR=93.54339669078391 Mbit/s
+QKD Part 1 verification: ALL CHECKS PASSED"
+QKDPichAdmissionSafetyVerification,PASS,PASS QKDPichAdmissionSafetyVerification
+QKDPichIntegratedAdmissionV15Verification,PASS,PASS QKDPichIntegratedAdmissionV15Verification
+QKDPichReceiverPowerVerification,PASS,PASS QKDPichReceiverPowerVerification
+QKDPichSharedClassicalQoTVerification,PASS,PASS QKDPichSharedClassicalQoTVerification
+QKDPichSnrAdmissionVerification,PASS,PASS QKDPichSnrAdmissionVerification
+QKDPriorityCorrectionsVerification,PASS,"[OK] contiguous QKDSpans contained within A-B
+[OK] rejected span crossing a SNetS node
+[OK] rejected noncontiguous spans
+[OK] rejected span beyond link endpoint
+PASS QKDPriorityCorrectionsVerification"
+QKDQualificationScenarioVerification,INCOMPLETE_CLASSPATH,"arioVerification.main(QKDQualificationScenarioVerification.java:75)
+Caused by: java.lang.ClassNotFoundException: com.google.gson.Gson
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	... 1 more"
+QKDReproducibilityVerification,PASS,"[OK] classical and QKD-enabled generators produce identical arrival/holding sequences for the same traffic seed
+[OK] QKD protection classification uses an independent reproducible random stream
+[OK] changing the replication-derived seed changes the stochastic realization
+
+QKD Part 17 reproducibility verification: ALL CHECKS PASSED"
+QKDRequestGenerationVerification,INCOMPLETE_CLASSPATH,"nerationVerification.main(QKDRequestGenerationVerification.java:26)
+Caused by: java.lang.ClassNotFoundException: com.google.gson.Gson
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	... 2 more"
+QKDRoutePhysicalEvaluationVerification,PASS,"an{index=1/2, logicalSource='QKD_TN[B->C:1]', logicalDestination='C', startKm=25.0, endKm=40.0, lengthKm=15.0}, PxtW=6.0E-14, pXt=1.4045086590291954E-5, QBER=0.01506412007135126, SKR_Mbps=143.00252796704422, viable=true}
+
+QKDRoutePhysicalResult{A->C, spans=6, minSKR_Mbps=93.54339669078391, maxQBER=0.015158485793074801, bottleneckSpanIndex=4, viable=true}
+
+QKD Part 7 verification: ALL CHECKS PASSED"
+QKDRoutePlanningVerification,PASS," A->B->C retained: 2 links, 3 nodes
+[OK] QKD route: 120 km -> 6 spans with QTND=25 km
+[OK] trusted relays: 4 virtual + 1 physical intermediate = 5
+[OK] QKD route planning accepts only QKD_PROTECTED requests
+
+QKDRoutePlan{A->C, physicalLinks=2, spans=6, virtualTrustedNodes=4, physicalIntermediateTrustedNodes=1, totalTrustedRelays=5, totalDistanceKm=120.0}
+
+QKD Part 6 verification: ALL CHECKS PASSED"
+QKDSameBandGuardVerification,PASS,PASS QKDSameBandGuardVerification
+QKDSharedAmplifierGainVerification,PASS,PASS QKDSharedAmplifierGainVerification
+QKDSpanGranularityVerification,INCOMPLETE_CLASSPATH,"ranularityVerification.main(QKDSpanGranularityVerification.java:43)
+Caused by: java.lang.ClassNotFoundException: com.google.gson.Gson
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	... 1 more"
+QKDSpectrumAllocationVerification,PASS,"e=0, spectrum=[3,5], slots=3, guardBand=0, coveredQkdSpans=4}
+     QKDChannelAllocation{B->C, core=0, spectrum=[6,8], slots=3, guardBand=0, coveredQkdSpans=2}
+[OK] session release restores the previous spectrum state
+[OK] allocation failure on a later link rolls back earlier QKD reservations
+     failure=Insufficient contiguous QKD spectrum on link <E,F>
+
+QKD Part 8 verification: ALL CHECKS PASSED"
+QKDStages12ContinuationVerification,PASS,PASS: QKDStages12ContinuationVerification
+QKDStages12Verification,PASS,PASS: QKDStages12Verification
+QKDThesisCrosstalkVerification,PASS,"PASS: Eq 3.36 and arithmetic of Eqs 3.33-3.35
+ISO thesis Fig 23, guard excluded: 0.40
+SNetS Spectrum keeps guard slots separate: confirmed
+PASS: SNetS Crosstalk engine == thesis Eq 3.33-3.38
+SNetS engine XT (dB): -67.81575877033917
+NOTE: per-link spectra and PICh spans validated by QKDLobatoPerLinkPichVerification"
+QKDThesisFiguresVerification,PASS,"spans,gn_normalized_db,egn_normalized_db
+1,30.145822690,28.086034039
+2,33.156122647,31.096333996
+5,37.135522734,35.075734083
+10,40.145822690,38.086034039
+20,43.156122647,41.096333996
+50,47.135522734,45.075734083
+PASS QKDThesisFiguresVerification (analytical reference; not end-to-end SNetS)"
+QKDThesisSNetSPhysicalLayerVerification,PASS,"SNetS engine Eq3.22: channels=15, B=32.000 GHz, PSD=2.01119256e-17, normalized=28.086036330 dB
+spans,engine_egn_normalized_db
+1,28.086036330
+2,31.096336286
+5,35.075736373
+10,38.086036330
+20,41.096336286
+50,45.075736373
+PASS QKDThesisSNetSPhysicalLayerVerification"
+QKDTopologyPlanningVerification,INCOMPLETE_CLASSPATH,"ngVerification.main(QKDTopologyPlanningVerification.java:43)
+Caused by: java.lang.ClassNotFoundException: com.google.gson.GsonBuilder
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	... 4 more"
+QKDUnifiedMultibandVerification,PASS,PASS QKDUnifiedMultibandVerification
+QKDv23LossAndBandVerification,PASS,"d band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+PASS longitudinal active-curve power optimum
+PASS QKDv23LossAndBandVerification"
+QKDv24CacheAndBoundaryVerification,PASS,"lected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+PASS v24 cache, PIch invalidation, mode=longitudinal
+PASS QKDv24CacheAndBoundaryVerification"
+QKDv24SaveStateVerification,PASS,"Nao foi possivel gravar progresso.json: java.lang.NoClassDefFoundError: com/google/gson/GsonBuilder
+Nao foi possivel gravar progresso.json: java.lang.NoClassDefFoundError: com/google/gson/GsonBuilder
+PASS v24 partial/finished checkpoint serialization and resume"
+QKDv25SharedNoiseFactorVerification,PASS,"uard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+QoT longitudinal=false saturated NF0=3940.469911264721 NF(Pin)=3459.039168269343
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+QoT longitudinal=true saturated NF0=3940.46991126472 NF(Pin)=3459.0391682693416
+PASS QKDv25SharedNoiseFactorVerification"
+QKDv26AseFrequencyParityVerification,PASS," band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+Guard band not selected.
+PASS QKDv26AseFrequencyParityVerification: 48 model comparisons, maxRel=5.81e-16"

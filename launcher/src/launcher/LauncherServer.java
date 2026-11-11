@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
  */
 public final class LauncherServer {
 
-    static final String VERSION = "1.21.2";
+    static final String VERSION = "1.25.0";
 
     private final Settings settings;
     private final Workspace workspace;
@@ -42,9 +42,6 @@ public final class LauncherServer {
     private final Figures figures;
     private final File webDir;
     private int port;
-    /** Parte 59: tray icon, window and close policy; updates from GitHub. */
-    private AppShell appShell;
-    private final AppUpdate update;
 
     private LauncherServer(Settings settings, File webDir) {
         this.settings = settings;
@@ -53,7 +50,6 @@ public final class LauncherServer {
         this.tools = new Tools(settings);
         this.figures = new Figures(settings);
         this.webDir = webDir;
-        this.update = new AppUpdate(settings);
     }
 
     public static void main(String[] args) throws Exception {
@@ -72,25 +68,12 @@ public final class LauncherServer {
             } else if ("--web".equals(a) && i + 1 < args.length) {
                 webDir = new File(args[++i]);
             } else if ("--help".equals(a) || "-h".equals(a)) {
-                System.out.println("java -jar snets-launcher.jar [--port 8765] [--project <pasta do SNetS>] "
+                System.out.println("java -jar snets-launcher.jar [--port 8766] [--project <pasta do SNetS>] "
                         + "[--no-browser]");
                 return;
             }
         }
         Settings settings = new Settings(Settings.detectLauncherDir());
-        // Parte 59: started without a console window (javaw): the messages go to launcher/launcher.log
-        if (System.console() == null && !"false".equalsIgnoreCase(System.getProperty("snets.logFile", "true"))) {
-            try {
-                java.io.PrintStream log = new java.io.PrintStream(new java.io.FileOutputStream(
-                        new File(settings.launcherDir(), "launcher.log"), true), true, "UTF-8");
-                log.println();
-                log.println("==== " + new java.util.Date());
-                System.setOut(log);
-                System.setErr(log);
-            } catch (IOException ignored) {
-                // keep the standard streams
-            }
-        }
         if (project != null) {
             settings.set("projectRoot", new File(project).getAbsolutePath());
         }
@@ -98,32 +81,7 @@ public final class LauncherServer {
         server.start(port, openBrowser);
     }
 
-    /** Parte 59: a launcher of this edition already answers on the port: open its window instead of a second one. */
-    private static boolean alreadyRunning(int port) {
-        try {
-            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("http://127.0.0.1:" + port + "/api/info").openConnection();
-            c.setConnectTimeout(800);
-            c.setReadTimeout(1500);
-            if (c.getResponseCode() != 200) return false;
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            try (InputStream in = c.getInputStream()) {
-                byte[] buf = new byte[4096];
-                int n;
-                while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
-            }
-            String body = new String(bos.toByteArray(), StandardCharsets.UTF_8);
-            return body.contains("\"simulatorJar\"") && body.contains("\"edition\":\"" + Edition.NAME + "\"");
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
     private void start(int requestedPort, boolean openBrowser) throws IOException {
-        if (!"false".equalsIgnoreCase(System.getProperty("snets.singleInstance", "true")) && alreadyRunning(requestedPort)) {
-            System.out.println("[launcher] já está aberto em http://localhost:" + requestedPort + "/ ; abrindo a janela");
-            if (openBrowser) AppShell.openWindow(settings, "http://localhost:" + requestedPort + "/");
-            System.exit(0);
-        }
         HttpServer http = null;
         IOException last = null;
         for (int p = requestedPort; p < requestedPort + 20; p++) {
@@ -150,8 +108,8 @@ public final class LauncherServer {
         System.out.println(" Projeto:     " + settings.projectRoot().getAbsolutePath());
         System.out.println(" Simulations: " + settings.simulationsDir().getAbsolutePath());
         System.out.println(" Interface:   " + url);
-        System.out.println(" Fechar esta janela (ou Encerrar no icone da bandeja) encerra o launcher e as execucoes.");
-        System.out.println(" Fechar a janela da interface segue a opcao de Configuracoes (padrao: continuar na bandeja).");
+        System.out.println(" Fechar esta janela encerra o launcher e as execucoes em andamento.");
+        System.out.println(" Fechar o navegador nao interrompe nada: reabra " + url);
         System.out.println("==============================================");
 
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
@@ -161,14 +119,12 @@ public final class LauncherServer {
             }
         }));
 
-        appShell = new AppShell(settings, runner, url); // Parte 59
-        appShell.start();
         if (openBrowser) {
-            AppShell.openWindow(settings, url);
+            openBrowser(url);
         }
     }
 
-    static void openBrowser(String url) {
+    private static void openBrowser(String url) {
         try {
             if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
                 Desktop.getDesktop().browse(new URI(url));
@@ -239,11 +195,10 @@ public final class LauncherServer {
                 requirePost(post);
                 Map<String, String> body = query(readBody(ex));
                 for (String key : new String[] {"projectRoot", "simulationsDir", "javaCommand", "defaultJar",
-                    "jvmArgs", "runConsole", "javacCommand", "appWindow", "closePolicy", "tray", "updateCheck",
-                    "updateToken", "updateRepo", "imagesDir"}) {
+                    "jvmArgs", "runConsole", "javacCommand"}) {
                     if (body.containsKey(key)) {
                         String v = body.get(key);
-                        if (("projectRoot".equals(key) || "simulationsDir".equals(key) || "imagesDir".equals(key)) && v != null
+                        if (("projectRoot".equals(key) || "simulationsDir".equals(key)) && v != null
                                 && !v.trim().isEmpty() && !new File(v.trim()).isDirectory()) {
                             throw new IllegalArgumentException("Pasta não encontrada: " + v);
                         }
@@ -253,45 +208,18 @@ public final class LauncherServer {
                 settings.save();
                 return settings.toMap();
             }
-            // ---------------------------------------------------------- Parte 59: application
-            case "/api/app/ping": {
-                if (appShell != null) appShell.ping(q.get("page"));
-                return appShell != null ? appShell.status() : ok();
-            }
-            case "/api/app/bye": {
-                if (appShell != null) appShell.bye(q.get("page"));
-                return ok();
-            }
-            case "/api/app/exit": {
+            // Selective experimental feature: native Windows/Linux/macOS folder chooser,
+            // only for the launcher's loopback-only UI. Manual input remains available in headless environments.
+            case "/api/pick": {
                 requirePost(post);
-                if (appShell == null) throw new IllegalStateException("Indisponível");
-                if ("whenDone".equals(q.get("mode"))) {
-                    appShell.exitWhenDone();
-                } else {
-                    appShell.exitNow("pedido da interface");
-                }
-                return ok();
-            }
-            case "/api/app/update-check": {
-                try {
-                    return update.check(VERSION);
-                } catch (IOException e) {
-                    throw new IllegalStateException(e.getMessage()); // no stack trace in the log
-                }
-            }
-            case "/api/app/update-download": {
-                requirePost(post);
-                Map<String, Object> m = ok();
-                m.put("file", update.download(required(q, "asset")));
-                return m;
-            }
-            case "/api/pick": { // Parte 60: folder or file chosen in the file explorer
-                requirePost(post);
-                Map<String, Object> m = ok();
-                String chosen = Picker.pick(q.get("mode"), q.get("start"), q.get("title"));
-                m.put("path", chosen);
-                m.put("cancelled", chosen == null);
-                return m;
+                String mode = q.get("mode");
+                if (!"folder".equals(mode) && !"file".equals(mode))
+                    throw new IllegalArgumentException("mode must be folder or file");
+                Map<String, Object> result = new LinkedHashMap<String, Object>();
+                String chosen = Picker.pick(mode, q.get("start"), q.get("title"));
+                result.put("path", chosen);
+                result.put("cancelled", chosen == null);
+                return result;
             }
             case "/api/tree":
                 return workspace.tree();
@@ -480,7 +408,6 @@ public final class LauncherServer {
                 return workspace.listFiles(q.get("path"));
             case "/api/runs":
                 return runner.list();
-            case "/api/run/output": // Parte 55: mesmo conteúdo; bloqueadores de anúncio barram URLs com "/log?"
             case "/api/run/log": {
                 int from = q.containsKey("from") ? Integer.parseInt(q.get("from")) : 0;
                 return runner.get(required(q, "id")).toMap(from);
@@ -522,16 +449,6 @@ public final class LauncherServer {
                 m.put("text", figures.read(required(q, "name")));
                 return m;
             }
-            case "/api/figure-styles": {
-                // Parte 55: padrão de aparência por tipo de gráfico (launcher/figure-styles.json)
-                if (post) {
-                    figures.saveStyles(readBody(ex));
-                    return ok();
-                }
-                Map<String, Object> m = new LinkedHashMap<String, Object>();
-                m.put("text", figures.readStyles());
-                return m;
-            }
             case "/api/figure/image": {
                 requirePost(post);
                 Map<String, Object> m = ok();
@@ -550,7 +467,7 @@ public final class LauncherServer {
             }
             case "/api/figures/open-folder": {
                 requirePost(post);
-                java.io.File d = figures.imagesDir(); // Parte 60
+                java.io.File d = figures.dir();
                 if (!d.isDirectory()) {
                     d.mkdirs();
                 }

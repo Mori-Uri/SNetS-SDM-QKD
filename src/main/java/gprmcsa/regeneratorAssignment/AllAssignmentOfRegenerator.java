@@ -31,6 +31,7 @@ public class AllAssignmentOfRegenerator implements RegeneratorAssignmentAlgorith
 			Node node = nodeList.get(i);
 
 			int numberRegeneratorsRequired = node.getRegenerators().getAmountOfRequiredRegenerators(circuit);
+
 			if(node.getRegenerators().canRegenerate(numberRegeneratorsRequired)){ // Check if you can regenerate
 
 				if(!regeneratorsNodesIndexList.contains(i)){ // Verifies that the node is no allocated to this connection

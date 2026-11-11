@@ -5,7 +5,6 @@ import java.io.Serializable;
 import network.Circuit;
 import network.ControlPlane;
 
-
 /**
  * This interface represents the DataSet structure
  */

@@ -74,16 +74,20 @@ public class ModulationUtilization extends Measurement {
 
 					// Number of circuits per modulation
 					Integer numCirc = numCircuitsPerMod.get(modName);
+
 					if (numCirc == null) numCirc = 0;
 					numCircuitsPerMod.put(modName, numCirc + 1);
 
 					// Number of circuits per modulation and bandwidth
 					HashMap<Double, Integer> numCircBw = numCircuitsPerModPerBw.get(modName);
+
 					if (numCircBw == null) {
 						numCircBw = new HashMap<>();
 						numCircuitsPerModPerBw.put(modName, numCircBw);
 					}
+
 					numCirc = numCircBw.get(bandwidth);
+
 					if (numCirc == null) numCirc = 0;
 					numCircBw.put(bandwidth, numCirc + 1);
 				}
@@ -107,7 +111,9 @@ public class ModulationUtilization extends Measurement {
     */
 	public double getPercentageCircuitsPerModulation(String modName){
 		Integer numCirc = numCircuitsPerMod.get(modName);
+
 		if(numCirc == null) numCirc = 0;
+
 		return (double)numCirc / (double)numObservations;
 	}
 
@@ -121,9 +127,11 @@ public class ModulationUtilization extends Measurement {
 	public double getPercentageCircuitPerModPerBw(String modName, double bandwidth){
 		Integer numCirc = 0;
 		HashMap<Double, Integer> numCircBw = numCircuitsPerModPerBw.get(modName);
+
 		if(numCircBw != null && numCircBw.get(bandwidth) != null){
 			numCirc = numCircBw.get(bandwidth);
 		}
+
 		return (double)numCirc / (double)numObservations;
 	}
 

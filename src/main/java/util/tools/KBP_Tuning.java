@@ -43,7 +43,7 @@ public class KBP_Tuning {
 	public static void main(String[] args) {
 
 		if(args.length == 0){
-            System.out.println("Error: Enter the simulation path");
+			System.out.println("Error: Enter the simulation path");
 
 		} else {
 
@@ -85,21 +85,26 @@ public class KBP_Tuning {
 
 		// Initializes the auxiliary weights with zero (0)
 		List<LinkConfig> linkList = networkConfig.getLinks();
+
 		for(LinkConfig link : linkList) {
 			String source = link.getSource();
 			String destination = link.getDestination();
 
 			Map<String, Double> kbpWeightsTemp = kbpWeights.get(source);
+
 			if(kbpWeightsTemp == null) {
 				kbpWeightsTemp = new HashMap<>();
 			}
+
 			kbpWeightsTemp.put(destination, 0.0);
 			kbpWeights.put(source, kbpWeightsTemp);
 
 			Map<String, Double> kbpWeightsFinalTemp = kbpWeightsFinal.get(source);
+
 			if(kbpWeightsFinalTemp == null) {
 				kbpWeightsFinalTemp = new HashMap<>();
 			}
+
 			kbpWeightsFinalTemp.put(destination, 0.0);
 			kbpWeightsFinal.put(source, kbpWeightsFinalTemp);
 		}
@@ -131,6 +136,7 @@ public class KBP_Tuning {
 			// Check whether a lower blocking result was achieved
 			BP = computePB(sm);
 			BPbyIteractions.add(BP);
+
 			if(BP <= BPmin) {
 				BPmin = BP; // Updates the lowest blocking value
 				bestIteration = i+1;
@@ -219,9 +225,11 @@ public class KBP_Tuning {
 		int lastLoadPoint = mainMeasuremens.size() -1; // Ultimo ponto de carga
 
 		int numMetrics = mainMeasuremens.get(lastLoadPoint).get(0).getMetrics().size();
+
 		for(int m = 0; m < numMetrics; m++){
 
 			Measurement metric = mainMeasuremens.get(lastLoadPoint).get(0).getMetrics().get(m);
+
 			if(metric instanceof BlockingProbability){
 
 				double sumPB = 0.0, contPB = 0.0;
@@ -261,9 +269,11 @@ public class KBP_Tuning {
 		int lastLoadPoint = mainMeasuremens.size() -1; // Ultimo ponto de carga
 
 		int numMetrics = mainMeasuremens.get(lastLoadPoint).get(0).getMetrics().size();
+
 		for(int m = 0; m < numMetrics; m++){
 
 			Measurement metric = mainMeasuremens.get(lastLoadPoint).get(0).getMetrics().get(m);
+
 			if(metric instanceof SpectrumUtilization){
 
 				List<LinkConfig> linkList = networkConfig.getLinks();
@@ -290,9 +300,11 @@ public class KBP_Tuning {
 					double mediaUEE = sumUEE / contUEE;
 
 					Map<String, Double> UEETemp = UEE.get(source);
+
 					if(UEETemp == null) {
 						UEETemp = new HashMap<>();
 					}
+
 					UEETemp.put(destination, mediaUEE);
 					UEE.put(source, UEETemp);
 				}
@@ -311,11 +323,11 @@ public class KBP_Tuning {
 	 */
 	public static NetworkConfig loadNetworkConfig(String path) {
 		File f = new File(path);
-        String name = f.getName();
-        String pathFile = f.getAbsoluteFile().getParentFile().getPath();
+		String name = f.getName();
+		String pathFile = f.getAbsoluteFile().getParentFile().getPath();
 
-        SimulationFileManager sfm = new SimulationFileManager();
-        SimulationRequest sr = null;
+		SimulationFileManager sfm = new SimulationFileManager();
+		SimulationRequest sr = null;
 
 		try {
 			sr = sfm.readSimulation(pathFile, name);
@@ -323,9 +335,9 @@ public class KBP_Tuning {
 			e.printStackTrace();
 		}
 
-        NetworkConfig networkConfig = sr.getNetworkConfig();
+		NetworkConfig networkConfig = sr.getNetworkConfig();
 
-        return networkConfig;
+		return networkConfig;
 	}
 
 	/**
@@ -337,11 +349,11 @@ public class KBP_Tuning {
 	public static void createLinkWeightFile(String path, String fileName, Map<String, Map<String, Double>> kbpWeights) {
 
 		File f = new File(path);
-        String name = f.getName();
-        String pathFile = f.getAbsoluteFile().getParentFile().getPath();
+		String name = f.getName();
+		String pathFile = f.getAbsoluteFile().getParentFile().getPath();
 
-        SimulationFileManager sfm = new SimulationFileManager();
-        SimulationRequest sr = null;
+		SimulationFileManager sfm = new SimulationFileManager();
+		SimulationRequest sr = null;
 
 		try {
 			sr = sfm.readSimulation(pathFile, name);
@@ -349,12 +361,12 @@ public class KBP_Tuning {
 			e.printStackTrace();
 		}
 
-        sr.getOthersConfig().setKbpWeights(kbpWeights); // Updates the new weights
+		sr.getOthersConfig().setKbpWeights(kbpWeights); // Updates the new weights
 
-        // Saves the new configuration of the others file
-        Gson gson = new GsonBuilder().create();
-        String p = path + separator + fileName;
-        saveFile(p, gson.toJson(sr.getOthersConfig()));
+		// Saves the new configuration of the others file
+		Gson gson = new GsonBuilder().create();
+		String p = path + separator + fileName;
+		saveFile(p, gson.toJson(sr.getOthersConfig()));
 	}
 
 	/**
@@ -365,11 +377,11 @@ public class KBP_Tuning {
 	public static void loadLinkWeightFile(String path, Map<String, Map<String, Double>> kbpWeights) {
 
 		File f = new File(path);
-        String name = f.getName();
-        String pathFile = f.getAbsoluteFile().getParentFile().getPath();
+		String name = f.getName();
+		String pathFile = f.getAbsoluteFile().getParentFile().getPath();
 
-        SimulationFileManager sfm = new SimulationFileManager();
-        SimulationRequest sr = null;
+		SimulationFileManager sfm = new SimulationFileManager();
+		SimulationRequest sr = null;
 
 		try {
 			sr = sfm.readSimulation(pathFile, name);
@@ -377,14 +389,14 @@ public class KBP_Tuning {
 			e.printStackTrace();
 		}
 
-        Map<String, Map<String, Double>> kbpWeightsFile = sr.getOthersConfig().getKbpWeights(); // File weights
+		Map<String, Map<String, Double>> kbpWeightsFile = sr.getOthersConfig().getKbpWeights(); // File weights
 
-        for(String source : kbpWeightsFile.keySet()) {
-        	for(String destination : kbpWeightsFile.get(source).keySet()) {
-        		Double value = kbpWeightsFile.get(source).get(destination);
-        		kbpWeights.get(source).put(destination, value);
-        	}
-        }
+		for(String source : kbpWeightsFile.keySet()) {
+			for(String destination : kbpWeightsFile.get(source).keySet()) {
+				Double value = kbpWeightsFile.get(source).get(destination);
+				kbpWeights.get(source).put(destination, value);
+			}
+		}
 
 	}
 
@@ -394,22 +406,23 @@ public class KBP_Tuning {
 	 * @param BPbyIteractions the BPbyIteractions.
 	 */
 	public static void saveBPbyIteractionsFile(String path, List<Double> BPbyIteractions) {
-        Gson gson = new GsonBuilder().create();
-        String p = path + separator + "BPbyIteractions.txt";
-        saveFile(p, gson.toJson(BPbyIteractions));
+		Gson gson = new GsonBuilder().create();
+		String p = path + separator + "BPbyIteractions.txt";
+		saveFile(p, gson.toJson(BPbyIteractions));
 
-        // Saving to a CSV file
-        String sep = ",";
-        StringBuilder res = new StringBuilder();
+		// Saving to a CSV file
+		String sep = ",";
+		StringBuilder res = new StringBuilder();
 
-        res.append("Iteration" + sep + "Blocking probability" + "\n");
-        for(int i = 0; i < BPbyIteractions.size(); i++) {
-        	Double bp = BPbyIteractions.get(i);
-        	res.append((i+1) + sep + bp  + "\n");
-        }
+		res.append("Iteration" + sep + "Blocking probability" + "\n");
 
-        String p2 = path + separator + "BPbyIteractions.csv";
-        saveFile(p2, res.toString());
+		for(int i = 0; i < BPbyIteractions.size(); i++) {
+			Double bp = BPbyIteractions.get(i);
+			res.append((i+1) + sep + bp  + "\n");
+		}
+
+		String p2 = path + separator + "BPbyIteractions.csv";
+		saveFile(p2, res.toString());
 	}
 
 	/**
@@ -418,16 +431,16 @@ public class KBP_Tuning {
 	 * @param value the value.
 	 */
 	private static void saveFile(String path, String value) {
-        if(value==null) return;
+		if(value==null) return;
 
-        FileWriter fw = null;
+		FileWriter fw = null;
 
-        try {
+		try {
 			fw = new FileWriter(new File(path));
 			fw.write(value);
-	        fw.close();
+			fw.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-    }
+	}
 }

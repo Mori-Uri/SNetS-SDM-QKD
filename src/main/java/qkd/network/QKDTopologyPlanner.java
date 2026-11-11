@@ -18,145 +18,153 @@ import simulationControl.parsers.NetworkConfig.LinkConfig;
  */
 public final class QKDTopologyPlanner {
 
-    private static final double EPSILON_KM = 1e-9;
+	private static final double EPSILON_KM = 1e-9;
 
-    /**
+	/**
      * Creates a complete QKD topology plan from the parsed {@code network}
      * configuration.
      */
-    public QKDTopologyPlan plan(NetworkConfig networkConfig) {
-        if (networkConfig == null) {
-            throw new IllegalArgumentException("networkConfig cannot be null");
-        }
+	public QKDTopologyPlan plan(NetworkConfig networkConfig) {
+		if (networkConfig == null) {
+			throw new IllegalArgumentException("networkConfig cannot be null");
+		}
 
-        final QKDNetworkParameters parameters =
-                QKDNetworkParameters.from(networkConfig);
+		final QKDNetworkParameters parameters =
+				QKDNetworkParameters.from(networkConfig);
 
-        if (!parameters.isEnabled()) {
-            return new QKDTopologyPlan(
-                    parameters,
-                    Collections.<QKDLinkPlan>emptyList());
-        }
+		if (!parameters.isEnabled()) {
+			return new QKDTopologyPlan(
+					parameters,
+					Collections.<QKDLinkPlan>emptyList());
+		}
 
-        final List<LinkConfig> configuredLinks = networkConfig.getLinks();
-        if (configuredLinks == null || configuredLinks.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "network.links cannot be null/empty when QKD is enabled");
-        }
+		final List<LinkConfig> configuredLinks = networkConfig.getLinks();
 
-        final List<QKDLinkPlan> linkPlans =
-                new ArrayList<QKDLinkPlan>(configuredLinks.size());
+		if (configuredLinks == null || configuredLinks.isEmpty()) {
+			throw new IllegalArgumentException(
+					"network.links cannot be null/empty when QKD is enabled");
+		}
 
-        for (LinkConfig link : configuredLinks) {
-            if (link == null) {
-                throw new IllegalArgumentException(
-                        "network.links cannot contain null when QKD is enabled");
-            }
-            linkPlans.add(planLink(
-                    link.getSource(),
-                    link.getDestination(),
-                    link.getSize(),
-                    // Parte 39: per-link trusted-node rule (network.qkd.trustedNodeMode = "perLink")
-                    networkConfig.getQkd() == null ? parameters.getQtndKm()
-                            : networkConfig.getQkd().qtndForLink(link.getSource(), link.getDestination(), link.getSize())));
-        }
+		final List<QKDLinkPlan> linkPlans =
+				new ArrayList<QKDLinkPlan>(configuredLinks.size());
 
-        return new QKDTopologyPlan(parameters, linkPlans);
-    }
+		for (LinkConfig link : configuredLinks) {
+			if (link == null) {
+				throw new IllegalArgumentException(
+						"network.links cannot contain null when QKD is enabled");
+			}
 
-    /**
+			linkPlans.add(planLink(
+					link.getSource(),
+					link.getDestination(),
+					link.getSize(),
+					// Parte 39: per-link trusted-node rule (network.qkd.trustedNodeMode = "perLink")
+					networkConfig.getQkd() == null ? parameters.getQtndKm()
+							: networkConfig.getQkd().qtndForLink(link.getSource(), link.getDestination(), link.getSize())));
+		}
+
+		return new QKDTopologyPlan(parameters, linkPlans);
+	}
+
+	/**
      * Splits one physical link into consecutive spans of at most QTND km.
      *
      * <p>Example: distance=80 km and QTND=25 km generates
      * 25 + 25 + 25 + 5 km.</p>
      */
-    public QKDLinkPlan planLink(String source, String destination,
-            double distanceKm, double qtndKm) {
+	public QKDLinkPlan planLink(String source, String destination,
+			double distanceKm, double qtndKm) {
 
-        if (source == null || source.trim().isEmpty()) {
-            throw new IllegalArgumentException("source cannot be blank");
-        }
-        if (destination == null || destination.trim().isEmpty()) {
-            throw new IllegalArgumentException("destination cannot be blank");
-        }
-        if (!Double.isFinite(distanceKm) || distanceKm <= 0.0) {
-            throw new IllegalArgumentException(
-                    "link distance must be finite and > 0");
-        }
-        if (!Double.isFinite(qtndKm) || qtndKm <= 0.0) {
-            throw new IllegalArgumentException("QTND must be finite and > 0");
-        }
+		if (source == null || source.trim().isEmpty()) {
+			throw new IllegalArgumentException("source cannot be blank");
+		}
 
-        final int totalSpans = calculateSpanCount(distanceKm, qtndKm);
-        final List<QKDSpan> spans = new ArrayList<QKDSpan>(totalSpans);
+		if (destination == null || destination.trim().isEmpty()) {
+			throw new IllegalArgumentException("destination cannot be blank");
+		}
 
-        for (int i = 0; i < totalSpans; i++) {
-            final double startKm = Math.min(distanceKm, i * qtndKm);
-            final double endKm = (i == totalSpans - 1)
-                    ? distanceKm
-                    : Math.min(distanceKm, (i + 1) * qtndKm);
+		if (!Double.isFinite(distanceKm) || distanceKm <= 0.0) {
+			throw new IllegalArgumentException(
+					"link distance must be finite and > 0");
+		}
 
-            if (endKm - startKm <= EPSILON_KM) {
-                throw new IllegalStateException(
-                        "generated zero-length QKD span for "
-                        + source + "->" + destination);
-            }
+		if (!Double.isFinite(qtndKm) || qtndKm <= 0.0) {
+			throw new IllegalArgumentException("QTND must be finite and > 0");
+		}
 
-            final String logicalSource = (i == 0)
-                    ? source
-                    : virtualTrustedNodeName(source, destination, i);
-            final String logicalDestination = (i == totalSpans - 1)
-                    ? destination
-                    : virtualTrustedNodeName(source, destination, i + 1);
+		final int totalSpans = calculateSpanCount(distanceKm, qtndKm);
+		final List<QKDSpan> spans = new ArrayList<QKDSpan>(totalSpans);
 
-            spans.add(new QKDSpan(
-                    source,
-                    destination,
-                    i,
-                    totalSpans,
-                    startKm,
-                    endKm,
-                    logicalSource,
-                    logicalDestination));
-        }
+		for (int i = 0; i < totalSpans; i++) {
+			final double startKm = Math.min(distanceKm, i * qtndKm);
+			final double endKm = (i == totalSpans - 1)
+					? distanceKm
+					: Math.min(distanceKm, (i + 1) * qtndKm);
 
-        return new QKDLinkPlan(
-                source,
-                destination,
-                distanceKm,
-                qtndKm,
-                spans);
-    }
+			if (endKm - startKm <= EPSILON_KM) {
+				throw new IllegalStateException(
+						"generated zero-length QKD span for "
+						+ source + "->" + destination);
+			}
 
-    public static int calculateSpanCount(double distanceKm, double qtndKm) {
-        if (!Double.isFinite(distanceKm) || distanceKm <= 0.0) {
-            throw new IllegalArgumentException(
-                    "distanceKm must be finite and > 0");
-        }
-        if (!Double.isFinite(qtndKm) || qtndKm <= 0.0) {
-            throw new IllegalArgumentException("qtndKm must be finite and > 0");
-        }
+			final String logicalSource = (i == 0)
+					? source
+					: virtualTrustedNodeName(source, destination, i);
+			final String logicalDestination = (i == totalSpans - 1)
+					? destination
+					: virtualTrustedNodeName(source, destination, i + 1);
 
-        /*
+			spans.add(new QKDSpan(
+					source,
+					destination,
+					i,
+					totalSpans,
+					startKm,
+					endKm,
+					logicalSource,
+					logicalDestination));
+		}
+
+		return new QKDLinkPlan(
+				source,
+				destination,
+				distanceKm,
+				qtndKm,
+				spans);
+	}
+
+	public static int calculateSpanCount(double distanceKm, double qtndKm) {
+		if (!Double.isFinite(distanceKm) || distanceKm <= 0.0) {
+			throw new IllegalArgumentException(
+					"distanceKm must be finite and > 0");
+		}
+
+		if (!Double.isFinite(qtndKm) || qtndKm <= 0.0) {
+			throw new IllegalArgumentException("qtndKm must be finite and > 0");
+		}
+
+		/*
          * Subtracting a very small epsilon avoids creating an accidental
          * additional residual span for exact multiples such as 75/25 when a
          * floating-point representation lands infinitesimally above 3.0.
          */
-        final double ratio = distanceKm / qtndKm;
-        final int spans = (int) Math.ceil(ratio - 1e-12);
-        return Math.max(1, spans);
-    }
+		final double ratio = distanceKm / qtndKm;
+		final int spans = (int) Math.ceil(ratio - 1e-12);
 
-    /**
+		return Math.max(1, spans);
+	}
+
+	/**
      * Diagnostic identity for a logical trusted boundary inside one directed
      * physical link. It is not inserted into the classical SNetS node list.
      */
-    public static String virtualTrustedNodeName(String source,
-            String destination, int oneBasedIndex) {
-        if (oneBasedIndex <= 0) {
-            throw new IllegalArgumentException("oneBasedIndex must be > 0");
-        }
-        return "QKD_TN[" + source + "->" + destination + ":"
-                + oneBasedIndex + "]";
-    }
+	public static String virtualTrustedNodeName(String source,
+			String destination, int oneBasedIndex) {
+		if (oneBasedIndex <= 0) {
+			throw new IllegalArgumentException("oneBasedIndex must be > 0");
+		}
+
+		return "QKD_TN[" + source + "->" + destination + ":"
+				+ oneBasedIndex + "]";
+	}
 }

@@ -63,6 +63,7 @@ public class CASDPushPull implements ReallocationAlgorithmInterface {
 						//list of circuits on the core
 						for (Circuit circuitAtivo : core.getCircuitList()) {
 							// System.out.println(circuitAtivo);
+
 							for (int i = 0; i <= 6; i++) {
 								if (core.getId() != i) {
 									List<int[]> composition = IntersectionFreeSpectrum.merge(circuitAtivo.getRoute(), circuitAtivo.getGuardBand(), i);
@@ -74,12 +75,14 @@ public class CASDPushPull implements ReallocationAlgorithmInterface {
 											// ssdc
 											// creating a copy of the circuit
 											Circuit circuitoTeste = new Circuit();
+
 											try {
 												circuitoTeste = circuitAtivo.clone();
 											} catch (CloneNotSupportedException e1) {
 												// TODO Auto-generated catch block
 												e1.printStackTrace();
 											}
+
 											try {
 												// releaseSpectrum(circ, circ.getSpectrumAssigned(),
 												// circ.getRoute().getLinkList(), circ.getGuardBand());
@@ -90,6 +93,7 @@ public class CASDPushPull implements ReallocationAlgorithmInterface {
 											}
 
 											circuitoTeste.setIndexCore(i);
+
 											try {
 												if (controlPlane.isAdmissibleQualityOfTransmission(circuitoTeste)) {
 													if (controlPlane.isAdmissibleCrosstalk(circuitoTeste)) {
@@ -104,12 +108,15 @@ public class CASDPushPull implements ReallocationAlgorithmInterface {
 														} else {
 															controlPlane.allocateCircuit(circuitAtivo);
 														}
+
 													} else {
 														controlPlane.allocateCircuit(circuitAtivo);
 													}
+
 												} else {
 													controlPlane.allocateCircuit(circuitAtivo);
 												}
+
 											} catch (Exception e) {
 												// TODO Auto-generated catch block
 												e.printStackTrace();

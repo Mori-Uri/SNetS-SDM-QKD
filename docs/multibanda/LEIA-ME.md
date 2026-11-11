@@ -18,8 +18,6 @@ Os artigos ficam em `docs/artigos/` (fora do git). Onde baixar: `docs/artigos/LE
 Como ativar MF, MB e MB-SDM no simulador, os modelos de Raman e as hipóteses: `SIMULACAO_MULTIBANDA.md` (Parte 43).
 Casos de exemplo: `simulations/QKD_Multibanda/`.
 
-QoT clássica por banda e ISRS (Parte 49): `QOT_CLASSICA_POR_BANDA.md`. Casos iniciais: `simulations/QKD_Multibanda_Parte49/`.
-
 ## Calculadora de enlace
 
 Física de um trecho QKD fora do simulador de rede: MF (fibra escura), MB (comb C+L no mesmo núcleo) ou MB-SDM

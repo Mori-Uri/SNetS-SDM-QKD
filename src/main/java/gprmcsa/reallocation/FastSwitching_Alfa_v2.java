@@ -131,6 +131,7 @@ public class FastSwitching_Alfa_v2 implements ReallocationAlgorithmInterface {
 
 		// populate the list of non-adjacent cores
 		ArrayList<Core> coreList = requisicao.getRoute().getLinkList().get(0).getCores();
+
 		for (Core c : coreList) {
 			if (!coresAdjacents.contains(c) && c.getId() != requisicao.getIndexCore()) {
 				this.coresNoAdjacents.add(c);

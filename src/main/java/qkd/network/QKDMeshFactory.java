@@ -18,83 +18,88 @@ import simulationControl.parsers.TrafficConfig;
  */
 public final class QKDMeshFactory {
 
-    private QKDMeshFactory() {
-    }
+	private QKDMeshFactory() {
+	}
 
-    public static Mesh create(NetworkConfig networkConfig,
-            TrafficConfig trafficConfig,
-            PhysicalLayerConfig physicalLayerConfig,
-            OthersConfig othersConfig,
-            HashMap<String, HashMap<Double, Double>> modulationDistances,
-            Util util,
-            SimulationConfig simulationConfig) {
-        return create(networkConfig, trafficConfig, physicalLayerConfig,
-                othersConfig, modulationDistances, util, simulationConfig, 0, 0);
-    }
+	public static Mesh create(NetworkConfig networkConfig,
+			TrafficConfig trafficConfig,
+			PhysicalLayerConfig physicalLayerConfig,
+			OthersConfig othersConfig,
+			HashMap<String, HashMap<Double, Double>> modulationDistances,
+			Util util,
+			SimulationConfig simulationConfig) {
+		return create(networkConfig, trafficConfig, physicalLayerConfig,
+				othersConfig, modulationDistances, util, simulationConfig, 0, 0);
+	}
 
-    /** Creates reproducible, independent streams per load point/replication. */
-    public static Mesh create(NetworkConfig networkConfig,
-            TrafficConfig trafficConfig,
-            PhysicalLayerConfig physicalLayerConfig,
-            OthersConfig othersConfig,
-            HashMap<String, HashMap<Double, Double>> modulationDistances,
-            Util util,
-            SimulationConfig simulationConfig,
-            int loadPoint, int replication) {
+	/** Creates reproducible, independent streams per load point/replication. */
+	public static Mesh create(NetworkConfig networkConfig,
+			TrafficConfig trafficConfig,
+			PhysicalLayerConfig physicalLayerConfig,
+			OthersConfig othersConfig,
+			HashMap<String, HashMap<Double, Double>> modulationDistances,
+			Util util,
+			SimulationConfig simulationConfig,
+			int loadPoint, int replication) {
 
-        long offset = ((long) loadPoint) * 100000L + (long) replication;
-        Long trafficSeed = null;
-        if (simulationConfig != null && simulationConfig.getTrafficRandomSeed() != null) {
-            trafficSeed = Long.valueOf(simulationConfig.getTrafficRandomSeed().longValue() + offset);
-        }
+		long offset = ((long) loadPoint) * 100000L + (long) replication;
+		Long trafficSeed = null;
 
-        if (isQkdEnabled(networkConfig)) {
-            if (simulationConfig == null) {
-                throw new IllegalArgumentException(
-                        "simulationConfig cannot be null for a QKD simulation");
-            }
+		if (simulationConfig != null && simulationConfig.getTrafficRandomSeed() != null) {
+			trafficSeed = Long.valueOf(simulationConfig.getTrafficRandomSeed().longValue() + offset);
+		}
 
-            SimulationConfig.QKDKeyDemandConfig keyConfig =
-                    simulationConfig.getQkdKeyDemand();
+		if (isQkdEnabled(networkConfig)) {
+			if (simulationConfig == null) {
+				throw new IllegalArgumentException(
+						"simulationConfig cannot be null for a QKD simulation");
+			}
 
-            QKDKeyDemandPolicy keyDemandPolicy = new QKDKeyDemandPolicy(
-                    keyConfig.getKeySizeBits(),
-                    keyConfig.getUpdateIntervalsMicroseconds(),
-                    keyConfig.getRandomSeed() + offset);
-            if (keyConfig.isByBitRate()) keyDemandPolicy.requestByBitRate(keyConfig.getKeyRateMbpsByBitRate());
+			SimulationConfig.QKDKeyDemandConfig keyConfig =
+					simulationConfig.getQkdKeyDemand();
 
-            QKDMesh qkdMesh = new QKDMesh(
-                    networkConfig,
-                    trafficConfig,
-                    physicalLayerConfig,
-                    othersConfig,
-                    modulationDistances,
-                    util,
-                    simulationConfig.getQkdProtectedRequestProbability(),
-                    keyDemandPolicy,
-                    trafficSeed,
-                    simulationConfig.getQkdProtectionRandomSeed() + offset);
-            qkdMesh.setQkdWarmupArrivals(simulationConfig.getQkdWarmupFraction()
-                    * simulationConfig.getRequests());
-            if (simulationConfig.isQkdExactRequestCount()) {
-                qkdMesh.setExactArrivalLimit(simulationConfig.getRequests());
-            }
-            return qkdMesh;
-        }
+			QKDKeyDemandPolicy keyDemandPolicy = new QKDKeyDemandPolicy(
+					keyConfig.getKeySizeBits(),
+					keyConfig.getUpdateIntervalSeconds(),
+					keyConfig.getRandomSeed() + offset);
 
-        return new Mesh(
-                networkConfig,
-                trafficConfig,
-                physicalLayerConfig,
-                othersConfig,
-                modulationDistances,
-                util,
-                trafficSeed);
-    }
+			keyDemandPolicy.setPreferGeneratorFixedRate(keyConfig.isPreferGeneratorFixedRate());
+			if (keyConfig.isByBitRate()) keyDemandPolicy.requestByBitRate(keyConfig.getKeyRateMbpsByBitRate());
 
-    public static boolean isQkdEnabled(NetworkConfig networkConfig) {
-        return networkConfig != null
-                && networkConfig.getQkd() != null
-                && networkConfig.getQkd().isEnabled();
-    }
+			QKDMesh qkdMesh = new QKDMesh(
+					networkConfig,
+					trafficConfig,
+					physicalLayerConfig,
+					othersConfig,
+					modulationDistances,
+					util,
+					simulationConfig.getQkdProtectedRequestProbability(),
+					keyDemandPolicy,
+					trafficSeed,
+					simulationConfig.getQkdProtectionRandomSeed() + offset);
+			qkdMesh.setQkdWarmupArrivals(simulationConfig.getQkdWarmupFraction()
+					* simulationConfig.getRequests());
+
+			if (simulationConfig.isQkdExactRequestCount()) {
+				qkdMesh.setExactArrivalLimit(simulationConfig.getRequests());
+			}
+
+			return qkdMesh;
+		}
+
+		return new Mesh(
+				networkConfig,
+				trafficConfig,
+				physicalLayerConfig,
+				othersConfig,
+				modulationDistances,
+				util,
+				trafficSeed);
+	}
+
+	public static boolean isQkdEnabled(NetworkConfig networkConfig) {
+		return networkConfig != null
+				&& networkConfig.getQkd() != null
+				&& networkConfig.getQkd().isEnabled();
+	}
 }

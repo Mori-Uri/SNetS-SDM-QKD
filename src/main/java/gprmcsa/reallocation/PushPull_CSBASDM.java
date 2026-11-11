@@ -120,6 +120,7 @@ public class PushPull_CSBASDM implements ReallocationAlgorithmInterface {
 			}
 
 		}
+
 		if (indexNucleo == 2 || indexNucleo == 4 || indexNucleo == 6) {
 			// sorting the circuit list
 			sortListCircuits.sortIndexSlot(selectedCircuits, "indiceslotdecrescente");
@@ -161,26 +162,31 @@ public class PushPull_CSBASDM implements ReallocationAlgorithmInterface {
 				System.out.println(circuit.getRoute().getDistanceAllLinks());
 			}
 		}
+
 		if (criterio.equals("crosstalk")) {
 			for (Circuit circuit : selectedCircuits) {
 				System.out.println(circuit.getXt());
 			}
 		}
+
 		if (criterio.equals("deltacrosstalk")) {
 			for (Circuit circuit : selectedCircuits) {
 				System.out.println((-1) * (circuit.getXt() - circuit.getModulation().getXTthreshold()));
 			}
 		}
+
 		if (criterio.equals("recurso")) {
 			for (Circuit circuit : selectedCircuits) {
 				System.out.println(circuit.getRoute().getHops() * circuit.getSpectrumAssigned().length);
 			}
 		}
+
 		if (criterio.equals("indiceslot")) {
 			for (Circuit circuit : selectedCircuits) {
 				System.out.println(circuit.getSpectrumAssigned()[0]);
 			}
 		}
+
 		if (criterio.equals("core")) {
 			for (Circuit circuit : selectedCircuits) {
 				System.out.println(circuit.getIndexCore());
@@ -221,7 +227,7 @@ public class PushPull_CSBASDM implements ReallocationAlgorithmInterface {
 		cCopia.setIndexCore(c.getIndexCore());
 		cCopia.setSpectrumAssigned(c.getSpectrumAssigned());
 
-		cCopia.setSNR(c.getSNR());
+		cCopia.setOSNR(c.getOSNR());
 		cCopia.setQoT(c.isQoT());
 		cCopia.setQoTForOther(c.isQoTForOther());
 		cCopia.setXt(c.getXt());

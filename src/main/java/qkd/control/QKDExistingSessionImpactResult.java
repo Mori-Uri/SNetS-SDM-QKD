@@ -11,71 +11,77 @@ import java.util.List;
  */
 public final class QKDExistingSessionImpactResult implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private final List<QKDSessionImpact> impacts;
-    private final int affectedSessions;
-    private final int violatedSessions;
+	private final List<QKDSessionImpact> impacts;
+	private final int affectedSessions;
+	private final int violatedSessions;
 
-    public QKDExistingSessionImpactResult(List<QKDSessionImpact> impacts) {
-        if (impacts == null) {
-            throw new IllegalArgumentException("impacts cannot be null");
-        }
-        this.impacts = Collections.unmodifiableList(
-                new ArrayList<QKDSessionImpact>(impacts));
+	public QKDExistingSessionImpactResult(List<QKDSessionImpact> impacts) {
+		if (impacts == null) {
+			throw new IllegalArgumentException("impacts cannot be null");
+		}
 
-        int affected = 0;
-        int violated = 0;
-        for (QKDSessionImpact impact : impacts) {
-            if (impact == null) {
-                throw new IllegalArgumentException("impacts cannot contain null");
-            }
-            if (impact.isAffected()) {
-                affected++;
-            }
-            if (!impact.remainsViable()) {
-                violated++;
-            }
-        }
-        this.affectedSessions = affected;
-        this.violatedSessions = violated;
-    }
+		this.impacts = Collections.unmodifiableList(
+				new ArrayList<QKDSessionImpact>(impacts));
 
-    public List<QKDSessionImpact> getImpacts() {
-        return impacts;
-    }
+		int affected = 0;
+		int violated = 0;
 
-    public int getSessionsEvaluated() {
-        return impacts.size();
-    }
+		for (QKDSessionImpact impact : impacts) {
+			if (impact == null) {
+				throw new IllegalArgumentException("impacts cannot contain null");
+			}
 
-    public int getAffectedSessions() {
-        return affectedSessions;
-    }
+			if (impact.isAffected()) {
+				affected++;
+			}
 
-    public int getViolatedSessions() {
-        return violatedSessions;
-    }
+			if (!impact.remainsViable()) {
+				violated++;
+			}
+		}
 
-    public boolean isAdmissible() {
-        return violatedSessions == 0;
-    }
+		this.affectedSessions = affected;
+		this.violatedSessions = violated;
+	}
 
-    public QKDSessionImpact getFirstViolation() {
-        for (QKDSessionImpact impact : impacts) {
-            if (!impact.remainsViable()) {
-                return impact;
-            }
-        }
-        return null;
-    }
+	public List<QKDSessionImpact> getImpacts() {
+		return impacts;
+	}
 
-    @Override
-    public String toString() {
-        return "QKDExistingSessionImpactResult{evaluated=" + getSessionsEvaluated()
-                + ", affected=" + affectedSessions
-                + ", violated=" + violatedSessions
-                + ", admissible=" + isAdmissible()
-                + '}';
-    }
+	public int getSessionsEvaluated() {
+		return impacts.size();
+	}
+
+	public int getAffectedSessions() {
+		return affectedSessions;
+	}
+
+	public int getViolatedSessions() {
+		return violatedSessions;
+	}
+
+	public boolean isAdmissible() {
+		return violatedSessions == 0;
+	}
+
+	public QKDSessionImpact getFirstViolation() {
+		for (QKDSessionImpact impact : impacts) {
+			if (!impact.remainsViable()) {
+				return impact;
+			}
+		}
+
+		return null;
+	}
+
+	@Override
+	public String toString() {
+		return "QKDExistingSessionImpactResult{evaluated=" + getSessionsEvaluated()
+				+ ", affected=" + affectedSessions
+				+ ", violated=" + violatedSessions
+				+ ", admissible=" + isAdmissible()
+				+ '}';
+	}
 }

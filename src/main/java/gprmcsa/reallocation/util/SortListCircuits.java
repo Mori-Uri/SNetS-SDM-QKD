@@ -28,6 +28,7 @@ public class SortListCircuits implements java.io.Serializable {
 	public void sort(ArrayList<Circuit> circuits, String criterion, ControlPlane cp) {
 
 		Collections.sort(circuits, new Comparator<Circuit>() {
+
 			/**
 			 * Returns the compare.
 			 * @param o1 the o1.
@@ -50,22 +51,27 @@ public class SortListCircuits implements java.io.Serializable {
 				if (criterion.equals("hops")) {
 					return (double) le.getRoute().getHops();
 				}
+
 				// route distance
 				if (criterion.equals("distance")) {
 					return le.getRoute().getDistanceAllLinks();
 				}
+
 				// circuit crosstalk value
 				if (criterion.equals("crosstalk")) {
 					return le.getXt();
 				}
+
 				// delta crosstalk value of the circuit
 				if (criterion.equals("deltacrosstalk")) {
 					return (-1) * (le.getXt() - le.getModulation().getXTthreshold());
 				}
+
 				// resource used in the circuit (number of slots x route hops)
 				return (double) (le.getRoute().getHops() * le.getSpectrumAssigned().length);
 
 			}
+
 		});
 	}
 
@@ -77,6 +83,7 @@ public class SortListCircuits implements java.io.Serializable {
 	public void sortIndexSlot(ArrayList<Circuit> circuits, String criterion) {
 
 		Collections.sort(circuits, new Comparator<Circuit>() {
+
 			/**
 			 * Returns the compare.
 			 * @param o1 the o1.
@@ -98,6 +105,7 @@ public class SortListCircuits implements java.io.Serializable {
 				if (criterion.equals("indiceslotcrescente")) {
 					return le.getSpectrumAssigned()[0];
 				}
+
 				// descending slot index
 				if (criterion.equals("indiceslotdecrescente")) {
 					return le.getRoute().getLink(0).getCore(0).getNumOfSlots() - le.getSpectrumAssigned()[0];
@@ -107,6 +115,7 @@ public class SortListCircuits implements java.io.Serializable {
 				return le.getSpectrumAssigned().length;
 
 			}
+
 		});
 	}
 
@@ -130,16 +139,19 @@ public class SortListCircuits implements java.io.Serializable {
 				System.out.println(circuit.getRoute().getDistanceAllLinks());
 			}
 		}
+
 		if (criterio.equals("crosstalk")) {
 			for (Circuit circuit : circuits) {
 				System.out.println(circuit.getXt());
 			}
 		}
+
 		if (criterio.equals("deltacrosstalk")) {
 			for (Circuit circuit : circuits) {
 				System.out.println((-1) * (circuit.getXt() - circuit.getModulation().getXTthreshold()));
 			}
 		}
+
 		if (criterio.equals("recurso")) {
 			for (Circuit circuit : circuits) {
 				System.out.println(circuit.getRoute().getHops() * circuit.getSpectrumAssigned().length);

@@ -144,27 +144,28 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 			List<int[]> compositionantiga = IntersectionFreeSpectrum.merge(circuitoCandidato.getRoute(), circuitoCandidato.getGuardBand(), c);
 
 			if(g1.contains(c)) {
-	    		chosen = alocacaoGrupo1Xt(numberOfSlots, compositionantiga, circuitoCandidato, cp, c);
-	    	}
+				chosen = alocacaoGrupo1Xt(numberOfSlots, compositionantiga, circuitoCandidato, cp, c);
+			}
 
-	    	if(g2.contains(c)) {
-	    		chosen = alocacaoGrupo2Xt(numberOfSlots, compositionantiga, circuitoCandidato, cp, c);
-	    	}
+			if(g2.contains(c)) {
+				chosen = alocacaoGrupo2Xt(numberOfSlots, compositionantiga, circuitoCandidato, cp, c);
+			}
 
-	    	if(g3.contains(c)) {
-	    		chosen = alocacaoGrupo3Xt(numberOfSlots, compositionantiga, circuitoCandidato, cp, c);
-	    	}
+			if(g3.contains(c)) {
+				chosen = alocacaoGrupo3Xt(numberOfSlots, compositionantiga, circuitoCandidato, cp, c);
+			}
 
-	    	if(chosen!=null) {
-	    		circuitoCandidato.setIndexCore(c);
-	    		circuitoCandidato.setSpectrumAssigned(chosen);
+			if(chosen!=null) {
+				circuitoCandidato.setIndexCore(c);
+				circuitoCandidato.setSpectrumAssigned(chosen);
 
-	    		if(cp.getMesh().getPhysicalLayer().getCrosstalk().isAdmissible(circuitoCandidato) && cp.getMesh().getPhysicalLayer().getCrosstalk().isAdmissibleInOthers(circuitoCandidato)) {
-	    			circuit.setIndexCore(c);
-	    			circuit.setSpectrumAssigned(chosen);
-	    	        return true;
-	    		}
-	    	}
+				if(cp.getMesh().getPhysicalLayer().getCrosstalk().isAdmissible(circuitoCandidato) && cp.getMesh().getPhysicalLayer().getCrosstalk().isAdmissibleInOthers(circuitoCandidato)) {
+					circuit.setIndexCore(c);
+					circuit.setSpectrumAssigned(chosen);
+
+					return true;
+				}
+			}
 		}
 
 		//Segunda tentativa
@@ -202,10 +203,12 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 	public int coreAssignment() {
 		Random generator = new Random();
 		int a = generator.nextInt(this.numberOfCores);
+
 		return a;
 	}
 
 	//Firt fit
+
 	/**
 	 * Returns the policy.
 	 * @param numberOfSlots the numberOfSlots.
@@ -216,21 +219,23 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 	 */
 	public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-        for (int[] band : freeSpectrumBands) {
-            if (band[1] - band[0] + 1 >= numberOfSlots) {
-                chosen = band.clone();
-                chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
-                break;
-            }
-        }
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-        return chosen;
+		for (int[] band : freeSpectrumBands) {
+			if (band[1] - band[0] + 1 >= numberOfSlots) {
+				chosen = band.clone();
+				chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
+				break;
+			}
+		}
+
+		return chosen;
 	}
 
 	//Firt fit
+
 	/**
 	 * Returns the policy xt.
 	 * @param numberOfSlots the numberOfSlots.
@@ -242,41 +247,43 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 	 */
 	public int[] policyXt(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp, int core) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-	    if(numberOfSlots> maxAmplitude) return null;
-	    int chosen[] = null;
 
-	    for (int[] band : freeSpectrumBands) {
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-	    	for (int i = band[0]; i <= band[1]; i++) {
+		for (int[] band : freeSpectrumBands) {
+
+			for (int i = band[0]; i <= band[1]; i++) {
 
 				if (band[1] - i + 1 >= numberOfSlots) {
-	                chosen = band.clone();
-	                chosen[0] = i;
-	                chosen[1] = chosen[0] + numberOfSlots - 1;
+					chosen = band.clone();
+					chosen[0] = i;
+					chosen[1] = chosen[0] + numberOfSlots - 1;
 
-	                if(chosen!=null) {
+					if(chosen!=null) {
 
-	                	circuit.setIndexCore(core);
-	                	circuit.setSpectrumAssigned(chosen);
+						circuit.setIndexCore(core);
+						circuit.setSpectrumAssigned(chosen);
 
-	                	circuit.setQoT(true);
-	                	circuit.setQoTForOther(true);
-	                	circuit.setSNR(PhysicalLayer.maxOSNR);
+						circuit.setQoT(true);
+						circuit.setQoTForOther(true);
+						circuit.setOSNR(PhysicalLayer.maxOSNR);
 
-	    	    		if(isAdmissibleQualityOfTransmission(circuit, cp.getMesh())) { //QOTN QOTO
+						if(isAdmissibleQualityOfTransmission(circuit, cp.getMesh())) { //QOTN QOTO
 
-		    	    		if(cp.getMesh().getPhysicalLayer().getCrosstalk().isAdmissible(circuit) && cp.getMesh().getPhysicalLayer().getCrosstalk().isAdmissibleInOthers(circuit)) {
-		    	    			//circuit.setSpectrumAssigned(chosen);
-		    	    	        //circuit.setIndexCore(core);
-		    	    	        return chosen;
-		    	    		}
-	    	    		}
-	    	    	}
-	            }
-	        }
-	     }
+							if(cp.getMesh().getPhysicalLayer().getCrosstalk().isAdmissible(circuit) && cp.getMesh().getPhysicalLayer().getCrosstalk().isAdmissibleInOthers(circuit)) {
+								//circuit.setSpectrumAssigned(chosen);
+								//circuit.setIndexCore(core);
 
-	    return null;
+								return chosen;
+							}
+						}
+					}
+				}
+			}
+		 }
+
+		return null;
 	}
 
 	/**
@@ -289,25 +296,29 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 	 */
 	public int[] alocacaoGrupo1(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-    	//Priority group
-    	List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition1, circuit, cp);
-        if (chosen!=null){return chosen;}
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-        //Priority group 2
-        List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition2, circuit, cp);
-        if (chosen!=null){return chosen;}
+		//Priority group
+		List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition1, circuit, cp);
 
-        //Lowest-priority group
-        List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition3, circuit, cp);
-        if (chosen!=null){return chosen;}
+		if (chosen!=null){return chosen;}
 
-        return chosen;
+		//Priority group 2
+		List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition2, circuit, cp);
+
+		if (chosen!=null){return chosen;}
+
+		//Lowest-priority group
+		List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition3, circuit, cp);
+
+		if (chosen!=null){return chosen;}
+
+		return chosen;
 	}
 
 	/**
@@ -320,25 +331,29 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 	 */
 	public int[] alocacaoGrupo2(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-    	//Priority group
-    	List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition2, circuit, cp);
-        if (chosen!=null){return chosen;}
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-        //Priority group 2
-        List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition3, circuit, cp);
-        if (chosen!=null){return chosen;}
+		//Priority group
+		List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition2, circuit, cp);
 
-        //Lowest-priority group
-        List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition1, circuit, cp);
-        if (chosen!=null){return chosen;}
+		if (chosen!=null){return chosen;}
 
-        return chosen;
+		//Priority group 2
+		List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition3, circuit, cp);
+
+		if (chosen!=null){return chosen;}
+
+		//Lowest-priority group
+		List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition1, circuit, cp);
+
+		if (chosen!=null){return chosen;}
+
+		return chosen;
 	}
 
 	/**
@@ -351,25 +366,29 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 	 */
 	public int[] alocacaoGrupo3(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-    	//Priority group
-        List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition3, circuit, cp);
-        if (chosen!=null){return chosen;}
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-        //Priority group 2
-    	List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition1, circuit, cp);
-        if (chosen!=null){return chosen;}
+		//Priority group
+		List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition3, circuit, cp);
 
-        //Lowest-priority group
-        List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition2, circuit, cp);
-        if (chosen!=null){return chosen;}
+		if (chosen!=null){return chosen;}
 
-        return chosen;
+		//Priority group 2
+		List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition1, circuit, cp);
+
+		if (chosen!=null){return chosen;}
+
+		//Lowest-priority group
+		List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition2, circuit, cp);
+
+		if (chosen!=null){return chosen;}
+
+		return chosen;
 	}
 
 	/**
@@ -383,25 +402,29 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 	 */
 	public int[] alocacaoGrupo1Xt(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp, int c) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-    	//Priority group
-    	List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
-    	chosen = policyXt(numberOfSlots, composition1, circuit, cp, c);
-        if (chosen!=null){return chosen;}
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-        //Priority group 2
-        List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
-    	chosen = policyXt(numberOfSlots, composition2, circuit, cp, c);
-        if (chosen!=null){return chosen;}
+		//Priority group
+		List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
+		chosen = policyXt(numberOfSlots, composition1, circuit, cp, c);
 
-        //Lowest-priority group
-        List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
-    	chosen = policyXt(numberOfSlots, composition3, circuit, cp, c);
-        if (chosen!=null){return chosen;}
+		if (chosen!=null){return chosen;}
 
-        return chosen;
+		//Priority group 2
+		List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
+		chosen = policyXt(numberOfSlots, composition2, circuit, cp, c);
+
+		if (chosen!=null){return chosen;}
+
+		//Lowest-priority group
+		List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
+		chosen = policyXt(numberOfSlots, composition3, circuit, cp, c);
+
+		if (chosen!=null){return chosen;}
+
+		return chosen;
 	}
 
 	/**
@@ -415,27 +438,30 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 	 */
 	public int[] alocacaoGrupo2Xt(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp, int c) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-    	//Priority group
-    	List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
-    	chosen = policyXt(numberOfSlots, composition2, circuit, cp, c);
-        if (chosen!=null){return chosen;}
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-        //Priority group 2
-        List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
-    	chosen = policyXt(numberOfSlots, composition3, circuit, cp, c);
-        if (chosen!=null){return chosen;}
+		//Priority group
+		List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
+		chosen = policyXt(numberOfSlots, composition2, circuit, cp, c);
 
-        //Lowest-priority group
-        List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
-    	chosen = policyXt(numberOfSlots, composition1, circuit, cp, c);
-        if (chosen!=null){return chosen;}
+		if (chosen!=null){return chosen;}
 
-        return chosen;
+		//Priority group 2
+		List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
+		chosen = policyXt(numberOfSlots, composition3, circuit, cp, c);
+
+		if (chosen!=null){return chosen;}
+
+		//Lowest-priority group
+		List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
+		chosen = policyXt(numberOfSlots, composition1, circuit, cp, c);
+
+		if (chosen!=null){return chosen;}
+
+		return chosen;
 	}
-
 
 	/**
 	 * Returns the alocacao grupo3 xt.
@@ -448,25 +474,29 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 	 */
 	public int[] alocacaoGrupo3Xt(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp, int c) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-    	//Priority group
-        List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
-    	chosen = policyXt(numberOfSlots, composition3, circuit, cp, c);
-        if (chosen!=null){return chosen;}
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-        //Priority group 2
-    	List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
-    	chosen = policyXt(numberOfSlots, composition1, circuit, cp, c);
-        if (chosen!=null){return chosen;}
+		//Priority group
+		List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
+		chosen = policyXt(numberOfSlots, composition3, circuit, cp, c);
 
-        //Lowest-priority group
-        List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
-    	chosen = policyXt(numberOfSlots, composition2, circuit, cp, c);
-        if (chosen!=null){return chosen;}
+		if (chosen!=null){return chosen;}
 
-        return chosen;
+		//Priority group 2
+		List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
+		chosen = policyXt(numberOfSlots, composition1, circuit, cp, c);
+
+		if (chosen!=null){return chosen;}
+
+		//Lowest-priority group
+		List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
+		chosen = policyXt(numberOfSlots, composition2, circuit, cp, c);
+
+		if (chosen!=null){return chosen;}
+
+		return chosen;
 	}
 
 	/**
@@ -483,7 +513,7 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 			// Est completamente dentro do intervalo
 			if ((band[1] >= this.eg1[0]) && (band[1] <= this.eg1[1]) && (band[0] >= this.eg1[0]) && (band[0] <= this.eg1[1])) {
 				novacomposition.add(band.clone());
-            }
+			}
 
 			// Est parcialmente no limite inferior
 			if ((band[1] >= this.eg1[0]) && (band[1] <= this.eg1[1]) && (band[0] < this.eg1[0]) && (band[0] < this.eg1[1])) {
@@ -491,7 +521,7 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 				novo[0] = this.eg1[0];
 				novo[1] = band[1];
 				novacomposition.add(novo);
-            }
+			}
 
 			// Est parcialmente no limite supeior
 			if ((band[1] > this.eg1[1]) && (band[1] > this.eg1[0]) && (band[0] <= this.eg1[1]) && (band[0] > this.eg1[0])) {
@@ -499,7 +529,7 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 				novo[0] = band[0];
 				novo[1] = this.eg1[1];
 				novacomposition.add(novo);
-            }
+			}
 
 			// Engloba os limites
 			if ((band[1] > this.eg1[1]) && (band[1] > this.eg1[0]) && (band[0] < this.eg1[1]) && (band[0] < this.eg1[0])) {
@@ -527,7 +557,7 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 			// Est completamente dentro do intervalo
 			if ((band[1] >= this.eg2[0]) && (band[1] <= this.eg2[1]) && (band[0] >= this.eg2[0]) && (band[0] <= this.eg2[1])) {
 				novacomposition.add(band.clone());
-            }
+			}
 
 			// Est parcialmente no limite inferior
 			if ((band[1] >= this.eg2[0]) && (band[1] <= this.eg2[1]) && (band[0] < this.eg2[0]) && (band[0] < this.eg2[1])) {
@@ -535,7 +565,7 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 				novo[0] = this.eg2[0];
 				novo[1] = band[1];
 				novacomposition.add(novo);
-            }
+			}
 
 			// Est parcialmente no limite supeior
 			if ((band[1] > this.eg2[1]) && (band[1] > this.eg2[0]) && (band[0] <= this.eg2[1]) && (band[0] > this.eg2[0])) {
@@ -543,7 +573,7 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 				novo[0] = band[0];
 				novo[1] = this.eg2[1];
 				novacomposition.add(novo);
-            }
+			}
 
 			// Engloba os limites
 			if ((band[1] > this.eg2[1]) && (band[1] > this.eg2[0]) && (band[0] < this.eg2[1]) && (band[0] < this.eg2[0])) {
@@ -571,7 +601,7 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 			// Est completamente dentro do intervalo
 			if ((band[1] >= this.eg3[0]) && (band[1] <= this.eg3[1]) && (band[0] >= this.eg3[0]) && (band[0] <= this.eg3[1])) {
 				novacomposition.add(band.clone());
-            }
+			}
 
 			// Est parcialmente no limite inferior
 			if ((band[1] >= this.eg3[0]) && (band[1] <= this.eg3[1]) && (band[0] < this.eg3[0]) && (band[0] < this.eg3[1])) {
@@ -579,7 +609,7 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 				novo[0] = this.eg3[0];
 				novo[1] = band[1];
 				novacomposition.add(novo);
-            }
+			}
 
 			// Est parcialmente no limite supeior
 			if ((band[1] > this.eg3[1]) && (band[1] > this.eg3[0]) && (band[0] <= this.eg3[1]) && (band[0] > this.eg3[0])) {
@@ -587,7 +617,7 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 				novo[0] = band[0];
 				novo[1] = this.eg3[1];
 				novacomposition.add(novo);
-            }
+			}
 
 			// Engloba os limites
 			if ((band[1] > this.eg3[1]) && (band[1] > this.eg3[0]) && (band[0] < this.eg3[1]) && (band[0] < this.eg3[0])) {
@@ -604,6 +634,7 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 //
 // Added the QoTN and QoTo check method. It is not in the original paper, but it was added to provide a fair comparison
 //
+
 	/**
 	 * Checks whether admissible quality of transmission.
 	 * @param circuit the circuit.
@@ -647,13 +678,13 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 	 */
 	public boolean computeQualityOfTransmission(Circuit circuit, Circuit testCircuit, boolean addTestCircuit, Mesh mesh){
 		//double sigma = 1.0;
-		double SNR = mesh.getPhysicalLayer().computeSNRSegment(circuit, circuit.getRoute(), 0, circuit.getRoute().getNodeList().size() - 1, circuit.getModulation(), circuit.getIndexCore(), circuit.getSpectrumAssigned(), testCircuit, addTestCircuit);
-		boolean QoT = mesh.getPhysicalLayer().isAdmissible(circuit.getModulation(), SNR);
+		double OSNR = mesh.getPhysicalLayer().computeOSNRSegment(circuit, circuit.getRoute(), 0, circuit.getRoute().getNodeList().size() - 1, circuit.getModulation(), circuit.getIndexCore(), circuit.getSpectrumAssigned(), testCircuit, addTestCircuit);
+		boolean QoT = mesh.getPhysicalLayer().isAdmissible(circuit.getModulation(), OSNR);
 
-		circuit.setSNR(SNR);
+		circuit.setOSNR(OSNR);
 		circuit.setQoT(QoT);
 
-		//System.out.println("--------\n A OSNR : "+SNRdB+"\n\n----------");
+		//System.out.println("--------\n A OSNR : "+OSNRdB+"\n\n----------");
 
 		return QoT;
 	}
@@ -666,57 +697,59 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 	 */
 	public boolean computeQoTForOther(Circuit circuit, Mesh mesh){
 		HashSet<Circuit> circuits = new HashSet<Circuit>(); // Circuit list for test
-		HashMap<Circuit, Double> circuitsSNR = new HashMap<Circuit, Double>(); // To guard the SNR of the test list circuits
+		HashMap<Circuit, Double> circuitsOSNR = new HashMap<Circuit, Double>(); // To guard the OSNR of the test list circuits
 		HashMap<Circuit, Boolean> circuitsQoT = new HashMap<Circuit, Boolean>(); // To guard the QoT of the test list circuits
 
 		// Search for all circuits that have links in common with the circuit under evaluation
 		Route route = circuit.getRoute();
+
 		for (Link link : route.getLinkList()) {
 
 			// Picks up the active circuits that use the link
 			HashSet<Circuit> circuitsTemp = link.getCore(circuit.getIndexCore()).getCircuitList();
-	        for (Circuit circuitTemp : circuitsTemp) {
 
-	        	// If the circuit is different from the circuit under evaluation and is not in the circuit list for test
-	            if (!circuit.equals(circuitTemp) && !circuits.contains(circuitTemp)) {
-	                circuits.add(circuitTemp);
-	            }
-	        }
+			for (Circuit circuitTemp : circuitsTemp) {
+
+				// If the circuit is different from the circuit under evaluation and is not in the circuit list for test
+				if (!circuit.equals(circuitTemp) && !circuits.contains(circuitTemp)) {
+					circuits.add(circuitTemp);
+				}
+			}
 		}
 
 		// Tests the QoT of circuits
-	    for (Circuit circuitTemp : circuits) {
+		for (Circuit circuitTemp : circuits) {
 
-	    	// Stores the SNR and QoT values
-	    	circuitsSNR.put(circuitTemp, circuitTemp.getSNR());
-	        circuitsQoT.put(circuitTemp, circuitTemp.isQoT());
+			// Stores the OSNR and QoT values
+			circuitsOSNR.put(circuitTemp, circuitTemp.getOSNR());
+			circuitsQoT.put(circuitTemp, circuitTemp.isQoT());
 
-	    	// Recalculates the QoT and SNR of the circuit
-	        //boolean QoT = computeQualityOfTransmission(circuitTemp, null, true, mesh);
+			// Recalculates the QoT and OSNR of the circuit
+			//boolean QoT = computeQualityOfTransmission(circuitTemp, null, true, mesh);
 
-	        boolean QoT = computeQualityOfTransmission(circuitTemp, circuit, true, mesh);
+			boolean QoT = computeQualityOfTransmission(circuitTemp, circuit, true, mesh);
 
-	        // Returns the SNR and QoT values of circuits before the establishment of the circuit in evaluation
-	    	//for (Circuit circuitAux : circuitsSNR.keySet()) {
-	    		//circuitAux.setSNR(circuitsSNR.get(circuitAux));
-	    		//circuitAux.setQoT(circuitsQoT.get(circuitAux));
-	    	//}
+			// Returns the OSNR and QoT values of circuits before the establishment of the circuit in evaluation
+			//for (Circuit circuitAux : circuitsOSNR.keySet()) {
+				//circuitAux.setOSNR(circuitsOSNR.get(circuitAux));
+				//circuitAux.setQoT(circuitsQoT.get(circuitAux));
+			//}
 
-	        if (!QoT) {
+			if (!QoT) {
 
-	        	// Returns the SNR and QoT values of circuits before the establishment of the circuit in evaluation
-	        	for (Circuit circuitAux : circuitsSNR.keySet()) {
-	        		circuitAux.setSNR(circuitsSNR.get(circuitAux));
-	        		circuitAux.setQoT(circuitsQoT.get(circuitAux));
-	        	}
+				// Returns the OSNR and QoT values of circuits before the establishment of the circuit in evaluation
+				for (Circuit circuitAux : circuitsOSNR.keySet()) {
+					circuitAux.setOSNR(circuitsOSNR.get(circuitAux));
+					circuitAux.setQoT(circuitsQoT.get(circuitAux));
+				}
 
-	            return false;
-	        }
-	    }
+				return false;
+			}
+		}
 
-	    // Returns the SNR and QoT values of circuits before the establishment of the circuit in evaluation
-		for (Circuit circuitAux : circuitsSNR.keySet()) {
-			circuitAux.setSNR(circuitsSNR.get(circuitAux));
+		// Returns the OSNR and QoT values of circuits before the establishment of the circuit in evaluation
+		for (Circuit circuitAux : circuitsOSNR.keySet()) {
+			circuitAux.setOSNR(circuitsOSNR.get(circuitAux));
 			circuitAux.setQoT(circuitsQoT.get(circuitAux));
 		}
 
@@ -724,4 +757,3 @@ public class IcxtAwareAlgorithm implements CoreAndSpectrumAssignmentAlgorithmInt
 	}
 
 }
-

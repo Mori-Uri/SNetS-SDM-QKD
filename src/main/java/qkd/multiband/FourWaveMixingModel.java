@@ -25,12 +25,12 @@ package qkd.multiband;
  */
 public final class FourWaveMixingModel {
 
-    private static final double C = 299792458.0;
+	private static final double C = 299792458.0;
 
-    private FourWaveMixingModel() {
-    }
+	private FourWaveMixingModel() {
+	}
 
-    /**
+	/**
      * Power of one FWM product at the fibre output.
      *
      * @param fi frequency of pump i (Hz)
@@ -48,24 +48,24 @@ public final class FourWaveMixingModel {
      * @param peak true for the upper envelope (sin^2 = 1)
      * @return product power in W
      */
-    public static double productPowerW(double fi, double fj, double fk, double pi, double pj, double pk,
-            double lengthKm, double alphaDbPerKm, double gammaPerWKm, double dispersionPsNmKm, double slopePsNm2Km,
-            double lambdaNm, boolean peak) {
-        final double a = alphaDbPerKm * Math.log(10.0) / 10.0 / 1e3; // 1/m
-        final double l = lengthKm * 1e3;
-        final double lambda = lambdaNm * 1e-9;
-        final double dc = dispersionPsNmKm * 1e-6; // s/m^2
-        final double s = slopePsNm2Km * 1e3; // s/m^3
-        final double dik = Math.abs(fi - fk);
-        final double djk = Math.abs(fj - fk);
-        final double db = 2 * Math.PI * lambda * lambda / C * dik * djk
-                * (dc + lambda * lambda / (2 * C) * s * (dik + djk));
-        final double loss = Math.exp(-a * l);
-        final double leff = -Math.expm1(-a * l) / a;
-        final double sin2 = peak ? 1.0 : Math.pow(Math.sin(db * l / 2), 2);
-        final double eta = a * a / (a * a + db * db) * (1 + 4 * loss * sin2 / Math.pow(-Math.expm1(-a * l), 2));
-        final double degeneracy = fi == fj ? 3.0 : 6.0;
-        final double gamma = gammaPerWKm / 1e3; // 1/(W m)
-        return eta / 9.0 * degeneracy * degeneracy * gamma * gamma * pi * pj * pk * loss * leff * leff;
-    }
+	public static double productPowerW(double fi, double fj, double fk, double pi, double pj, double pk,
+			double lengthKm, double alphaDbPerKm, double gammaPerWKm, double dispersionPsNmKm, double slopePsNm2Km,
+			double lambdaNm, boolean peak) {
+		final double a = alphaDbPerKm * Math.log(10.0) / 10.0 / 1e3; // 1/m
+		final double l = lengthKm * 1e3;
+		final double lambda = lambdaNm * 1e-9;
+		final double dc = dispersionPsNmKm * 1e-6; // s/m^2
+		final double s = slopePsNm2Km * 1e3; // s/m^3
+		final double dik = Math.abs(fi - fk);
+		final double djk = Math.abs(fj - fk);
+		final double db = 2 * Math.PI * lambda * lambda / C * dik * djk
+				* (dc + lambda * lambda / (2 * C) * s * (dik + djk));
+		final double loss = Math.exp(-a * l);
+		final double leff = -Math.expm1(-a * l) / a;
+		final double sin2 = peak ? 1.0 : Math.pow(Math.sin(db * l / 2), 2);
+		final double eta = a * a / (a * a + db * db) * (1 + 4 * loss * sin2 / Math.pow(-Math.expm1(-a * l), 2));
+		final double degeneracy = fi == fj ? 3.0 : 6.0;
+		final double gamma = gammaPerWKm / 1e3; // 1/(W m)
+		return eta / 9.0 * degeneracy * degeneracy * gamma * gamma * pi * pj * pk * loss * leff * leff;
+	}
 }

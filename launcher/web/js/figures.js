@@ -27,11 +27,7 @@
         try { files[f] = JSON.parse(cd.files[f]); } catch (e) { /* ignore */ }
       }
       const name = App.caseNameOf(path);
-      // Parte 55: pasta renomeada depois da simulação: os CSVs mantêm o prefixo antigo (ex.: pasta "EX - Teste_EX" com
-      // Teste_EX_BlockingDetails.csv). Sem isso o caso aparecia com arquivos "Teste_EX_BlockingDetails" e era ignorado.
-      const bases = (cd.csv || []).map((c) => c.name.replace(/\.csv$/i, ''));
-      const oldPrefix = bases.some((b) => b.startsWith(name + '_')) ? '' : commonCsvPrefix(bases);
-      const csv = (cd.csv || []).map((c) => ({ name: c.name, size: c.size, mtime: c.mtime, suffix: suffixOf(name, c.name, oldPrefix) }));
+      const csv = (cd.csv || []).map((c) => ({ name: c.name, size: c.size, mtime: c.mtime, suffix: suffixOf(name, c.name) }));
       // 1.14.0: cost indicators derived from QKDMetrics.csv (virtual file, computed in the launcher)
       const qm = csv.find((c) => c.suffix === 'QKDMetrics');
       if (qm) csv.push({ name: '(derivado do QKDMetrics) QKDCost', size: 0, mtime: qm.mtime, suffix: 'QKDCost', virtual: true });
@@ -42,28 +38,9 @@
     try { return await p; } catch (e) { caseCache.delete(path); throw e; }
   }
 
-  /** Parte 55: arquivos que o SNetS grava como <prefixo>_<nome>.csv. */
-  const KNOWN_CSV = ['BlockingProbability', 'BitRateBlockingProbability', 'BlockingDetails', 'ConsumedEnergy', 'ExternalFragmentation',
-    'GroomingStatistics', 'ModulationUtilization', 'PhysicalLayerStatistics', 'RelativeFragmentation', 'SlotBlocking', 'SlotUtilization',
-    'SpectrumStatistics', 'SpectrumUtilization', 'TransmittersReceiversRegeneratorsUtilization', 'QKDChannelBlocking',
-    'QKDChannelSlotBlocking', 'QKDMetrics', 'QKDStatistics', 'DataSetInformation', 'AlgorithmCost'];
-
-  /** Parte 55: prefixo comum ("Teste_EX_") de todos os CSVs de uma pasta, cortado no último "_"; '' se não houver. */
-  function commonCsvPrefix(bases) {
-    if (bases.length < 2) return '';
-    let p = bases[0];
-    for (const b of bases) { let i = 0; while (i < p.length && i < b.length && p[i] === b[i]) i++; p = p.slice(0, i); }
-    const k = p.lastIndexOf('_');
-    return k > 0 ? p.slice(0, k + 1) : '';
-  }
-
-  function suffixOf(caseName, csvName, oldPrefix) {
-    const s = csvName.replace(/\.csv$/i, '');
-    if (s.startsWith(caseName + '_')) return s.slice(caseName.length + 1);
-    // Parte 55: pasta renomeada: reconhece o nome do arquivo do SNetS mesmo com outro prefixo
-    const known = KNOWN_CSV.find((k) => s === k || s.endsWith('_' + k));
-    if (known) return known;
-    if (oldPrefix && s.startsWith(oldPrefix) && s.length > oldPrefix.length) return s.slice(oldPrefix.length);
+  function suffixOf(caseName, csvName) {
+    let s = csvName.replace(/\.csv$/i, '');
+    if (s.startsWith(caseName + '_')) s = s.slice(caseName.length + 1);
     return s;
   }
 
@@ -437,7 +414,7 @@
   // ================================================================ templates
 
   // Parte 27: models grouped by subject (optgroups of the "Modelo de gráfico" box); ids are kept, so saved figures still open
-  const TEMPLATE_GROUPS = ['Bloqueio', 'Causas de bloqueio', 'Comparação com um caso de referência', 'Núcleos', 'Espectro e utilização', 'Fragmentação', 'Mapas de calor', 'QKD', 'Canais QKD bloqueados', 'Custo QKD', 'Outros', 'Correlações'];
+  const TEMPLATE_GROUPS = ['Bloqueio', 'Causas de bloqueio', 'Canais QKD bloqueados', 'Núcleos', 'Espectro e utilização', 'Fragmentação', 'Mapas de calor', 'Correlações', 'QKD', 'Custo QKD', 'Outros'];
   const TEMPLATES = [
     // ---- Bloqueio
     { id: 'bp', group: 'Bloqueio', name: 'Bloqueio de circuitos × carga', type: 'line', file: 'BlockingProbability', metric: 'Blocking probability', y: 'Probabilidade de Bloqueio de Circuito', x: 'Carga (Erlangs)', xMode: 'erl' },
@@ -492,8 +469,8 @@
       desc: 'Para cada slot de cada núcleo de cada enlace, a fração das tentativas que terminaram bloqueadas. Uma tentativa é a faixa do candidato da requisição (o circuito aceito, ou o candidato que foi bloqueado) em cada enlace da rota. À direita: requisições bloqueadas ÷ requisições que usaram aquele núcleo do enlace, e a porcentagem. Usa o SlotBlocking.csv (Parte 29).' },
     { id: 'slotBlockCauses', group: 'Mapas de calor', name: 'Espectro: causa do bloqueio em cada slot (todas as causas, uma cor cada)', type: 'slotblock', file: 'SlotBlocking', blockMode: 'causes',
       desc: 'Cada slot recebe a cor da causa com mais bloqueios ali (passe o mouse para ver todas). Cinza: houve tentativas e nenhum bloqueio; branco: nenhuma tentativa. Escolha uma causa em "Causa" para ver só ela. Usa o SlotBlocking.csv (Parte 29).' },
-    { id: 'slotBlockQoTO', group: 'Mapas de calor', name: 'Espectro: onde ocorreram os bloqueios das causas escolhidas', type: 'slotblock', file: 'SlotBlocking', blockMode: 'causes', blockCauses: ['QoTO'],
-      desc: 'Só os bloqueios das causas marcadas em "2. Dados" (começa com QoTO), cada uma na sua cor. Marque uma ou várias causas; com todas marcadas é igual ao mapa de todas as causas.' },
+    { id: 'slotBlockQoTO', group: 'Mapas de calor', name: 'Espectro: onde ocorreram os bloqueios por QoTO', type: 'slotblock', file: 'SlotBlocking', blockMode: 'causes', blockCause: 'QoTO',
+      desc: 'Só os bloqueios por QoTO (o novo circuito degradaria a QoT de circuitos ativos), na cor da causa. Troque a causa na seção 2 para ver as outras.' },
     // ---- Correlações
     { id: 'scLinkUtilBlock', group: 'Correlações', name: 'Enlaces: utilização × bloqueio (um ponto por enlace)', type: 'scatter', by: 'Link', xFile: 'SpectrumUtilization', xMetric: 'Utilization Per Link', yFile: 'BlockingDetails', yMetric: 'Link blocking probability', x: 'Utilização do enlace', y: 'Bloqueio do enlace',
       desc: 'Cada ponto é um enlace dirigido; r é o coeficiente de correlação de Pearson e a reta tracejada, o ajuste por mínimos quadrados.' },
@@ -548,15 +525,6 @@
       desc: 'Como o mapa de bloqueio do espectro, mas só com os canais das requisições protegidas (QKDChannelSlotBlocking.csv, Parte 39). Escolha um canal em "Causa" para ver só ele.' },
     { id: 'qkdQtnd', group: 'QKD', name: 'Métrica × QTND (casos de uma varredura)', type: 'line', file: 'QKDMetrics', metric: 'QKD blocking probability', y: 'Probabilidade de bloqueio QKD', x: 'QTND (km)', xMode: 'param', paramPath: 'network:qkd.qtndKm' },
     { id: 'qkdEquip', group: 'QKD', name: 'QTx/QRx em uso por nó (pico)', type: 'bars', file: 'QKDMetrics', metric: 'Peak QTx in use per node', itemsFrom: 'dim', dim: 'src', xAxis: 'items', y: 'QTx em uso (pico)', x: 'Nó', rotate: -60 },
-    // ---- 1.18.3: comparação com um caso de referência (barras divergentes)
-    { id: 'refBp', group: 'Comparação com um caso de referência', name: 'Bloqueio de circuitos em relação a um caso', type: 'ref', file: 'BlockingProbability', itemsFrom: 'metrics', items: ['Blocking probability'], desc: 'Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
-    { id: 'refBbp', group: 'Comparação com um caso de referência', name: 'Bloqueio de banda em relação a um caso', type: 'ref', file: 'BitRateBlockingProbability', itemsFrom: 'metrics', items: ['BitRate blocking probability'], desc: 'Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
-    { id: 'refCauses', group: 'Comparação com um caso de referência', name: 'Causas de bloqueio em relação a um caso (uma seção por causa)', type: 'ref', file: 'BlockingDetails', metric: 'Blocking probability by cause', itemsFrom: 'dim', dim: 'Cause', desc: 'Uma seção por causa de bloqueio; marque só uma causa em "2. Dados" para ver uma de cada vez. As seções ficam lado a lado ou uma embaixo da outra. Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
-    { id: 'refCoreUtil', group: 'Comparação com um caso de referência', name: 'Utilização de cada núcleo em relação a um caso', type: 'ref', file: 'SpectrumUtilization', metric: 'Utilization per Core', itemsFrom: 'dim', dim: 'Core', desc: 'Uma seção por núcleo. Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
-    { id: 'refCoreBlock', group: 'Comparação com um caso de referência', name: 'Bloqueio de cada núcleo em relação a um caso', type: 'ref', file: 'BlockingDetails', metric: 'Blocking probability per core', itemsFrom: 'dim', dim: 'Core', desc: 'Uma seção por núcleo. Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
-    { id: 'refUtil', group: 'Comparação com um caso de referência', name: 'Utilização do espectro em relação a um caso', type: 'ref', file: 'SpectrumUtilization', itemsFrom: 'metrics', items: ['Utilization'], desc: 'Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
-    { id: 'refQkdBp', group: 'Comparação com um caso de referência', name: 'Bloqueio QKD em relação a um caso', type: 'ref', file: 'QKDMetrics', itemsFrom: 'metrics', items: ['QKD blocking probability'], desc: 'Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
-    { id: 'refQkdCauses', group: 'Comparação com um caso de referência', name: 'Causas do bloqueio QKD em relação a um caso', type: 'ref', file: 'QKDMetrics', itemsFrom: 'metrics', itemsRe: /^QKD blocking probability by /i, desc: 'Uma seção por causa do bloqueio QKD. Escolha o caso de referência em "2. Dados" (ou com a estrela ao lado do caso na seção 1). A linha vertical é o caso de referência: barras à direita = valor maior que o dele, à esquerda = menor. A diferença pode ser absoluta ou em % do valor da referência.' },
     // ---- Outros
     { id: 'custom', group: 'Outros', name: 'Personalizado (qualquer CSV)', type: 'line', x: 'Carga (Erlangs)', xMode: 'erl' },
   ];
@@ -580,28 +548,23 @@
     if (t.type === 'slotblock') { style.slotScale = 'blues'; style.slotZero = 'gray'; style.slotRange = t.blockMode === 'count' ? 'auto' : 'fixed'; }
     if (t.type === 'scatter') { style.errorBars = 'none'; style.grid = 'both'; style.xAsCategories = false; }
     if (t.type === 'slotline') { style.width = 1000; style.errorBars = 'none'; style.xAsCategories = false; style.lineWidth = 1.5; }
-    if (t.type === 'ref') { style.width = t.itemsFrom === 'dim' || t.itemsRe ? 1400 : 900; style.fontSize = 15; style.grid = 'x'; style.errorBars = 'none'; style.title = ''; }
     if (t.layout === 'panels') { style.panelHeight = 300; style.barGap = 0.3; style.legend = 'none'; style.fontSize = 10; style.errorBars = 'none'; style.titleSize = 13; }
-    const spec = {
+    return {
       version: 1, template: t.id, type: t.type,
       cases: (cases || []).map((p) => ({ path: p, label: App.caseNameOf(p) })),
       file: t.file || '', metric: t.metric || '', metrics: (t.metrics || []).slice(), filters: {},
       line: { seriesBy: t.seriesBy || 'case', xMode: t.xMode || 'lp', paramPath: t.paramPath || '', paramLp: -1, lps: [] },
       bars: {
-        lp: -1, itemsFrom: t.itemsFrom || 'metrics', itemsRe: t.itemsRe ? t.itemsRe.source : '', dim: t.dim || '', items: (t.items || []).slice(),
+        lp: -1, itemsFrom: t.itemsFrom || 'metrics', itemsRe: t.itemsRe ? t.itemsRe.source : '', dim: t.dim || '', items: [],
         xAxis: t.xAxis || 'cases', seriesDim: t.seriesDim || '', stacked: !!t.stacked, normalize: !!t.normalize, layout: t.layout || 'grouped', sort: t.sort || 'none', top: 0, hideZero: true,
       },
-      // 1.18.3: chart with a reference case (path '' = first case)
-      ref: { path: '', mode: 'abs', order: 'selection', layout: 'cols', colorBy: 'auto', hideZero: true },
       cores: { lp: -1, utilFile: 'SpectrumUtilization', utilMetric: 'Utilization per Core', blockFile: 'BlockingProbability', blockPrefix: 'Blocking probability per core', normBlock: false },
       topo: { lps: [], range: 'shared', block: !!t.topoBlock, blockFile: 'BlockingDetails', blockMetric: 'Link blocking probability', blockClasses: 'split' },
-      slots: { lp: -1, links: [], cores: [], oneWay: false, from: 1, to: 0, order: 'name', caseLayout: 'stack', blockMode: t.blockMode || 'ratio', blockCause: t.blockCause || 'all', blockCauses: (t.blockCauses || []).slice(), onlyBlocked: false, summary: true },
+      slots: { lp: -1, links: [], cores: [], oneWay: false, from: 1, to: 0, order: 'name', caseLayout: 'stack', blockMode: t.blockMode || 'ratio', blockCause: t.blockCause || 'all', onlyBlocked: false, summary: true },
       scatter: { xFile: t.xFile || 'SpectrumUtilization', xMetric: t.xMetric || 'Utilization Per Link', yFile: t.yFile || 'BlockingDetails', yMetric: t.yMetric || 'Link blocking probability',
         by: t.by || 'Link', lp: -1, fx: {}, fy: {}, trend: true, pooled: false },
       labels: Object.assign({}, t.labels || {}), seriesStyle: {}, seriesOrder: [], style,
     };
-    applyTypeStyle(spec); // Parte 55: figuras novas abrem com o padrão do tipo
-    return spec;
   }
 
   // ================================================================ state
@@ -655,105 +618,6 @@
     delete tmplStore()[id];
     writeTemplates();
   }
-  // ---------------------------------------------------------------- Parte 55: padrão de aparência por tipo de gráfico
-  /**
-   * Parte 55: ajustes de aparência compartilhados por todos os gráficos do mesmo tipo (linhas, barras, mapas do
-   * espectro...). Ficam em launcher/figure-styles.json. Figuras novas desse tipo já abrem com o padrão, e "Aplicar"
-   * leva o padrão à figura aberta ou a todas as figuras salvas e modelos guardados do tipo. Não entram os ajustes que
-   * dependem dos dados de cada figura: títulos, limites e marcas dos eixos, escala log, rotação dos rótulos do eixo x
-   * e linhas de referência.
-   */
-  const TYPE_STYLE_SKIP = new Set(['title', 'xTitle', 'yTitle', 'panelLabel', 'yMin', 'yMax', 'xMin', 'xMax', 'yStep', 'xStep',
-    'yTicksExtra', 'xTicksExtra', 'refLines', 'yLog', 'xLabelRotate', 'xAsCategories', 'topoLabelOffsets', 'slotCauseColors', 'slotMin', 'slotMax']);
-  const TYPE_NAMES = {
-    line: 'gráficos de linha', bars: 'gráficos de barras', 'bars:panels': 'gráficos de barras em painéis', ref: 'gráficos de comparação com um caso',
-    cores: 'diagramas da fibra', topo: 'mapas da topologia', slots: 'mapas de ocupação do espectro', slotblock: 'mapas de bloqueio do espectro',
-    slotline: 'perfis de ocupação por slot', scatter: 'gráficos de dispersão',
-  };
-  let typeStyles = null; // { <tipo>: { style: {...}, saved: <ms> } }
-  function typeKey(spec) { return spec && spec.type === 'bars' && spec.bars && spec.bars.layout === 'panels' ? 'bars:panels' : (spec && spec.type) || 'line'; }
-  function typeName(spec) { return TYPE_NAMES[typeKey(spec)] || 'gráficos deste tipo'; }
-  function sharedStyle(style) {
-    const out = {};
-    for (const k of Object.keys(style || {})) if (!TYPE_STYLE_SKIP.has(k)) out[k] = JSON.parse(JSON.stringify(style[k]));
-    return out;
-  }
-  async function loadTypeStyles(force) {
-    if (typeStyles && !force) return typeStyles;
-    try { const d = await App.api.figureStyles(); typeStyles = JSON.parse((d && d.text) || '{}') || {}; } catch (e) { typeStyles = typeStyles || {}; }
-    return typeStyles;
-  }
-  /** Copia o padrão do tipo para o estilo da figura; false se o tipo ainda não tem padrão. */
-  function applyTypeStyle(spec) {
-    const p = typeStyles && typeStyles[typeKey(spec)];
-    if (!p || !p.style) return false;
-    spec.style = Object.assign(spec.style || {}, sharedStyle(p.style));
-    return true;
-  }
-  async function writeTypeStyles() { await App.api.saveFigureStyles(JSON.stringify(typeStyles || {}, null, 2)); }
-  async function saveTypeStyle() {
-    await loadTypeStyles(true);
-    typeStyles[typeKey(S.spec)] = { style: sharedStyle(S.spec.style), saved: Date.now() };
-    await writeTypeStyles();
-  }
-  async function forgetTypeStyle() {
-    await loadTypeStyles(true);
-    delete typeStyles[typeKey(S.spec)];
-    await writeTypeStyles();
-  }
-  /** Aplica o padrão à figura aberta, às figuras salvas e aos modelos guardados (memória dos modelos) do mesmo tipo. */
-  async function applyTypeStyleEverywhere() {
-    const k = typeKey(S.spec), name = typeName(S.spec);
-    const p = typeStyles && typeStyles[k];
-    if (!p) return;
-    await refreshSaved();
-    const targets = [];
-    for (const f of S.saved) {
-      try {
-        const spec = JSON.parse((await App.api.figure(f.name)).text);
-        if (typeKey(upgrade(JSON.parse(JSON.stringify(spec)))) === k) targets.push({ name: f.name, spec });
-      } catch (e) { /* figura ilegível: fica como está */ }
-    }
-    const mem = tmplStore();
-    const tmpls = Object.keys(mem).filter((id) => { try { return typeKey(mem[id]) === k; } catch (e) { return false; } });
-    if (!window.confirm('Aplicar o padrão dos ' + name + ' à figura aberta, a ' + targets.length + ' figura(s) salva(s) em launcher/figures e a '
-      + tmpls.length + ' modelo(s) guardado(s) deste tipo?\n\nTítulos, eixos, dados e cores das séries de cada figura não mudam. '
-      + 'As imagens já gravadas (SVG/PNG) só mudam quando forem gravadas de novo.')) return;
-    for (const t of targets) {
-      t.spec.style = Object.assign(t.spec.style || {}, sharedStyle(p.style));
-      await App.api.saveFigure(t.name, JSON.stringify(t.spec, null, 2));
-    }
-    for (const id of tmpls) mem[id].style = Object.assign(mem[id].style || {}, sharedStyle(p.style));
-    writeTemplates();
-    applyTypeStyle(S.spec);
-    S.dirty = true; persistDraft(); drawControls(); await refresh();
-    App.toast('Padrão aplicado: figura aberta, ' + targets.length + ' figura(s) salva(s) e ' + tmpls.length + ' modelo(s).', 'ok', 6000);
-  }
-  function typeStylePanel() {
-    const name = typeName(S.spec);
-    const p = typeStyles && typeStyles[typeKey(S.spec)];
-    const run = (fn) => async (ev) => {
-      const b = ev.currentTarget;
-      b.disabled = true;
-      try { await fn(); } catch (e) { App.toast(e.message, 'err'); } finally { b.disabled = false; }
-    };
-    const when = p && p.saved ? new Date(p.saved).toLocaleString('pt-BR') : '';
-    return el('div.stack-s',
-      el('p.small.muted', p
-        ? 'Há um padrão para os ' + name + (when ? ' (salvo em ' + when + ')' : '') + '. Figuras novas desse tipo já abrem com ele.'
-        : 'Ainda não há padrão para os ' + name + '. Deixe esta figura do jeito que quer (tamanho, fontes, legenda, grade, formato dos números…) e clique em "Usar esta figura como padrão".'),
-      el('div.toolbar', { style: { margin: '2px 0 0' } },
-        el('button.btn.small.primary', { type: 'button', title: 'Guarda a aparência desta figura para todos os ' + name + ': tamanho, fontes, cores de fundo, legenda, grade, barras de erro, formato dos números etc. Não guarda títulos, limites dos eixos, escala log nem linhas de referência.',
-          on: { click: run(async () => { await saveTypeStyle(); App.toast('Padrão dos ' + name + ' salvo.', 'ok'); drawControls(); }) } }, 'Usar esta figura como padrão'),
-        p ? el('button.btn.small', { type: 'button', title: 'Troca a aparência desta figura pela do padrão (os dados, títulos e eixos continuam)',
-          on: { click: run(async () => { applyTypeStyle(S.spec); S.dirty = true; persistDraft(); drawControls(); await refresh(); App.toast('Padrão aplicado a esta figura.', 'ok'); }) } }, 'Aplicar a esta figura') : null,
-        p ? el('button.btn.small', { type: 'button', title: 'Aplica o padrão à figura aberta, às figuras salvas em launcher/figures e aos modelos guardados deste tipo',
-          on: { click: run(applyTypeStyleEverywhere) } }, 'Aplicar a todas…') : null,
-        p ? el('button.btn.small.ghost', { type: 'button', title: 'Apaga o padrão deste tipo; as figuras já ajustadas continuam como estão',
-          on: { click: run(async () => { await forgetTypeStyle(); App.toast('Padrão dos ' + name + ' apagado.', 'ok'); drawControls(); }) } }, 'Esquecer padrão') : null),
-      el('p.small.muted', 'O padrão vale para o tipo de gráfico, não só para este modelo: por exemplo, todos os gráficos de linha (bloqueio × carga, SKR, custo…). Fica em launcher/figure-styles.json.'));
-  }
-
   function loadDraft() {
     try {
       const d = JSON.parse(localStorage.getItem(draftKey()) || 'null');
@@ -801,7 +665,7 @@
   }
 
   /** 1.17.0: bar pattern and value-label overrides of one series (spec.seriesStyle[key]), passed to the renderer. */
-  const EXTRA_KEYS = ['pattern', 'patternColor', 'patternSize', 'patternWidth', 'valShow', 'valColor', 'valBold', 'valBox', 'valBoxFill', 'valBoxStroke', 'valPos', 'valFormat', 'valDigits', 'valBoxInside'];
+  const EXTRA_KEYS = ['pattern', 'patternColor', 'patternSize', 'patternWidth', 'valShow', 'valColor', 'valBold', 'valBox', 'valBoxFill', 'valBoxStroke', 'valPos'];
   function extraStyle(o) {
     const out = {};
     for (const k of EXTRA_KEYS) if (o[k] !== undefined && o[k] !== '' && o[k] !== 'inherit') out[k] = o[k];
@@ -913,7 +777,7 @@
     if (!avail.length) return { empty: 'Nenhum dos casos selecionados tem o arquivo ' + spec.file + '.csv.' + fileHint(spec.file) };
     const missing = parsed.filter((x) => !x.p).map((x) => caseLabel(x.c));
     for (const x of avail) EXCL.set(x.p, await excludedCores(x.c.path));
-    const m = spec.type === 'line' ? await buildLine(spec, avail) : spec.type === 'ref' ? buildRef(spec, avail) : buildBars(spec, avail);
+    const m = spec.type === 'line' ? await buildLine(spec, avail) : buildBars(spec, avail);
     m.missing = missing;
     return m;
   }
@@ -1141,84 +1005,6 @@
     return { kind: 'panels', panels, lpUsed, items: selItems };
   }
 
-  // ---------------------------------------------------------------- 1.18.3: comparison with a reference case
-
-  function refCaseOf(spec) {
-    return spec.cases.find((c) => c.path === spec.ref.path) || spec.cases[0] || null;
-  }
-
-  /**
-   * Values of every case for the chosen items (same data as the bars, items on the x axis), then the difference of
-   * each case to the reference case: absolute (value − reference) or relative (% of the reference). One section per
-   * item (cause, core, metric).
-   */
-  function buildRef(spec, avail) {
-    const RF = spec.ref;
-    const refC = refCaseOf(spec);
-    if (!refC) return { empty: 'Selecione os casos na seção 1.' };
-    if (!avail.some((x) => x.c.path === refC.path)) return { empty: 'O caso de referência (' + caseLabel(refC) + ') não tem o arquivo ' + spec.file + '.csv.' };
-    if (avail.length < 2) return { empty: 'Selecione pelo menos dois casos com resultados: o de referência e os que serão comparados com ele.' };
-    const tmp = Object.assign({}, spec, { bars: Object.assign({}, spec.bars, { xAxis: 'items', layout: 'grouped', seriesDim: '', stacked: false, normalize: false, sort: 'none', top: 0, hideZero: RF.hideZero !== false }) });
-    const bm = buildBars(tmp, avail);
-    if (!bm || bm.kind !== 'bars') return { empty: 'Sem dados para a comparação.' };
-    const items = bm.categories.map((c) => c.key);
-    const valOf = (path, it) => { const sr = bm.series.find((x) => x.key === path); const v = sr && sr.values[it]; return v && Number.isFinite(v.mean) ? v.mean : NaN; };
-    const sections = items.map((it) => {
-      const refVal = valOf(refC.path, it);
-      const bars = avail.filter(({ c }) => c.path !== refC.path).map(({ c }) => {
-        const val = valOf(c.path, it);
-        let diff = NaN;
-        if (Number.isFinite(val) && Number.isFinite(refVal)) {
-          if (RF.mode === 'rel') diff = refVal !== 0 ? (val - refVal) / Math.abs(refVal) * 100 : (val === 0 ? 0 : NaN);
-          else diff = val - refVal;
-        }
-        return { key: c.path, item: it, label: caseLabel(c), val, diff, color: '#888888' };
-      });
-      return { key: it, item: it, label: '', refVal, bars };
-    });
-    return { kind: 'ref', mode: RF.mode === 'rel' ? 'rel' : 'abs', refPath: refC.path, refLabel: caseLabel(refC), sections, items, lpUsed: bm.lpUsed, cols: 1 };
-  }
-
-  /** Colours, labels, order and visibility of the comparison (re-applied on every style change). */
-  function styleRef(m, spec) {
-    const RF = spec.ref;
-    const refC = refCaseOf(spec);
-    m.refLabel = refC ? caseLabel(refC) : m.refLabel;
-    m.mode = RF.mode === 'rel' ? 'rel' : 'abs';
-    const single = spec.bars.itemsFrom === 'metrics' && m.sections.length === 1;
-    const caseIdx = (path) => Math.max(0, spec.cases.findIndex((c) => c.path === path));
-    m.sections.forEach((sec, k) => {
-      const it = sec.item;
-      sec.label = single ? '' : (spec.bars.itemsFrom === 'dim' && spec.bars.dim === 'Core' && /^\d+$/.test(it) && !spec.labels[it] ? 'Núcleo ' + it : itemLabel(spec, it));
-      const itemStyle = styleFor(spec, 'i:' + it, k, 'bar', it);
-      const byItem = RF.colorBy === 'item' || (RF.colorBy !== 'case' && !!causeColor(it));
-      sec.color = byItem ? itemStyle.color : null;
-      sec.visible = itemStyle.visible !== false;
-      for (const b of sec.bars) {
-        const c = spec.cases.find((x) => x.path === b.key);
-        b.label = c ? caseLabel(c) : b.label;
-        const vk = 'refval:' + it + '|' + b.key;
-        b.valText = spec.labels[vk] !== undefined ? spec.labels[vk] : '';
-        const cs = styleFor(spec, b.key, caseIdx(b.key), 'bar');
-        b.visible = cs.visible !== false && !(c && c.hidden);
-        b.color = byItem ? itemStyle.color : cs.color;
-      }
-    });
-    m.cols = RF.layout === 'rows' ? 1 : RF.layout === 'grid' ? Math.max(1, Number(spec.style.panelCols) || 2) : m.sections.length;
-  }
-
-  function viewRef(m, spec) {
-    const RF = spec.ref;
-    const sortBars = (bars) => {
-      if (RF.order === 'selection') return bars;
-      const v = (b) => (Number.isFinite(b.diff) ? b.diff : -Infinity);
-      const out = bars.slice().sort((a, b) => v(b) - v(a));
-      return RF.order === 'asc' ? out.reverse() : out;
-    };
-    const sections = m.sections.filter((s) => s.visible !== false).map((s) => Object.assign({}, s, { bars: sortBars(s.bars.filter((b) => b.visible !== false)) })).filter((s) => s.bars.length);
-    return Object.assign({}, m, { sections, cols: Math.max(1, Math.min(m.cols, sections.length || 1)) });
-  }
-
   function coreLayout(cores) { return App.presets.coreLayout(cores); }
 
   // ---------------------------------------------------------------- link heat map on the topology
@@ -1353,22 +1139,12 @@
     return causeColor(cause) || ['#C00000', '#7030A0', '#00B050', '#0070C0', '#ED7D31', '#FFC000', '#5B9BD5', '#A5A5A5'][i % 8];
   }
 
-  /** 1.18.4: causes shown by the spectrum blocking map (null = all). The old single "blockCause" still works. */
-  function slotChosenCauses(T) {
-    if (Array.isArray(T.blockCauses) && T.blockCauses.length) return T.blockCauses.slice();
-    if (T.blockCause && T.blockCause !== 'all') return [T.blockCause];
-    return null;
-  }
-
   /** Spectrum blocking heat map: blocked ÷ attempts, counts or the cause of each slot (Parte 29). */
   async function buildSlotBlock(spec) {
     const T = spec.slots || (spec.slots = newSpec('slotBlock', []).slots);
     const st = spec.style;
     const mode = T.blockMode || 'ratio';
-    const chosen = slotChosenCauses(T);
-    const want = chosen ? 'some' : 'all';
-    const chosenLabel = chosen ? chosen.map((k) => autoLabel(k)).join(' + ') : '';
-    const sumArr = (arrs) => { const ok = arrs.filter(Boolean); if (!ok.length) return null; const out = new Float64Array(ok[0].length); for (const a of ok) for (let i = 0; i < a.length; i++) out[i] += a[i]; return out; };
+    const want = T.blockCause || 'all';
     const panels = [];
     const missing = [];
     const allCauses = [];
@@ -1390,7 +1166,7 @@
       const from = Math.max(1, Math.min(p.nSlots, Math.round(Number(T.from) || 1)));
       const to = Number(T.to) > 0 ? Math.max(from, Math.min(p.nSlots, Math.round(Number(T.to)))) : p.nSlots;
       const n = to - from + 1;
-      const causes = want === 'all' ? p.causes : p.causes.filter((k) => chosen.includes(k));
+      const causes = want === 'all' ? p.causes : p.causes.filter((k) => k === want);
       const rows = [];
       const netS = cd.files.network || {};
       const qCoreS = App.isPlainObject(netS.qkd) && netS.qkd.enabled ? String(netS.qkd.quantumCoreId) : null;
@@ -1399,9 +1175,9 @@
         const key = lp + '|' + link + '|' + core;
         const att = p.att.get(key);
         if (!att) continue;
-        const blkArr = want === 'all' ? p.blkAll.get(key) : sumArr(chosen.map((k) => (p.blk.get(k) || new Map()).get(key)));
+        const blkArr = want === 'all' ? p.blkAll.get(key) : (p.blk.get(want) || new Map()).get(key);
         const reqA = p.reqAtt.get(key) || 0;
-        const reqB = want === 'all' ? (p.reqBlkAll.get(key) || 0) : chosen.reduce((a, k) => a + ((p.reqBlk.get(k) || new Map()).get(key) || 0), 0);
+        const reqB = want === 'all' ? (p.reqBlkAll.get(key) || 0) : ((p.reqBlk.get(want) || new Map()).get(key) || 0);
         totReq += reqA; totBlk += reqB;
         if (T.onlyBlocked && !reqB) continue;
         const values = new Float64Array(n);
@@ -1441,7 +1217,7 @@
       }
       nSlotsAll = Math.max(nSlotsAll, n);
       const nb = p.noBand.get(lp) || 0;
-      const sub = [lpLabel(cd, lp), p.nReps > 1 ? 'soma de ' + p.nReps + ' replicações' : '', want !== 'all' ? chosenLabel : '',
+      const sub = [lpLabel(cd, lp), p.nReps > 1 ? 'soma de ' + p.nReps + ' replicações' : '', want !== 'all' ? autoLabel(want) : '',
         nb > 0 && want === 'all' ? nb + ' bloqueio' + (nb > 1 ? 's' : '') + ' sem faixa no espectro (fora do mapa)' : '',
         (p.noQch.get(lp) || 0) > 0 && want === 'all' ? p.noQch.get(lp) + ' bloqueio' + (p.noQch.get(lp) > 1 ? 's' : '') + ' QKD sem QCh tentado (fora do núcleo ' + (qCoreS || 'quântico') + ')' : '',
         (p.noPich.get(lp) || 0) > 0 && want === 'all' ? p.noPich.get(lp) + ' bloqueio' + (p.noPich.get(lp) > 1 ? 's' : '') + ' de PICh sem faixa tentada' : ''].filter(Boolean);
@@ -1449,7 +1225,7 @@
     }
     S.slotCauses = allCauses;
     if (!panels.length) return { empty: 'Nenhum caso selecionado tem o arquivo ' + slotBlockFile(spec) + '.csv.' + fileHint(slotBlockFile(spec)), missing };
-    if (!panels.some((x) => x.rows.length)) return { empty: T.onlyBlocked ? 'Nenhum núcleo de enlace selecionado teve bloqueio' + (want !== 'all' ? ' por ' + chosenLabel : '') + ' neste ponto de carga.' : 'Nenhum enlace/núcleo selecionado teve tentativas.', missing };
+    if (!panels.some((x) => x.rows.length)) return { empty: T.onlyBlocked ? 'Nenhum núcleo de enlace selecionado teve bloqueio' + (want !== 'all' ? ' por ' + autoLabel(want) : '') + ' neste ponto de carga.' : 'Nenhum enlace/núcleo selecionado teve tentativas.', missing };
     let min = 0, max = 1;
     if (mode === 'count' || st.slotRange === 'auto') {
       min = mode === 'count' ? 0 : Infinity; max = -Infinity;
@@ -1465,8 +1241,8 @@
     if (mode === 'causes') {
       const used = new Set();
       for (const pn of panels) for (const r of pn.rows) for (const c of r.colors) if (c) used.add(c);
-      model.legendItems = allCauses.filter((k) => want === 'all' || chosen.includes(k)).map((k) => [slotCauseColor(k, allCauses.indexOf(k), st), autoLabel(k)]).filter(([c]) => used.has(c));
-      model.legendItems.push([st.slotNoBlockColor || SLOT_NOBLOCK_COLOR, 'Tentado, sem bloqueio' + (want !== 'all' ? (chosen.length > 1 ? ' por estas causas' : ' por esta causa') : '')], [model.noDataColor, 'Nenhuma tentativa']);
+      model.legendItems = allCauses.filter((k) => want === 'all' || k === want).map((k) => [slotCauseColor(k, allCauses.indexOf(k), st), autoLabel(k)]).filter(([c]) => used.has(c));
+      model.legendItems.push([st.slotNoBlockColor || SLOT_NOBLOCK_COLOR, 'Tentado, sem bloqueio' + (want !== 'all' ? ' por esta causa' : '')], [model.noDataColor, 'Nenhuma tentativa']);
     }
     model.legendTitle = slotBlockLegendTitle(spec, mode);
     return model;
@@ -1561,8 +1337,7 @@
       const pts = [];
       if (by === 'LoadPoint') {
         const fx = autoFilters(px, X.xMetric, null, X.fx), fy = autoFilters(py, X.yMetric, null, X.fy);
-        const lpWanted = (l) => !(Array.isArray(X.lps) && X.lps.length) || X.lps.includes(l); // Parte 59: animation
-        for (const lp of px.lps.filter((l) => py.lps.includes(l) && lpWanted(l))) {
+        for (const lp of px.lps.filter((l) => py.lps.includes(l))) {
           const sx = stats(repsAt(px, X.xMetric, lp, fx)), sy = stats(repsAt(py, X.yMetric, lp, fy));
           if (!Number.isFinite(sx.mean) || !Number.isFinite(sy.mean)) continue;
           const erl = cd.loads ? cd.loads.base + lp * cd.loads.inc : null;
@@ -1690,12 +1465,6 @@
       }
       return { head, rows };
     }
-    if (model.kind === 'ref') {
-      const head = ['seção', 'caso', 'valor', 'valor da referência (' + model.refLabel + ')', model.mode === 'rel' ? 'diferença (%)' : 'diferença'];
-      const rows = [];
-      for (const sx of model.sections) for (const b of sx.bars) rows.push([sx.label || itemLabel(spec, sx.item), b.label, Number.isFinite(b.val) ? b.val : '', Number.isFinite(sx.refVal) ? sx.refVal : '', Number.isFinite(b.diff) ? b.diff : '']);
-      return { head, rows };
-    }
     if (model.kind === 'topo') {
       const head = ['painel', 'enlace', 'média', 'IC95', 'n'];
       const rows = [];
@@ -1803,7 +1572,7 @@
     } else if (m.kind === 'slots' && m.block) {
       add('painel', 'caso e ponto de carga (um mapa por caso); soma das replicações. Bloqueios sem faixa (sem candidato) não têm lugar no espectro e são contados à parte no título.');
       add('enlace / núcleo', 'uma linha do mapa por núcleo de cada enlace direcional escolhido.');
-      add('requisições bloqueadas/feitas', 'quantas requisições tiveram o candidato naquele núcleo daquele enlace (cada requisição conta uma vez por enlace da rota) e quantas delas foram bloqueadas' + (slotChosenCauses(spec.slots) ? ' pelas causas escolhidas' : '') + '; ao lado, a porcentagem.');
+      add('requisições bloqueadas/feitas', 'quantas requisições tiveram o candidato naquele núcleo daquele enlace (cada requisição conta uma vez por enlace da rota) e quantas delas foram bloqueadas' + (spec.slots.blockCause !== 'all' ? ' pela causa escolhida' : '') + '; ao lado, a porcentagem.');
       add('slot N', m.block === 'count' ? 'número de bloqueios cuja faixa incluía o slot N.' : m.block === 'causes' ? 'cor da causa com mais bloqueios no slot N (vazio = sem tentativas). Na tabela: bloqueadas ÷ tentativas.' : 'bloqueios ÷ tentativas cuja faixa incluía o slot N (vazio = sem tentativas). Requisições grandes ocupam mais slots, por isso a média dos slots fica acima da porcentagem por requisição.');
     } else if (m.kind === 'slots') {
       add('painel', 'caso e ponto de carga (um mapa por caso).');
@@ -1881,7 +1650,7 @@
 
   // ================================================================ render page
 
-  let host = null, leftCol = null, previewBox = null, tableBox = null, seriesBox = null, infoBox = null, navBox = null;
+  let host = null, leftCol = null, previewBox = null, tableBox = null, seriesBox = null, infoBox = null;
 
   function render() { return renderInto(document.getElementById('figView'), 'page'); }
 
@@ -1890,7 +1659,6 @@
    * the case is always selected first and the figure is remembered per case.
    */
   async function renderInto(container, mode, casePath) {
-    await loadTypeStyles(); // Parte 55
     if (mode !== S.mode || casePath !== S.casePath || !S.spec) {
       S.mode = mode === 'case' ? 'case' : 'page';
       S.casePath = S.mode === 'case' ? casePath : null;
@@ -1905,46 +1673,26 @@
     S.seriesKeys = '';
     host = clear(container);
     leftCol = el('div.fig-controls');
-    navBox = el('div.fig-nav');
     previewBox = el('div.fig-preview');
     tableBox = el('div.fig-table');
     infoBox = el('div.fig-info');
-    // 1.18.2: the title stays in place and the toolbar goes to a bar that stays fixed while the page scrolls
-    // (a sticky element only stays in view inside its parent, so title and bar are direct children of host)
     const head = S.mode === 'case'
-      ? [
-        el('div.fig-head', el('div', el('h2', 'Resultados do caso'),
-          el('p.muted', 'Média das replicações com IC 95 % (t de Student). Escolha o arquivo e a métrica em "2. Dados"; adicione outros casos em "1. Casos" para comparar. Estilo, exportação e figuras salvas funcionam como no botão Gráficos.'))),
-        el('div.toolbar.fig-stickybar', toolbar(),
+      ? el('div.fig-head',
+        el('div', el('h2', 'Resultados do caso'),
+          el('p.muted', 'Média das replicações com IC 95 % (t de Student). Escolha o arquivo e a métrica em "2. Dados"; adicione outros casos em "1. Casos" para comparar. Estilo, exportação e figuras salvas funcionam como no botão Gráficos.')),
+        el('div.toolbar', { style: { margin: 0 } }, toolbar(),
           el('button.btn.small.ghost', { type: 'button', title: 'Continua esta figura na página Gráficos', on: { click: () => {
             try { localStorage.setItem('snets.figure.draft', JSON.stringify({ spec: S.spec, savedName: S.savedName })); } catch (e) { /* ignore */ }
             S.mode = 'page'; S.casePath = null; S.spec = null;
             App.showFigures();
-          } } }, 'Abrir na página Gráficos'))]
-      : [
-        // Parte 55: sem o cabeçalho grande; o nome fica na barra fixa, ao lado dos botões
-        el('div.fig-stickybar', el('div.fig-bar-row',
-          el('span.fig-bar-title', { title: 'Monte figuras com os CSVs de vários casos, ajuste o estilo e exporte em SVG/PNG. As figuras salvas ficam em launcher/figures e são recalculadas com os resultados atuais.' }, 'Estúdio de gráficos'),
-          toolbar()))];
+          } } }, 'Abrir na página Gráficos')))
+      : el('div.fig-head',
+        el('div', el('h1', 'Estúdio de gráficos'),
+          el('p.muted', 'Monte figuras com os CSVs de vários casos, ajuste o estilo e exporte em SVG/PNG. As figuras salvas ficam em launcher/figures e são recalculadas com os resultados atuais.')),
+        toolbar());
     const reportSec = section('Relatório: várias figuras numa imagem (SVG/PNG/PDF)', false, reportPanel());
     reportSec.classList.add('fig-report');
-    host.append(...head, el('div.fig-layout', el('div.fig-side', navBox, leftCol), el('div.fig-right', infoBox, previewBox, tableBox, reportSec)));
-    // 1.18.4: the left column starts below the fixed toolbar, whatever its height
-    const barEl = host.querySelector('.fig-stickybar');
-    const sizeSide = () => {
-      if (!barEl || !host.isConnected) return;
-      host.style.setProperty('--fig-bar-h', barEl.offsetHeight + 'px');
-      // height of the left column: the visible part of the scrolling page below the toolbar
-      let sp = host.parentElement;
-      while (sp && sp !== document.body && !/(auto|scroll)/.test(getComputedStyle(sp).overflowY)) sp = sp.parentElement;
-      const viewH = sp && sp !== document.body ? sp.clientHeight : window.innerHeight;
-      const caseH = parseFloat(getComputedStyle(host).getPropertyValue('--case-sticky-h')) || 0;
-      host.style.setProperty('--fig-side-h', Math.max(320, viewH - barEl.offsetHeight - caseH - 70) + 'px');
-    };
-    if (barEl && window.ResizeObserver) new ResizeObserver(sizeSide).observe(barEl);
-    if (!S.sideResize) { S.sideResize = true; window.addEventListener('resize', () => { if (host) { const f = host.querySelector('.fig-stickybar'); if (f) f.dispatchEvent(new Event('fig-size')); } }); }
-    if (barEl) barEl.addEventListener('fig-size', sizeSide);
-    sizeSide();
+    host.append(head, el('div.fig-layout', leftCol, el('div.fig-right', infoBox, previewBox, tableBox, reportSec)));
     await refreshSaved();
     drawControls();
     await refresh();
@@ -1978,7 +1726,7 @@
 
   function toolbar() {
     const bar = el('div.toolbar.fig-toolbar');
-    const savedSel = el('select.input', { style: { maxWidth: '180px' } });
+    const savedSel = el('select.input', { style: { maxWidth: '230px' } });
     const fillSaved = () => {
       clear(savedSel).append(el('option', { value: '' }, S.saved.length ? 'Abrir figura salva…' : 'Nenhuma figura salva'),
         S.saved.map((f) => el('option', { value: f.name }, f.name)));
@@ -1997,46 +1745,29 @@
         App.toast('Figura "' + n + '" aberta', 'ok');
       } catch (e) { App.toast(e.message, 'err'); }
     });
-    const pngScale = el('select.input', { title: 'Resolução do PNG (3× ≈ 300 dpi numa coluna de artigo)', style: { width: 'auto' } },
-      [[1, 'PNG 1×'], [2, 'PNG 2×'], [3, 'PNG 3×'], [4, 'PNG 4×']].map(([v, l]) => el('option', { value: v }, l)));
+    const pngScale = el('select.input', { title: 'Resolução do PNG', style: { width: 'auto' } },
+      [[1, 'PNG 1×'], [2, 'PNG 2×'], [3, 'PNG 3× (≈300 dpi)'], [4, 'PNG 4×']].map(([v, l]) => el('option', { value: v }, l)));
     pngScale.value = '3';
     const fname = () => (S.savedName || (S.spec.style.title || S.spec.template || 'figura')).replace(/[^\w\-. ()+À-ÿ]+/g, '_').slice(0, 80) || 'figura';
-    // Parte 60: Figura | Imagem: PNG, .SVG, .PNG, gravar, dados | Animação ... pasta e numeração à direita
-    const imagesFolder = () => (App.state.info && App.state.info.settings && App.state.info.settings.imagesDir) || 'launcher/figures';
-    const pickImages = async () => {
-      const d = await App.pickFolder(imagesFolder(), 'Pasta das imagens e animações');
-      if (!d) return;
-      try {
-        await App.api.saveSettings({ imagesDir: d });
-        if (App.state.info) App.state.info.settings.imagesDir = d;
-        App.toast('Imagens e animações vão para ' + d, 'ok');
-      } catch (e) { App.toast(e.message, 'err'); }
-    };
-    bar.append(el('div.fig-group.fig-group-main',
+    bar.append(
       el('button.btn.small', { type: 'button', on: { click: () => newDialog() } }, 'Nova'),
       savedSel,
       el('button.btn.small.primary', { type: 'button', on: { click: () => saveDialog(false) } }, 'Salvar'),
-      el('button.btn.small', { type: 'button', on: { click: () => saveDialog(true) } }, 'Salvar como…')),
-      el('div.fig-group.fig-group-sep',
-      el('span.fig-bar-title.fig-bar-sub', 'Imagem'),
+      el('button.btn.small', { type: 'button', on: { click: () => saveDialog(true) } }, 'Salvar como…'),
+      el('span.sep'),
+      el('button.btn.small', { type: 'button', on: { click: () => { if (S.svg) App.downloadText(nextName(fname(), 'svg'), R().serialize(S.svg), 'image/svg+xml'); } } }, 'Baixar SVG'),
       pngScale,
-      el('button.btn.small', { type: 'button', title: 'Baixar a figura em SVG', on: { click: () => { if (S.svg) App.downloadText(nextName(fname(), 'svg'), R().serialize(S.svg), 'image/svg+xml'); } } }, '.SVG'),
-      el('button.btn.small', { type: 'button', title: 'Baixar a figura em PNG, na resolução escolhida', on: { click: async () => {
+      el('button.btn.small', { type: 'button', on: { click: async () => {
         if (!S.svg) return;
         try {
           const url = await R().toPng(S.svg, Number(pngScale.value));
           const a = el('a', { href: url, download: nextName(fname(), 'png') }); document.body.appendChild(a); a.click(); a.remove();
         } catch (e) { App.toast(e.message, 'err'); }
-      } } }, '.PNG'),
-      el('button.btn.small', { type: 'button', title: 'Grava SVG e PNG na pasta das imagens (' + imagesFolder() + ')', on: { click: () => saveImages(Number(pngScale.value)) } }, 'Gravar imagens na pasta'),
-      el('button.btn.small', { type: 'button', on: { click: () => { if (S.table) App.downloadText(nextName(fname(), 'csv'), toCsv(S.table), 'text/csv'); } } }, 'Dados (CSV)')),
-      el('div.fig-group.fig-group-sep',
-      el('span.fig-bar-title.fig-bar-sub', 'Animação'),
-      el('button.btn.small', { type: 'button', title: 'Animação ao longo dos pontos de carga (GIF, MP4, WebM ou quadros separados)', on: { click: () => { if (App.anim) App.anim.open(); } } }, 'Gerar animação')),
-      el('div.fig-group.fig-group-end',
-      el('button.btn.small.ghost', { type: 'button', title: 'Abrir a pasta das imagens (' + imagesFolder() + ')', on: { click: () => App.api.openFiguresFolder().catch((e) => App.toast(e.message, 'err')) } }, 'Abrir pasta'),
-      el('button.btn.small.ghost', { type: 'button', title: 'Escolher no explorador a pasta onde as imagens e animações são gravadas', on: { click: pickImages } }, 'Escolher pasta…'),
-      el('button.btn.small.ghost', { type: 'button', title: 'Os downloads repetidos saem como nome(1), nome(2)…; isto recomeça a contagem', on: { click: resetDownloadNames } }, 'Zerar numeração')));
+      } } }, 'Baixar PNG'),
+      el('button.btn.small', { type: 'button', title: 'Grava SVG e PNG em launcher/figures', on: { click: () => saveImages(Number(pngScale.value)) } }, 'Gravar imagens na pasta'),
+      el('button.btn.small', { type: 'button', on: { click: () => { if (S.table) App.downloadText(nextName(fname(), 'csv'), toCsv(S.table), 'text/csv'); } } }, 'Dados (CSV)'),
+      el('button.btn.small.ghost', { type: 'button', title: 'Os downloads repetidos saem como nome(1), nome(2)…; isto recomeça a contagem', on: { click: resetDownloadNames } }, 'Zerar numeração'),
+      el('button.btn.small.ghost', { type: 'button', title: 'Abrir launcher/figures', on: { click: () => App.api.openFiguresFolder().catch((e) => App.toast(e.message, 'err')) } }, 'Abrir pasta'));
     return bar;
   }
 
@@ -2050,7 +1781,6 @@
     out.topo = Object.assign(base.topo, spec.topo || {});
     out.slots = Object.assign(base.slots, spec.slots || {});
     out.scatter = Object.assign(base.scatter, spec.scatter || {});
-    out.ref = Object.assign(base.ref, spec.ref || {});
     out.labels = spec.labels || {}; out.seriesStyle = spec.seriesStyle || {}; out.filters = spec.filters || {};
     return out;
   }
@@ -2119,102 +1849,17 @@
   function drawControlsInner() {
     clear(leftCol);
     const spec = S.spec;
-    const tag = (d, key, label) => { if (d) { d.dataset.nav = key; d.dataset.navLabel = label; } return d; };
     leftCol.append(
-      tag(section('1. Casos (' + spec.cases.length + ')', true, casesPanel()), 'cases', 'Casos'),
-      tag(section('2. Dados', true, dataPanel()), 'data', 'Dados'),
-      usesCost(spec) ? tag(section('Pesos do custo', true, costPanel()), 'cost', 'Custo') : null,
-      (seriesBox = el('div', { 'data-nav': 'series', 'data-nav-label': 'Séries e cores' })),
-      tag(section('Padrão dos ' + typeName(spec), false, typeStylePanel()), 'typestyle', 'Padrão do tipo'),
-      tag(section('4. Aparência', false, appearancePanel()), 'look', 'Aparência'),
-      ['line', 'bars'].includes(spec.type) ? tag(section('5. Rótulos dos valores', false, valuesPanel()), 'values', 'Valores') : null,
-      spec.type === 'ref' ? tag(section('5. Gráfico de referência', true, refStylePanel()), 'ref', 'Referência') : null,
-      tag(section('6. Eixos e números', false, axesPanel()), 'axes', 'Eixos'),
-      tag(section('7. Linhas de referência', false, refLinesPanel()), 'lines', 'Linhas'),
-      tag(section('8. Legenda e título', false, legendPanel()), 'legend', 'Legenda e título'));
+      section('1. Casos (' + spec.cases.length + ')', true, casesPanel()),
+      section('2. Dados', true, dataPanel()),
+      usesCost(spec) ? section('Pesos do custo', true, costPanel()) : null,
+      (seriesBox = el('div')),
+      section('4. Aparência', false, appearancePanel()),
+      ['line', 'bars'].includes(spec.type) ? section('5. Rótulos dos valores', false, valuesPanel()) : null,
+      section('6. Eixos e números', false, axesPanel()),
+      section('7. Linhas de referência', false, refLinesPanel()),
+      section('8. Legenda e título', false, legendPanel()));
     drawSeriesPanel();
-    drawNav();
-  }
-
-  // ---------------------------------------------------------------- 1.18.4: menu of the settings (top of the left column)
-
-  const navNorm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  function navSections() {
-    if (!leftCol) return [];
-    return [...leftCol.children].filter((x) => x.dataset && x.dataset.nav).map((x) => ({
-      key: x.dataset.nav, label: x.dataset.navLabel, box: x, det: x.matches('details') ? x : x.querySelector(':scope > details'),
-    })).filter((x) => x.det);
-  }
-  function navOne() { try { return localStorage.getItem('snets.fig.navOne') === '1'; } catch (e) { return false; } }
-  function goSection(key, target) {
-    const list = navSections();
-    const it = list.find((x) => x.key === key);
-    if (!it) return;
-    if (navOne()) for (const x of list) if (x !== it && x.key !== 'cases' && x.det.open) x.det.open = false;
-    it.det.open = true;
-    let p = target ? target.parentElement : null;
-    while (p && p !== leftCol) { if (p.tagName === 'DETAILS') p.open = true; p = p.parentElement; }
-    requestAnimationFrame(() => {
-      const t = target || it.det;
-      const top = t.getBoundingClientRect().top - leftCol.getBoundingClientRect().top + leftCol.scrollTop - 6;
-      leftCol.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-      if (target) { target.classList.add('fig-flash'); setTimeout(() => target.classList.remove('fig-flash'), 1600); }
-      markNav();
-    });
-  }
-  function markNav() {
-    if (!navBox) return;
-    const open = new Set(navSections().filter((x) => x.det.open).map((x) => x.key));
-    for (const b of navBox.querySelectorAll('[data-go]')) b.classList.toggle('is-open', open.has(b.dataset.go));
-  }
-  function drawNav() {
-    if (!navBox) return;
-    const list = navSections();
-    let search = navBox.querySelector('.fig-nav-search');
-    let results = navBox.querySelector('.fig-nav-results');
-    const keepVal = search ? search.value : '';
-    clear(navBox);
-    const chips = el('div.fig-nav-chips', list.map((x) => el('button.fig-nav-chip', { type: 'button', 'data-go': x.key, title: 'Ir para "' + x.det.querySelector('summary').textContent + '"', on: { click: () => goSection(x.key) } }, x.label)));
-    search = el('input.input.fig-nav-search', { type: 'search', placeholder: 'Procurar um ajuste (ex.: casas decimais, fonte, legenda)…', value: keepVal });
-    results = el('div.fig-nav-results');
-    results.hidden = true;
-    const run = () => {
-      clear(results);
-      const q = navNorm(search.value.trim());
-      if (q.length < 2) { results.hidden = true; return; }
-      const hits = [];
-      for (const sx of navSections()) {
-        for (const f of sx.box.querySelectorAll('.field, label.check, .fig-series-grid label, summary')) {
-          if (f.closest('.fig-nav')) continue;
-          const lab = f.querySelector(':scope > .flabel, :scope > span') || f;
-          const t = lab.textContent.trim();
-          if (!t || !navNorm(t).includes(q)) continue;
-          hits.push({ sx, f, t });
-          if (hits.length >= 14) break;
-        }
-        if (hits.length >= 14) break;
-      }
-      results.hidden = false;
-      if (!hits.length) { results.append(el('div.small.muted', { style: { padding: '6px 8px' } }, 'Nenhum ajuste com "' + search.value.trim() + '".')); return; }
-      for (const h of hits) results.append(el('button.fig-nav-hit', { type: 'button', on: { click: () => { results.hidden = true; goSection(h.sx.key, h.f); } } },
-        el('span', h.t.length > 70 ? h.t.slice(0, 68) + '…' : h.t), el('span.small.muted', h.sx.label)));
-    };
-    search.addEventListener('input', App.debounce(run, 120));
-    search.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const b = results.querySelector('.fig-nav-hit'); if (b) b.click(); } if (e.key === 'Escape') { search.value = ''; results.hidden = true; } });
-    search.addEventListener('focus', () => { if (search.value.trim().length >= 2) run(); });
-    const one = el('input', { type: 'checkbox' });
-    one.checked = navOne();
-    one.addEventListener('change', () => { try { localStorage.setItem('snets.fig.navOne', one.checked ? '1' : '0'); } catch (e) { /* ignore */ } });
-    const all = (v) => () => { for (const x of navSections()) x.det.open = v; markNav(); };
-    navBox.append(chips, el('div.fig-nav-row', el('div.fig-nav-searchwrap', search, results)),
-      el('div.fig-nav-row.fig-nav-opts',
-        el('label.check', one, ' Uma seção por vez'),
-        el('span.fig-nav-sp'),
-        el('button.fig-nav-link', { type: 'button', title: 'Abre todas as seções', on: { click: all(true) } }, 'Abrir todas'),
-        el('span.muted', '·'),
-        el('button.fig-nav-link', { type: 'button', title: 'Fecha todas as seções', on: { click: all(false) } }, 'Fechar todas')));
-    for (const x of list) x.det.addEventListener('toggle', markNav);
-    markNav();
   }
 
   function usesCost(spec) {
@@ -2260,7 +1905,6 @@
         el('label.fig-case-vis', vis),
         el('div.fig-case-main', lab, el('div.small.muted.ell', { title: c.path }, (c.hidden ? 'oculto · ' : '') + c.path)),
         el('div.fig-case-btns',
-          spec.type === 'ref' ? el('button.btn.small.icon' + (refCaseOf(spec) === c ? '.primary' : ''), { type: 'button', title: refCaseOf(spec) === c ? 'Caso de referência' : 'Usar como caso de referência', on: { click: () => { spec.ref.path = c.path; changedData(); } } }, refCaseOf(spec) === c ? '★' : '☆') : null,
           el('button.btn.small.icon', { type: 'button', title: 'Subir', disabled: i === 0, on: { click: () => { spec.cases.splice(i - 1, 0, spec.cases.splice(i, 1)[0]); changedData(); } } }, '↑'),
           el('button.btn.small.icon', { type: 'button', title: 'Descer', disabled: i === spec.cases.length - 1, on: { click: () => { spec.cases.splice(i + 1, 0, spec.cases.splice(i, 1)[0]); changedData(); } } }, '↓'),
           el('button.btn.small.icon', { type: 'button', title: 'Remover', on: { click: () => { spec.cases.splice(i, 1); changedData(); } } }, '✕'))));
@@ -2328,7 +1972,7 @@
       const keepStyle = { width: spec.style.width, font: spec.style.font, fontSize: spec.style.fontSize, decimal: spec.style.decimal, palette: spec.style.palette, bg: spec.style.bg };
       S.spec = newSpec(id, []);
       S.spec.cases = keepCases;
-      if (!applyTypeStyle(S.spec)) Object.assign(S.spec.style, keepStyle); // Parte 55: o padrão do tipo vem primeiro
+      Object.assign(S.spec.style, keepStyle);
       if (S.spec.template === 'cores') { S.spec.style.width = Math.max(S.spec.style.width, 900); }
       changedData();
     };
@@ -2349,12 +1993,11 @@
     box.append(groupField('Modelo de gráfico', el('div.stack-s', tmplSel, el('div', resetTmpl)),
       (tdesc ? tdesc + ' ' : '') + 'Os ajustes feitos em cada modelo ficam guardados: ao trocar de modelo e voltar, eles reaparecem. "Padrão do modelo" esquece os ajustes deste modelo.'));
 
-    const typeSel = selectInput(spec, 'type', [['line', 'Linhas (métrica × carga ou parâmetro)'], ['bars', 'Barras (agrupadas / empilhadas)'], ['cores', 'Diagrama da fibra (núcleos)'], ['topo', 'Mapa de calor na topologia (enlaces)'], ['slots', 'Mapa de calor do espectro (slots × núcleos × enlaces)'], ['slotblock', 'Mapa de calor do bloqueio no espectro (slots)'], ['slotline', 'Perfil de ocupação por slot (linhas)'], ['scatter', 'Dispersão: métrica × métrica (correlação)'], ['ref', 'Comparação com um caso de referência (barras divergentes)']], () => {
+    const typeSel = selectInput(spec, 'type', [['line', 'Linhas (métrica × carga ou parâmetro)'], ['bars', 'Barras (agrupadas / empilhadas)'], ['cores', 'Diagrama da fibra (núcleos)'], ['topo', 'Mapa de calor na topologia (enlaces)'], ['slots', 'Mapa de calor do espectro (slots × núcleos × enlaces)'], ['slotblock', 'Mapa de calor do bloqueio no espectro (slots)'], ['slotline', 'Perfil de ocupação por slot (linhas)'], ['scatter', 'Dispersão: métrica × métrica (correlação)']], () => {
       if (spec.type === 'topo' && !spec.file) { spec.file = 'SpectrumUtilization'; spec.metric = 'Utilization Per Link'; }
       if (spec.type === 'slots') { spec.file = 'SlotUtilization'; if (!spec.slots) spec.slots = newSpec('slotHeat', []).slots; if (spec.style.width < 1000) spec.style.width = 1400; }
       if (spec.type === 'slotblock') { spec.file = 'SlotBlocking'; if (!spec.slots) spec.slots = newSpec('slotBlock', []).slots; if (spec.style.width < 1000) spec.style.width = 1400; }
       if (spec.type === 'slotline') { spec.file = 'SlotUtilization'; if (!spec.slots) spec.slots = newSpec('slotProfile', []).slots; spec.style.xAsCategories = false; }
-      if (spec.type === 'ref') { if (!spec.ref) spec.ref = newSpec('refBp', []).ref; if (!spec.file) { spec.file = 'BlockingProbability'; spec.bars.itemsFrom = 'metrics'; spec.bars.items = ['Blocking probability']; } spec.style.errorBars = 'none'; }
       if (spec.type === 'scatter') { if (!spec.scatter) spec.scatter = newSpec('scLinkUtilBlock', []).scatter; spec.style.xAsCategories = false; spec.style.errorBars = 'none'; }
       changedData();
     });
@@ -2435,8 +2078,7 @@
       box.append(filterFields(spec, L.seriesBy.startsWith('dim:') ? L.seriesBy.slice(4) : null));
     } else {
       const B = spec.bars;
-      if (spec.type === 'ref') box.append(refDataFields());
-      box.append(field(spec.type === 'ref' ? 'Seções a partir de' : 'Barras a partir de', selectInput(B, 'itemsFrom', [['metrics', 'Várias métricas (ex.: causas de bloqueio)'], ['dim', 'Valores de uma dimensão (ex.: Link, Modulation, Core)']], () => { B.items = []; changedData(); })));
+      box.append(field('Barras a partir de', selectInput(B, 'itemsFrom', [['metrics', 'Várias métricas (ex.: causas de bloqueio)'], ['dim', 'Valores de uma dimensão (ex.: Link, Modulation, Core)']], () => { B.items = []; changedData(); })));
       if (B.itemsFrom === 'metrics') {
         const re = B.itemsRe ? new RegExp(B.itemsRe, 'i') : null;
         const current = B.items.length ? B.items : metrics.filter((m) => (re ? re.test(m) : m === spec.metric));
@@ -2445,7 +2087,7 @@
         const dims = (S.dimOptions[spec.metric] || []).filter((d) => d.values.length > 1);
         if (!dims.find((d) => d.name === B.dim) && dims.length) B.dim = dims[0].name;
         box.append(field('Dimensão', selectInput(B, 'dim', dims.map((d) => [d.name, d.name + ' (' + d.values.length + ')']), () => { B.items = []; changedData(); })));
-        if (spec.type !== 'ref') box.append(field('Cores (séries) por', selectInput(B, 'seriesDim', [['', B.xAxis === 'items' ? 'Casos' : 'Valores da dimensão']].concat(dims.filter((x) => x.name !== B.dim).map((x) => [x.name, x.name])), () => { if (B.seriesDim) B.xAxis = 'items'; changedData(); }), 'Ex.: Dimensão = Core e cores por Cause dá as causas de bloqueio em cada núcleo.'));
+        box.append(field('Cores (séries) por', selectInput(B, 'seriesDim', [['', B.xAxis === 'items' ? 'Casos' : 'Valores da dimensão']].concat(dims.filter((x) => x.name !== B.dim).map((x) => [x.name, x.name])), () => { if (B.seriesDim) B.xAxis = 'items'; changedData(); }), 'Ex.: Dimensão = Core e cores por Cause dá as causas de bloqueio em cada núcleo.'));
         const d = dims.find((x) => x.name === B.dim);
         if (d && d.values.length <= 40) {
           const vals = d.values.filter((v) => v !== 'all');
@@ -2453,7 +2095,6 @@
         }
       }
       box.append(field('Ponto de carga', lpSelect(B, 'lp')));
-      if (spec.type === 'ref') { box.append(filterFields(spec, B.itemsFrom === 'dim' ? [B.dim] : null)); return box; }
       box.append(field('No eixo x', selectInput(B, 'xAxis', [['cases', 'Casos (cores = itens)'], ['items', 'Itens (cores = casos)']], () => changedData())));
       const opts = el('div.checks');
       opts.append(checkInput(B, 'stacked', 'Empilhar', () => { if (B.stacked) spec.style.errorBars = 'none'; changedData(); }));
@@ -2470,23 +2111,6 @@
     return box;
   }
   const changedStyleData = App.debounce(() => { persistDraft(); refresh(); }, 250);
-
-  /** 1.18.3: reference case, difference, order, layout and colours of the comparison chart. */
-  function refDataFields() {
-    const spec = S.spec;
-    const RF = spec.ref;
-    const refC = refCaseOf(spec);
-    const box = el('div.stack-s');
-    box.append(field('Caso de referência', selectInput(Object.assign(RF, { path: refC ? refC.path : '' }), 'path', spec.cases.map((c) => [c.path, caseLabel(c)]), () => changedData()),
-      'A linha vertical do gráfico. Também dá para escolher pela estrela (☆) ao lado do caso na seção 1.'));
-    box.append(el('div.fields.two',
-      field('Diferença', selectInput(RF, 'mode', [['abs', 'Absoluta (valor − referência)'], ['rel', 'Porcentagem da referência']], () => changedData())),
-      field('Ordem das barras', selectInput(RF, 'order', [['selection', 'Ordem de seleção dos casos'], ['desc', 'Maior aumento primeiro'], ['asc', 'Maior redução primeiro']], () => changedData())),
-      field('Seções (uma por item)', selectInput(RF, 'layout', [['cols', 'Lado a lado'], ['rows', 'Uma embaixo da outra'], ['grid', 'Grade (painéis por linha da seção 4)']], () => changedData())),
-      field('Cores', selectInput(RF, 'colorBy', [['auto', 'Automática: cor da causa nas causas, cor do caso nos demais'], ['case', 'Sempre a cor do caso'], ['item', 'Sempre a cor do item (causa, núcleo, métrica)']], () => changedData()))));
-    box.append(el('div.checks', checkInput(RF, 'hideZero', 'Ocultar itens sempre zero', () => changedData())));
-    return box;
-  }
 
   function coresDataFields() {
     const C = S.spec.cores;
@@ -2550,7 +2174,7 @@
     if (isBlock) {
       if (!/^(SlotBlocking|QKDChannelSlotBlocking)$/.test(S.spec.file || '')) S.spec.file = 'SlotBlocking';
       box.append(field('Requisições do mapa', selectInput(S.spec, 'file', [['SlotBlocking', 'Todas, cores por causa (SlotBlocking.csv)'], ['QKDChannelSlotBlocking', 'Só as protegidas por QKD, cores por canal CCh/QCh/PICh (QKDChannelSlotBlocking.csv)']], () => {
-        S.spec.slots.blockCause = 'all'; S.spec.slots.blockCauses = []; changedData();
+        S.spec.slots.blockCause = 'all'; changedData();
       })));
     }
     if (!o.links.length) {
@@ -2560,24 +2184,13 @@
     box.append(field('Ponto de carga', lpSelect(T, 'lp')));
     if (isBlock) {
       const causes = (o.causes || []).slice();
-      const ch0 = slotChosenCauses(T) || [];
-      for (const k of ch0) if (!causes.includes(k)) causes.push(k);
+      if (T.blockCause && T.blockCause !== 'all' && !causes.includes(T.blockCause)) causes.push(T.blockCause);
       box.append(el('div.fields.two',
         field('O que cada slot mostra', selectInput(T, 'blockMode', [['ratio', 'Bloqueadas ÷ tentativas (escala de cores)'], ['count', 'Número de bloqueios (escala de cores)'], ['causes', 'Causa do bloqueio (uma cor por causa)']], () => {
           if (T.blockMode === 'count') S.spec.style.slotRange = 'auto';
           changedData();
-        }))));
-      // 1.18.4: several causes can be marked (none or all marked = all causes)
-      if (causes.length) {
-        const labs = causes.map((k) => autoLabel(k) + (autoLabel(k) !== k ? ' (' + k + ')' : ''));
-        const cur = ch0.length ? causes.filter((k) => ch0.includes(k)) : causes;
-        box.append(groupField('Causas mostradas (' + cur.length + ' de ' + causes.length + ')', metricChecklist(labs, cur.map((k) => labs[causes.indexOf(k)]), (arr) => {
-          const pick = causes.filter((k, i) => arr.includes(labs[i]));
-          T.blockCauses = pick.length === causes.length ? [] : pick;
-          T.blockCause = 'all';
-          changedData();
-        }, true), 'Marque uma ou mais causas: o mapa mostra só onde elas ocorreram, cada uma na sua cor. Todas marcadas = todas as causas.'));
-      }
+        })),
+        field('Causa', selectInput(T, 'blockCause', [['all', 'Todas as causas']].concat(causes.map((k) => [k, autoLabel(k) + (autoLabel(k) !== k ? ' (' + k + ')' : '')])), () => changedData()))));
       box.append(el('div.checks',
         checkInput(T, 'onlyBlocked', 'Só os núcleos de enlace com bloqueio', () => changedData()),
         checkInput(T, 'summary', 'Colunas à direita: bloqueadas/feitas e %', () => changedData())));
@@ -2657,11 +2270,6 @@
   /** Current style of the entry e (index i) of the series panel; panels with a series dimension are looked up by key. */
   function seriesStyleOf(m, e, i) {
     if (m.kind === 'line' || m.kind === 'bars') { const x = m.series.find((s) => s.key === e.key) || m.series[i]; return x ? x.style : null; }
-    if (m.kind === 'ref') {
-      const spec = S.spec;
-      if (e.key.startsWith('i:')) { const k = m.sections.findIndex((sx) => 'i:' + sx.item === e.key); return styleFor(spec, e.key, Math.max(0, k), 'bar', e.key.slice(2)); }
-      return styleFor(spec, e.key, Math.max(0, spec.cases.findIndex((c) => c.path === e.key)), 'bar');
-    }
     if (m.kind === 'panels') {
       for (const p of m.panels) { const x = p.model.series.find((s) => s.key === e.key); if (x && x.style) return x.style; }
       const p = m.panels[i];
@@ -2690,9 +2298,6 @@
     if (!seriesBox) return;
     const keepFocus = focusKeyIn(seriesBox);
     try { App.keepScroll(drawSeriesPanelInner); } finally { restoreFocus(seriesBox, keepFocus); }
-    const d = seriesBox.querySelector(':scope > details');
-    if (d) d.addEventListener('toggle', markNav);
-    markNav();
   }
 
   function drawSeriesPanelInner() {
@@ -2711,11 +2316,6 @@
       orderable = true;
     }
     else if (m.kind === 'panels') entries = m.panels.map((p) => ({ key: p.model.series[0].key, name: p.title, kind: 'bar' }));
-    else if (m.kind === 'ref') {
-      const sec0 = m.sections[0];
-      entries = (sec0 ? sec0.bars : []).map((b) => ({ key: b.key, name: b.label, kind: 'ref' }));
-      if (m.sections.length > 1 || spec.ref.colorBy === 'item') entries = entries.concat(m.sections.map((sx) => ({ key: 'i:' + sx.item, name: sx.label || itemLabel(spec, sx.item), kind: 'ref' })));
-    }
     const pal = R().PALETTES;
     const palSel = selectInput(spec.style, 'palette', Object.keys(pal).map((k) => [k, R().PALETTE_NAMES[k]]), () => changedStyle());
     const resetBtn = el('button.btn.small', { type: 'button', title: 'Remove as cores, traços e a ordem escolhidos manualmente', on: { click: () => { spec.seriesStyle = {}; spec.seriesOrder = []; persistDraft(); drawSeriesPanel(); refresh(true); } } }, 'Restaurar padrão');
@@ -2885,8 +2485,8 @@
       const xb = el('button.btn.small.ghost', { type: 'button', title: e.kind === 'bar' ? 'Padrão (hachura) da barra e valores desta série' : 'Valores desta série' },
         (extraOpen.has(e.key) ? '▾ ' : '▸ ') + (e.kind === 'bar' ? 'Padrão e valores' : 'Valores') + (hasExtra ? ' •' : ''));
       xb.addEventListener('click', () => { if (extraOpen.has(e.key)) extraOpen.delete(e.key); else extraOpen.add(e.key); drawSeriesPanel(); });
-      if (e.kind !== 'ref') row.append(el('div', { style: { marginTop: '2px' } }, xb));
-      if (e.kind !== 'ref' && extraOpen.has(e.key)) row.append(seriesExtras(o, e.kind === 'bar'));
+      row.append(el('div', { style: { marginTop: '2px' } }, xb));
+      if (extraOpen.has(e.key)) row.append(seriesExtras(o, e.kind === 'bar'));
       body.append(row);
     });
     if (m.kind === 'bars' && spec.bars.xAxis === 'cases' && m.categories.length) body.append(el('p.small.muted', 'Os rótulos dos casos (eixo x) são editados na seção 1.'));
@@ -2897,7 +2497,6 @@
         body.append(el('div.fields.two', cats.map((c) => field(c.key, labelInput(c.key, autoLabel(c.key))))));
       }
     }
-    if (m.kind === 'ref') { const tx = refTexts(m); if (tx) body.append(tx); }
     seriesBox.append(section('3. Séries e cores (' + entries.length + ')', true, body));
   }
 
@@ -3005,10 +2604,6 @@
         field('Painéis por linha', numInput(st, 'panelCols', changedStyle, { min: 1, max: 6 })),
         field('Altura de cada painel (px)', numInput(st, 'panelHeight', changedStyle, { min: 0, max: 2000, step: 10, placeholder: '0 = usa a altura total' })),
         field('Rótulo do painel', textInput(st, 'panelLabel', changedStyle, { placeholder: 'ex.: (a)' }))),
-      el('div.fields.two',
-        field('Cantos das barras arredondados (px)', numInput(st, 'barRadius', changedStyle, { min: 0, max: 30, step: 0.5 })),
-        field('Cor do contorno das barras', colorInput(st, 'barOutlineColor', changedStyle)),
-        field('Espessura do contorno das barras (px)', numInput(st, 'barOutlineWidth', changedStyle, { min: 0.2, max: 8, step: 0.2 }))),
       el('div.checks',
         checkInput(st, 'barOutline', 'Contorno nas barras', changedStyle),
         checkInput(st, 'border', 'Moldura no gráfico', changedStyle)),
@@ -3021,10 +2616,7 @@
 
   const VAL_COLORS = [['auto', 'Automática (texto nas barras, cor da série nas linhas)'], ['text', 'Cor do texto do gráfico'], ['series', 'Cor da série'], ['contrast', 'Contraste com o fundo (preto/branco)'], ['custom', 'Cor escolhida']];
   const VAL_BAR_POS = [['auto', 'Automática (dentro se couber, senão acima)'], ['outsideEnd', 'Acima da barra'], ['insideEnd', 'Dentro, no topo'], ['center', 'Dentro, no centro'], ['insideBase', 'Dentro, na base']];
-  const VAL_STACK = [['auto', 'Automático: dentro se couber, senão ao lado da pilha'], ['autoTop', 'Automático: dentro se couber, senão no topo da pilha'], ['side', 'Todos ao lado da pilha (com linha guia)'], ['top', 'Todos no topo da pilha'], ['center', 'Só dentro (oculta os que não cabem)']];
-  // 1.18.4
-  const VAL_FORMATS = [['axis', 'Igual ao eixo y'], ['auto', 'Automático'], ['fixed', 'Decimal fixo (casas decimais)'], ['sci', 'Científico (1,2E-3)'], ['percent', 'Porcentagem']];
-  const VAL_BOX_INSIDE = [['same', 'Igual à de fora'], ['transparent', 'Transparente (só o contorno)'], ['nobox', 'Sem caixa (só o número)']];
+  const VAL_STACK = [['center', 'No centro de cada segmento'], ['auto', 'No centro; ao lado se não couber'], ['side', 'Sempre ao lado, com linha guia']];
   const VAL_LINE_POS = [['above', 'Acima do ponto'], ['below', 'Abaixo do ponto'], ['right', 'À direita'], ['left', 'À esquerda']];
 
   /** Colour mode select + colour picker; the picker sets a hex colour, the modes are words. */
@@ -3060,88 +2652,15 @@
           : field('Casas decimais', numInput(st, 'lineValueDigits', changedStyle, { min: 0, max: 10 })),
         field('Ocultar valores menores que', textInput(st, 'valMin', changedStyle, { placeholder: 'ex.: 0,001' }), 'Em módulo; vazio = mostra todos.'),
         bars && !stacked ? field('Posição na barra', selectInput(st, 'valPos', VAL_BAR_POS, changedStyle), 'Se não couber dentro, o valor vai para cima da barra.') : null,
-        stacked ? field('Posição dos valores (empilhadas)', selectInput(st, 'valStacked', VAL_STACK, changedStyle), 'Cada série pode ter a sua posição (seção 3, "Padrão e valores").') : null,
+        stacked ? field('Barras empilhadas', selectInput(st, 'valStacked', VAL_STACK, changedStyle), 'Ao lado: o valor fica à direita da pilha, ligado ao segmento por uma linha (bom para segmentos finos).') : null,
         bars ? field('Rotação', selectInput(st, 'valRotate', [['auto', 'Automática (gira se não couber)'], ['0', 'Horizontal'], ['-90', 'Vertical']], changedStyle)) : null,
         !bars ? field('Posição no ponto', selectInput(st, 'valLinePos', VAL_LINE_POS, changedStyle)) : null,
-        field('Formato do número', selectInput(st, 'valFormat', VAL_FORMATS, changedStyle), 'Cada série pode ter formato e casas próprios (seção 3, "Padrão e valores").'),
         field('Caixa', selectInput(st, 'valBox', [['none', 'Sem caixa'], ['box', 'Caixa com fundo']], changedStyle)),
-        groupField('Fundo da caixa', boxColorInput(st, 'valBoxFill', changedStyle, false, '#ffffff'), '"Cor da série" usa a cor do caso ou da causa; o texto fica preto ou branco conforme o fundo.'),
-        groupField('Contorno da caixa', boxColorInput(st, 'valBoxStroke', changedStyle, false, '#7f7f7f')),
-        bars ? field('Caixa dos valores dentro da barra', selectInput(st, 'valBoxInside', VAL_BOX_INSIDE, changedStyle), 'Os valores fora da barra continuam com a caixa.') : null,
-        stacked ? field('Espaço para os valores ao lado da pilha', selectInput(Object.assign(st, { valSideFit: st.valSideAuto === false ? 'off' : (st.valSideFit || 'widen') }), 'valSideFit', [['widen', 'Manter a largura das barras e alargar a imagem'], ['narrow', 'Estreitar as barras'], ['off', 'Não ajustar (pode sobrepor)']], () => { st.valSideAuto = st.valSideFit !== 'off'; changedStyle(); }),
-          '"Alargar a imagem": a largura das barras da seção 4 é mantida e a imagem cresce até o maior valor caber entre uma barra e a vizinha, com a distância escolhida acima.') : null,
-        stacked && st.valSideFit === 'narrow' ? field('Largura mínima da barra ao estreitar (%)', numInput(st, 'valSideMinBar', changedStyle, { min: 5, max: 100, step: 5, placeholder: '25' })) : null,
-        stacked ? field('Espaço acima das pilhas para os valores (%)', numInput(st, 'valHeadroom', changedStyle, { min: 0, max: 200, step: 1 }), 'Aumenta o máximo do eixo y para os valores acima das barras caberem.') : null,
-        stacked ? field('Valores ao lado: distância da barra (px)', numInput(st, 'valSideGap', changedStyle, { min: 0, max: 200, step: 1 })) : null,
-        stacked ? field('Lado dos valores ao lado da pilha', selectInput(Object.assign(st, { valSideWhere: st.valSideWhere === 'left' ? 'left' : 'right' }), 'valSideWhere', [['right', 'À direita da barra'], ['left', 'À esquerda da barra']], changedStyle), 'Os valores ao lado nunca ficam sobre os nomes dos casos (eixo x).') : null,
+        field('Fundo da caixa', colorInput(st, 'valBoxFill', changedStyle)),
+        field('Contorno da caixa', colorInput(st, 'valBoxStroke', changedStyle)),
         field('Opacidade da caixa', numInput(st, 'valBoxOpacity', changedStyle, { min: 0, max: 1, step: 0.05 }))),
       el('div.checks', checkInput(st, 'valBold', 'Negrito', changedStyle)),
       el('p.small.muted', 'Cada série pode ter cor, negrito, caixa, posição própria ou ficar sem valores: botão "Valores" na série (seção 3).'));
-  }
-
-  /** 1.18.3: look of the comparison chart (height of each bar, boxes, numbers). */
-  /** 1.18.3: names of the cases and texts of the values of the comparison chart (section 3). */
-  function refTexts(m) {
-    const spec = S.spec;
-    // texts of this chart: case names (the case label, also in section 1) and the value of each bar
-    let texts = null;
-    if (m && m.sections.length) {
-      const rows = [];
-      const caseKeys = m.sections[0].bars.map((b) => b.key);
-      for (const k of caseKeys) {
-        const c = spec.cases.find((x) => x.path === k);
-        if (!c) continue;
-        const i = el('input.input', { type: 'text', value: c.label, 'data-fk': 'refname:' + k, placeholder: App.caseNameOf(k) });
-        i.addEventListener('input', () => { c.label = i.value; changedStyle(); });
-        rows.push(field('Nome · ' + App.caseNameOf(k), i));
-      }
-      const vals = [];
-      for (const sx of m.sections.slice(0, 20)) for (const b of sx.bars) {
-        const key = 'refval:' + sx.item + '|' + b.key;
-        const i = el('input.input', { type: 'text', value: spec.labels[key] !== undefined ? spec.labels[key] : '', 'data-fk': 'lbl:' + key, placeholder: R().refValueText(b.diff, m.mode, spec.style) + ' (automático)' });
-        i.addEventListener('input', () => { if (i.value === '') delete spec.labels[key]; else spec.labels[key] = i.value; changedStyle(); });
-        vals.push(field('Valor · ' + (sx.label ? sx.label + ' · ' : '') + b.label, i));
-      }
-      const clearVals = el('button.btn.small.ghost', { type: 'button', on: { click: () => { for (const k of Object.keys(spec.labels)) if (k.startsWith('refval:')) delete spec.labels[k]; persistDraft(); drawControls(); refresh(true); } } }, 'Voltar todos os valores ao automático');
-      texts = el('details.fsec', el('summary', 'Textos do gráfico (nomes e valores)'),
-        el('div.stack-s', { style: { padding: '6px 0' } },
-          el('p.small.muted', 'O nome é o rótulo do caso nesta figura (o mesmo da seção 1). O valor vazio usa o número calculado; escreva um texto para trocá-lo só nesta figura.'),
-          el('div.fields.two', rows), el('div.fields.two', vals), clearVals));
-      texts.open = !!S.refTextsOpen;
-      texts.addEventListener('toggle', () => { S.refTextsOpen = texts.open; });
-    }
-    return texts;
-  }
-
-  function refStylePanel() {
-    const st = S.spec.style;
-    const spec = S.spec;
-    return el('div.stack-s',
-      el('div.fields.two',
-        field('Grossura das barras (px)', numInput(st, 'refBarPx', changedStyle, { min: 2, max: 200, step: 1, placeholder: 'auto' })),
-        field('Altura de cada linha (px)', numInput(st, 'refRowH', changedStyle, { min: 30, max: 400, step: 2 }), 'Espaço de cada caso (nome + barra). Aumenta sozinho se o nome e a barra não couberem.'),
-        field('Tamanho do nome do caso (px)', numInput(st, 'refNameSize', changedStyle, { min: 6, max: 60, step: 0.5, placeholder: 'auto' })),
-        field('Tamanho do valor (px)', numInput(st, 'refValueSize', changedStyle, { min: 6, max: 60, step: 0.5, placeholder: 'auto' })),
-        field('Distância do nome até a barra (px)', numInput(st, 'refNameGap', changedStyle, { min: 0, max: 100, step: 1 }), 'Espaço vertical entre o nome e a barra.'),
-        field('Afastamento do nome da linha da referência (px)', numInput(st, 'refNameDx', changedStyle, { min: 0, max: 400, step: 1 })),
-        field('Distância do valor até a ponta da barra (px)', numInput(st, 'refValueGap', changedStyle, { min: 0, max: 100, step: 1 })),
-        field('Casas decimais', numInput(st, 'refDigits', changedStyle, { min: 0, max: 10, placeholder: 'auto (3; 1 em %)' })),
-        field('Formato da diferença absoluta', selectInput(st, 'refFormat', [['fixed', 'Decimal (ex.: +0,026)'], ['sci', 'Científico (ex.: +2,6E-3)']], changedStyle)),
-        field('Tamanho do título da seção (px)', numInput(st, 'refTitleSize', changedStyle, { min: 0, max: 60, step: 1, placeholder: 'auto' })),
-        field('Cor da linha da referência', colorInput(st, 'refZeroColor', changedStyle)),
-        field('Contorno das barras', colorInput(Object.assign(st, { refOutlineColor: st.refOutlineColor || '#1f2d3a' }), 'refOutlineColor', changedStyle))),
-      el('div.checks',
-        checkInput(st, 'refNameBox', 'Moldura nos nomes dos casos', changedStyle),
-        checkInput(st, 'refValueBox', 'Moldura nos valores', changedStyle),
-        checkInput(st, 'refTitleBox', 'Moldura no nome da referência (título)', changedStyle),
-        checkInput(st, 'refNameBold', 'Nomes em negrito', changedStyle),
-        checkInput(st, 'refValueBold', 'Valores em negrito', changedStyle),
-        checkInput(st, 'refOutline', 'Contorno nas barras', changedStyle),
-        checkInput(st, 'refTicks', 'Números no eixo', changedStyle),
-        checkInput(st, 'refShowRefValue', 'Mostrar o valor do caso de referência', changedStyle),
-        checkInput(st, 'refShared', 'Mesma escala em todas as seções', changedStyle),
-        checkInput(st, 'refColorTitle', 'Nome da causa com a cor dela no título', changedStyle)),
-      el('p.small.muted', 'Nomes dos casos e textos dos valores: seção 3 ("Textos do gráfico"). Largura, fonte e tamanho geral do texto: seção 4. Cor de cada caso ou causa: seção 3.'));
   }
 
   /** Per-series overrides: pattern (bars) and value labels. Shown under the series row when opened. */
@@ -3164,11 +2683,7 @@
           el('label', el('span', 'Tamanho (px)'), numInput(o, 'patternSize', ch, { min: 3, max: 40, step: 1, placeholder: '8' })),
           el('label', el('span', 'Traço (px)'), numInput(o, 'patternWidth', ch, { min: 0, max: 10, step: 0.25, placeholder: 'auto' }))));
     }
-    // 1.18.4: stacked bars have their own positions (inside the segment or beside the stack)
-    const stackedNow = isBar && S.spec.bars && !!S.spec.bars.stacked;
-    const posOpts = !isBar ? inh('', 'Igual à seção 5').concat(VAL_LINE_POS)
-      : stackedNow ? inh('', 'Igual à seção 5').concat(VAL_STACK)
-        : inh('', 'Igual à seção 5').concat(VAL_BAR_POS);
+    const posOpts = isBar ? inh('', 'Igual à seção 5').concat(VAL_BAR_POS, [['side', 'Ao lado (empilhadas)']]) : inh('', 'Igual à seção 5').concat(VAL_LINE_POS);
     box.append(el('div.small.muted', 'Valores desta série'),
       el('div.fig-series-grid',
         el('label', el('span', 'Mostrar'), selectInput(Object.assign(o, { valShow: o.valShow || '' }), 'valShow', [['', 'Sim'], ['hide', 'Não (só esta série)']], ch)),
@@ -3176,29 +2691,12 @@
         el('label', el('span', 'Negrito'), selectInput(Object.assign(o, { valBold: o.valBold || '' }), 'valBold', [['', 'Igual à seção 5'], ['yes', 'Sim'], ['no', 'Não']], ch)),
         el('label', el('span', 'Posição'), selectInput(Object.assign(o, { valPos: o.valPos || '' }), 'valPos', posOpts, ch)),
         el('label', el('span', 'Caixa'), selectInput(Object.assign(o, { valBox: o.valBox || '' }), 'valBox', [['', 'Igual à seção 5'], ['none', 'Sem caixa'], ['box', 'Com caixa']], ch)),
-        el('div', el('span.small', 'Fundo da caixa'), boxColorInput(o, 'valBoxFill', ch, true, S.spec.style.valBoxFill || '#ffffff')),
-        el('div', el('span.small', 'Contorno da caixa'), boxColorInput(o, 'valBoxStroke', ch, true, S.spec.style.valBoxStroke || '#7f7f7f')),
-        isBar ? el('label', el('span', 'Caixa dentro da barra'), selectInput(Object.assign(o, { valBoxInside: o.valBoxInside || '' }), 'valBoxInside', [['', 'Igual à seção 5']].concat(VAL_BOX_INSIDE), ch)) : null,
-        el('label', el('span', 'Formato do número'), selectInput(Object.assign(o, { valFormat: o.valFormat || '' }), 'valFormat', [['', 'Igual à seção 5']].concat(VAL_FORMATS.filter((x) => x[0] !== 'axis')), ch)),
-        el('label', el('span', 'Casas decimais'), numInput(o, 'valDigits', ch, { min: 0, max: 12, step: 1, placeholder: 'seção 5' }))));
+        el('label', el('span', 'Fundo da caixa'), (() => {
+          const c = el('input.input.color', { type: 'color', value: toHex(o.valBoxFill || S.spec.style.valBoxFill || '#ffffff') });
+          c.addEventListener('input', () => { o.valBoxFill = c.value; ch(); });
+          return c;
+        })())));
     return box;
-  }
-
-  /** 1.18.4: colour of a value box: same as section 5, the colour of the series, or a chosen colour. */
-  function boxColorInput(obj, key, onChange, inherit, fallback) {
-    const cur = obj[key];
-    const isHex = /^#/.test(String(cur || ''));
-    const sel = el('select.input', (inherit ? [['', 'Igual à seção 5']] : []).concat([['series', 'Cor da série (do caso ou da causa)'], ['custom', 'Cor escolhida']]).map(([v, l]) => el('option', { value: v }, l)));
-    sel.value = cur === 'series' ? 'series' : isHex ? 'custom' : (inherit ? '' : 'custom');
-    const pick = el('input.input.color', { type: 'color', value: toHex(isHex ? cur : (fallback || '#ffffff')) });
-    pick.hidden = sel.value !== 'custom';
-    sel.addEventListener('change', () => {
-      pick.hidden = sel.value !== 'custom';
-      if (sel.value === '') delete obj[key]; else obj[key] = sel.value === 'custom' ? pick.value : 'series';
-      onChange();
-    });
-    pick.addEventListener('input', () => { obj[key] = pick.value; onChange(); });
-    return el('div.toolbar', { style: { margin: 0, flexWrap: 'nowrap' } }, sel, pick);
   }
 
   /** 1.16.0: bar width (%) as a slider plus a number; stored as barGap = 1 − width. */
@@ -3271,17 +2769,8 @@
         field('Grade', selectInput(st, 'grid', [['y', 'Horizontal'], ['xy', 'Horizontal e vertical'], ['x', 'Vertical'], ['none', 'Sem grade']], changedStyle)),
         field('Traço da grade', selectInput(st, 'gridDash', [['solid', 'Contínuo'], ['dashed', 'Tracejado'], ['dotted', 'Pontilhado']], changedStyle)),
         field('Cor da grade', colorInput(st, 'gridColor', changedStyle)),
-        field('Cor dos eixos', colorInput(st, 'axisColor', changedStyle)),
-        field('Espessura dos eixos (px)', numInput(st, 'axisWidth', changedStyle, { min: 0.5, max: 6, step: 0.5 })),
-        field('Tamanho dos títulos dos eixos (px)', numInput(st, 'axisTitleSize', changedStyle, { min: 6, max: 60, step: 0.5, placeholder: 'auto' })),
-        field('Tamanho dos números do eixo y (px)', numInput(st, 'yLabelSize', changedStyle, { min: 6, max: 60, step: 0.5, placeholder: 'auto' })),
-        field('Tamanho dos rótulos do eixo x (px)', numInput(st, 'xLabelSize', changedStyle, { min: 6, max: 60, step: 0.5, placeholder: 'auto' })),
-        field('Cor dos rótulos do eixo x', colorInput(Object.assign(st, { xLabelColor: st.xLabelColor || st.textColor }), 'xLabelColor', changedStyle)),
-        field('Distância dos rótulos x até o eixo (px)', numInput(st, 'xLabelGap', changedStyle, { min: 0, max: 80, step: 1 }))),
+        field('Cor dos eixos', colorInput(st, 'axisColor', changedStyle))),
       el('div.checks',
-        checkInput(st, 'axisTitleBold', 'Títulos dos eixos em negrito', changedStyle),
-        checkInput(st, 'xLabelBold', 'Rótulos do eixo x em negrito', changedStyle),
-        checkInput(st, 'yAxisLine', 'Linha do eixo y sempre visível', changedStyle),
         checkInput(st, 'yLog', 'Eixo y logarítmico', changedStyle),
         checkInput(st, 'xAsCategories', 'Eixo x com espaçamento uniforme (como no Excel)', changedStyle),
         checkInput(st, 'ticksOut', 'Marcas nos eixos', changedStyle)));
@@ -3424,9 +2913,8 @@
     if (m.kind === 'line' || m.kind === 'bars') return m.series.map((s) => s.key).concat(m.categories ? m.categories.map((c) => c.key) : []);
     if (m.kind === 'panels') return m.panels.map((p) => p.model.series.map((s) => s.key).join(',')).concat(m.items || []);
     if (m.kind === 'cores') return ['cores'];
-    if (m.kind === 'slots') return ['slots', m.block || '', (m.legendItems || []).map((x) => x[1]).join('|'), (S.slotCauses || []).join('|')];
+    if (m.kind === 'slots') return ['slots'];
     if (m.kind === 'topo') return ['topo'];
-    if (m.kind === 'ref') return m.sections.map((sx) => 'i:' + sx.item).concat(m.sections[0] ? m.sections[0].bars.map((b) => b.key) : [], [S.spec.ref.colorBy]);
     return [];
   }
 
@@ -3576,13 +3064,6 @@
       how.push(m.block ? 'Cada célula é um slot de um núcleo de um enlace; a cor é o bloqueio das requisições cuja faixa incluía o slot (ou a causa principal, no modo de causas). Passe o mouse para ver tentativas e bloqueios.'
         : 'Cada célula é um slot de um núcleo de um enlace; a cor é a fração do tempo em que o slot esteve ocupado. Faixas escuras contínuas são espectro quase sempre ocupado; no núcleo QKD aparecem os QChs e PIChs.');
     }
-    if (m.kind === 'ref') {
-      how.push('A linha vertical é o caso de referência (' + m.refLabel + '). Cada barra é outro caso: à direita, valor maior que o da referência; à esquerda, menor.');
-      how.push(m.mode === 'rel' ? 'O número é a diferença em % do valor da referência: (valor − referência) ÷ referência × 100. Com referência zero, a porcentagem não existe (n/d).'
-        : 'O número é a diferença absoluta: valor do caso − valor da referência, na unidade da métrica.');
-      if (m.sections.length > 1) how.push('Uma seção por ' + (spec.bars.dim === 'Core' ? 'núcleo' : spec.bars.dim === 'Cause' || /cause|by /i.test((m.items || []).join(' ')) ? 'causa' : 'item') + (st.refShared !== false ? ', todas na mesma escala.' : ', cada uma com a sua escala.'));
-      how.push('Média das replicações no ponto de carga escolhido; a diferença não mostra o intervalo de confiança (veja os gráficos de barras para isso).');
-    }
 
     // ---- legend items
     const legend = [];
@@ -3713,8 +3194,6 @@
         if (c) { p.title = caseLabel(c); s.name = p.title; }
         for (const cat of p.model.categories) cat.label = itemLabel(spec, cat.key);
       });
-    } else if (m.kind === 'ref') {
-      styleRef(m, spec);
     } else if (m.kind === 'topo') {
       m.legendTitle = spec.labels.__heat || App.metricInfo.axisTitle(spec.metric) || spec.metric;
     } else if (m.kind === 'slots') {
@@ -3749,7 +3228,6 @@
       const c = caseOfKey(spec, s.key);
       return c && hid.has(c.path) ? Object.assign({}, s, { hiddenCase: true, style: Object.assign({}, s.style, { visible: false }) }) : s;
     }), spec);
-    if (m.kind === 'ref') return viewRef(m, spec);
     if (m.kind === 'line') return Object.assign({}, m, { series: fix(m.series) });
     if (m.kind === 'bars') return Object.assign({}, m, { series: fix(m.series), categories: m.categories.filter((c) => !hid.has(c.key)) });
     if (m.kind === 'panels') {
@@ -3762,7 +3240,6 @@
     if (v.kind === 'line') return !v.series.some((s) => s.style.visible !== false);
     if (v.kind === 'bars') return !v.categories.length || !v.series.some((s) => s.style.visible !== false);
     if (v.kind === 'panels') return !v.panels.length;
-    if (v.kind === 'ref') return !v.sections.length;
     return false;
   }
 
@@ -4099,66 +3576,5 @@
     return box;
   }
 
-  // ---------------------------------------------------------------- Parte 59: animation (js/animation.js)
-
-  /** Builds and draws one frame of an animation: the figure of spec, with optional fixed axis domains. */
-  async function renderFrame(spec, domains) {
-    const saved = S.spec;
-    S.spec = spec; // applyStyle reads the spec of the state
-    try {
-      const m0 = await buildModel(spec);
-      if (!m0 || m0.empty) return { empty: (m0 && m0.empty) || 'Sem dados.' };
-      applyStyle(m0);
-      const m = viewModel(m0, spec);
-      if (nothingVisible(m)) return { empty: 'Nada a desenhar.' };
-      const put = (x) => {
-        if (!domains) return;
-        if (domains.y) x.yDomain = domains.y;
-        if (domains.x) x.xDomain = domains.x;
-        // colour scale of the maps (topology, spectrum): the same in every frame
-        if (domains.range && x.range && Number.isFinite(domains.range[0])) x.range = Object.assign({}, x.range, { min: domains.range[0], max: domains.range[1] });
-      };
-      put(m);
-      if (m.kind === 'panels') m.panels.forEach((p) => put(p.model));
-      return { model: m, svg: R().render(m, spec.style) };
-    } finally {
-      S.spec = saved;
-    }
-  }
-
-  /** Values on the axes of a model (for fixed axes over all the frames). */
-  function modelDomain(m) {
-    const out = { x: [], y: [], range: [] };
-    const visit = (mm) => {
-      if (!mm) return;
-      if (mm.range && Number.isFinite(mm.range.min) && Number.isFinite(mm.range.max)) out.range.push(mm.range.min, mm.range.max);
-      if (mm.kind === 'panels') { mm.panels.forEach((p) => visit(p.model)); return; }
-      if (mm.kind === 'line') {
-        for (const sr of mm.series) {
-          if (sr.style && sr.style.visible === false) continue;
-          for (const pt of sr.points) {
-            if (!Number.isFinite(pt.mean)) continue;
-            out.x.push(pt.x);
-            if (Number.isFinite(pt.ci)) out.y.push(pt.mean - pt.ci, pt.mean + pt.ci); else out.y.push(pt.mean);
-          }
-        }
-      } else if (mm.kind === 'bars') {
-        const series = mm.series.filter((sr) => !(sr.style && sr.style.visible === false));
-        for (const cat of mm.categories) {
-          let tot = 0;
-          for (const sr of series) {
-            const v = sr.values[cat.key];
-            if (!v || !Number.isFinite(v.mean)) continue;
-            if (mm.stacked) tot += Math.max(0, v.mean); else out.y.push(Number.isFinite(v.ci) ? v.mean + v.ci : v.mean, v.mean);
-          }
-          if (mm.stacked && !mm.normalize) out.y.push(tot);
-        }
-      }
-    };
-    visit(m);
-    return out;
-  }
-
-  App.figures = { render, renderInto, openWith, invalidate, parseCsv, buildModel, newSpec, TEMPLATES, buildReport, _report: RP, _state: S,
-    _anim: { renderFrame, modelDomain, state: S, nextName, persistDraft } };
+  App.figures = { render, renderInto, openWith, invalidate, parseCsv, buildModel, newSpec, TEMPLATES, buildReport, _report: RP, _state: S };
 })(window.App);

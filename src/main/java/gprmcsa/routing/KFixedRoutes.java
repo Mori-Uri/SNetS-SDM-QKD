@@ -20,118 +20,119 @@ import network.Node;
  */
 public class KFixedRoutes implements KRoutingAlgorithmInterface {
 
-    private static final String DIV = "-";
+	private static final String DIV = "-";
 
-    private ArrayList<String> routeList;
+	private ArrayList<String> routeList;
 
-    // List with the k shortest routes for all pairs (s, d)
-    private HashMap<String, List<Route>> routesForAllPairs;
+	// List with the k shortest routes for all pairs (s, d)
+	private HashMap<String, List<Route>> routesForAllPairs;
 
-    // Number of shortest routes to be computed for each pair(s, d)
-    private int k;
+	// Number of shortest routes to be computed for each pair(s, d)
+	private int k;
 
-    /**
+	/**
      * Creates a new instance of KFixedRoutes
      */
-    public KFixedRoutes() {
-        this.k = 3;
-        this.routesForAllPairs = new HashMap<>();
-    }
+	public KFixedRoutes() {
+		this.k = 3;
+		this.routesForAllPairs = new HashMap<>();
+	}
 
-    /**
+	/**
      * This method loads the list of routes from a file
      *
      * @param mesh Mesh
      */
-    private void loadRoutesFromFile(Mesh mesh) {
-    	try {
-        	String separator = System.getProperty("file.separator");
-        	String filePath = mesh.getUtil().projectPath + separator + "kRoutesByPar.txt";
-        	String routesListGson = "";
+	private void loadRoutesFromFile(Mesh mesh) {
+		try {
+			String separator = System.getProperty("file.separator");
+			String filePath = mesh.getUtil().projectPath + separator + "kRoutesByPar.txt";
+			String routesListGson = "";
 
-        	Scanner scanner = new Scanner(new File(filePath));
-        	while (scanner.hasNext()) {
-        		routesListGson += scanner.next();
-            }
+			Scanner scanner = new Scanner(new File(filePath));
+			while (scanner.hasNext()) {
+				routesListGson += scanner.next();
+			}
 
-        	Gson gson = new GsonBuilder().create();
-        	Type typeTemp = new TypeToken<ArrayList<String>>(){}.getType();
+			Gson gson = new GsonBuilder().create();
+			Type typeTemp = new TypeToken<ArrayList<String>>(){}.getType();
 
-        	List<String> routeListTemp = gson.fromJson(routesListGson, typeTemp);
-        	routeList = (ArrayList<String>)routeListTemp;
+			List<String> routeListTemp = gson.fromJson(routesListGson, typeTemp);
+			routeList = (ArrayList<String>)routeListTemp;
 
-        	scanner.close();
+			scanner.close();
 
-        } catch (Exception e) {
-            System.err.println("The file kRoutesByPar.txt was not found!");
+		} catch (Exception e) {
+			System.err.println("The file kRoutesByPar.txt was not found!");
 
-            e.printStackTrace();
-        }
-    }
+			e.printStackTrace();
+		}
+	}
 
-    /**
+	/**
      * Computes the smallest paths for each pair
      *
      * @param mesh Mesha - network topology
      * @param k    int - number of routes to be computed for each pair(s, d)
      */
-    public void computeAllRoutes(Mesh mesh, int k) {
-    	loadRoutesFromFile(mesh);
+	public void computeAllRoutes(Mesh mesh, int k) {
+		loadRoutesFromFile(mesh);
 
-    	this.k = k;
-    	this.routesForAllPairs = new HashMap<>();
+		this.k = k;
+		this.routesForAllPairs = new HashMap<>();
 
-        for (int i = 0; i < routeList.size(); i++) {
-        	String nodes[] = routeList.get(i).split("-");
-            Vector<Node> route = new Vector<Node>();
+		for (int i = 0; i < routeList.size(); i++) {
+			String nodes[] = routeList.get(i).split("-");
+			Vector<Node> route = new Vector<Node>();
 
-            for(int n = 0; n < nodes.length; n++){
-            	route.add(mesh.searchNode(nodes[n]));
-            }
+			for(int n = 0; n < nodes.length; n++){
+				route.add(mesh.searchNode(nodes[n]));
+			}
 
-            String pair = nodes[0] + DIV + nodes[nodes.length - 1];
+			String pair = nodes[0] + DIV + nodes[nodes.length - 1];
 
-            List<Route> routes = routesForAllPairs.get(pair);
-            if(routes == null){
-            	routes = new ArrayList<>();
-            	routesForAllPairs.put(pair, routes);
-            }
+			List<Route> routes = routesForAllPairs.get(pair);
 
-            routes.add(new Route(route));
+			if(routes == null){
+				routes = new ArrayList<>();
+				routesForAllPairs.put(pair, routes);
+			}
 
-            if(routes.size() > this.k){
-            	this.k = routes.size();
-            }
-        }
-    }
+			routes.add(new Route(route));
 
-    /**
+			if(routes.size() > this.k){
+				this.k = routes.size();
+			}
+		}
+	}
+
+	/**
      * Returns the k shortest paths between two nodes
      *
      * @param n1 Node
      * @param n2 Node
      * @return List<Route>
      */
-    public List<Route> getRoutes(Node n1, Node n2) {
-        return this.routesForAllPairs.get(n1.getName() + DIV + n2.getName());
-    }
+	public List<Route> getRoutes(Node n1, Node n2) {
+		return this.routesForAllPairs.get(n1.getName() + DIV + n2.getName());
+	}
 
-    /**
+	/**
      * Returns the k shortest paths by pair
      *
      * @param pair String
      * @return List<Route>
      */
-    public List<Route> getRoutes(String pair) {
-        return this.routesForAllPairs.get(pair);
-    }
+	public List<Route> getRoutes(String pair) {
+		return this.routesForAllPairs.get(pair);
+	}
 
-    /**
+	/**
 	 * Returns the route list for all pairs
 	 *
 	 * @return Vector<Route>
 	 */
-    public HashMap<String, List<Route>> getRoutesForAllPairs() {
+	public HashMap<String, List<Route>> getRoutesForAllPairs() {
 		return routesForAllPairs;
 	}
 }

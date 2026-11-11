@@ -19,7 +19,7 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	private int centralCoreId; // ID do core Central
 	private int[] pointArray; // Core score table
 	private int[] coreUse; // Quantas vezes cada core foi used.
-	
+
 	ArrayList<Integer> groupBlue;
 	ArrayList<Integer> groupOrange;
 	ArrayList<Integer> groupGreen;
@@ -30,7 +30,7 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	 */
 	public Adein() {
 		this.numberOfCores = -1;
-		
+
 		groupBlue = new ArrayList<Integer>();
 		groupOrange = new ArrayList<Integer>();
 		groupGreen = new ArrayList<Integer>();
@@ -44,61 +44,61 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 
 			if (numberOfCores == 7) {
 				centralCoreId = 0;
-				
+
 				groupBlue.add(1);
 				groupBlue.add(4);
-				
+
 				groupOrange.add(2);
 				groupOrange.add(5);
-				
+
 				groupGreen.add(3);
 				groupGreen.add(6);
-				
+
 				groupBlack.add(0);
-				
+
 			}else if (numberOfCores == 12) {
 				centralCoreId = 0;
-				
+
 				groupBlue.add(0);
 				groupBlue.add(8);
 				groupBlue.add(3);
 				groupBlue.add(11);
-				
+
 				groupOrange.add(1);
 				groupOrange.add(9);
 				groupOrange.add(4);
 				groupOrange.add(6);
-				
+
 				groupGreen.add(2);
 				groupGreen.add(10);
 				groupGreen.add(5);
-				
+
 				groupBlack.add(7);
-				
+
 			}else if (numberOfCores == 19) {
 				centralCoreId = 18;
-				
+
 				groupBlue.add(0);
 				groupBlue.add(2);
 				groupBlue.add(4);
 				groupBlue.add(6);
 				groupBlue.add(16);
 				groupBlue.add(17);
-				
+
 				groupOrange.add(1);
 				groupOrange.add(3);
 				groupOrange.add(5);
 				groupOrange.add(13);
 				groupOrange.add(14);
 				groupOrange.add(15);
-				
+
 				groupGreen.add(7);
 				groupGreen.add(8);
 				groupGreen.add(9);
 				groupGreen.add(10);
 				groupGreen.add(11);
 				groupGreen.add(12);
-				
+
 				groupBlack.add(18);
 			}
 
@@ -110,6 +110,7 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 				pointArray[i] = DEFAULTPOINTFOROTHERCORE;
 				coreUse[i] = 0;
 			}
+
 			pointArray[centralCoreId] = DEFAULTPOINTFORCENTRALCORE;
 		}
 
@@ -142,59 +143,60 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	}
 
 	private void pointTableUpdate(int currentCore) {
-		
+
 		if (currentCore == centralCoreId) { // Central core.
 			pointArray[centralCoreId] = DEFAULTPOINTFORCENTRALCORE;
+
 			for (int i = 0; i < numberOfCores; i++) {
 				if(i != centralCoreId) {
 					pointArray[i]--;
 				}
 			}
-			
+
 		} else { // Other cores.
 			if(numberOfCores == 7) {
 				pointTableUpdate7(currentCore);
-				
+
 			}else if(numberOfCores == 12) {
 				pointTableUpdate12(currentCore);
-				
+
 			}else if(numberOfCores == 19) {
 				pointTableUpdate19(currentCore);
 			}
 		}
 	}
-	
+
 	private void pointTableUpdate7(int currentCore) {
 		int oppositeCore;
 		int adjaLeftCore;
 		int adjaRightCore;
 		int adOposLeftCore;
 		int adOposRightCore;
-		
+
 		// Defining Ncleo Oposto
 		if (currentCore < 4)
 			oppositeCore = currentCore + 3;
 		else
 			oppositeCore = currentCore - 3;
-		
+
 		// Defining Ncleo Adjacente Esquerdo
 		if (currentCore == 1)
 			adjaLeftCore = 6;
 		else
 			adjaLeftCore = currentCore - 1;
-		
+
 		// Defining Ncleo Adjacente Direito
 		if (currentCore == 6)
 			adjaRightCore = 1;
 		else
 			adjaRightCore = currentCore + 1;
-		
+
 		// Defining Ncleo Adjacente Oposto Esquerdo
 		if (oppositeCore == 1)
 			adOposLeftCore = 6;
 		else
 			adOposLeftCore = oppositeCore - 1;
-		
+
 		// Defining Ncleo Adjacente Oposto Direito
 		if (oppositeCore == 6)
 			adOposRightCore = 1;
@@ -219,14 +221,14 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 		pointArray[adOposLeftCore] = pointArray[adOposLeftCore] - 3; // Ncleo Adjacente Oposto Esquerdo
 		pointArray[adOposRightCore] = pointArray[adOposRightCore] - 3; // Ncleo Adjacente Oposto Direito
 	}
-	
+
 	private void pointTableUpdate12(int currentCore) {
 		int oppositeCore = 0;
 		int adjaLeftCore = 0;
 		int adjaRightCore = 0;
 		int adOposLeftCore = 0;
 		int adOposRightCore = 0;
-		
+
 		if(currentCore == 0) {
 			adjaLeftCore = 11;
 			adjaRightCore = 1;
@@ -330,14 +332,14 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 		pointArray[adOposLeftCore] = pointArray[adOposLeftCore] - 3; // Ncleo Adjacente Oposto Esquerdo
 		pointArray[adOposRightCore] = pointArray[adOposRightCore] - 3; // Ncleo Adjacente Oposto Direito
 	}
-	
+
 	private void pointTableUpdate19(int currentCore) {
 		int oppositeCore = 0;
 		int adjaLeftCore = 0;
 		int adjaRightCore = 0;
 		int adOposLeftCore = 0;
 		int adOposRightCore = 0;
-		
+
 		if(currentCore == 0) {
 			adjaLeftCore = 3;
 			adjaRightCore = 1;
@@ -495,17 +497,21 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	private int checkPointTable() {
 		int menorValor = 999999;
 		int coreID = -1;
+
 		for (int i = 0; i < numberOfCores; i++) {
 			if (pointArray[i] <= menorValor) {
 				menorValor = pointArray[i];
 				coreID = i;
 			}
 		}
+
 		coreUse[coreID]++;
+
 		return coreID;
 	}
 
 	// Primeira attempt de alocar
+
 	/**
 	 * Executes the policy operation.
 	 * @param numberOfslots the numberOfslots.
@@ -517,6 +523,7 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		// Checks whether the request is within the signal amplitude limits
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
+
 		if (numberOfSlots > maxAmplitude)
 			return null;
 
@@ -545,10 +552,12 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 					//					System.out.println("1 - CORE [" + circuit.getIndexCore() + "] BLUE FIRST FIT REQUISIO ["
 					//							+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1] + "] BandaCompleta ["
 					//							+ band[0] + " - " + band[1] + "]");
+
 					return chosen;
 				}
 			}
 		}
+
 		// (ORANGE) Medium Fit
 		else if (groupOrange.contains(circuit.getIndexCore())) {
 			int reference = t1 + (t1 / 2);
@@ -570,6 +579,7 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 							}
 						}
 					}
+
 					// Scenario 2 - Inside - [0] < Reference < [1]
 					else if (band[0] <= reference && band[1] >= reference) {
 						if ((reference - (numberOfSlots / 2)) > band[0] && (reference + (numberOfSlots / 2)) < band[1]) {
@@ -580,6 +590,7 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 							//									"1 - CORE [" + circuit.getIndexCore() + "] ORANGE IN MIDDLE FIT REQUISIO ["
 							//											+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1]
 							//											+ "] BandaCompleta [" + band[0] + " - " + band[1] + "]");
+
 							return chosen;
 						} else {
 							chosen = band.clone();
@@ -588,9 +599,11 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 							//									"1 - CORE [" + circuit.getIndexCore() + "] ORANGE ELSE IN FIRST FIT REQUISIO ["
 							//											+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1]
 							//											+ "] BandaCompleta [" + band[0] + " - " + band[1] + "]");
+
 							return chosen;
 						}
 					}
+
 					// Scenario 3 - Right - Reference < [0] [1]
 					else if (band[0] >= reference && band[1] > reference && band[0] + numberOfSlots - 1 < t2) {
 						if (chosenBandRight == null) {
@@ -609,38 +622,46 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 			// Verificando se usar bloco da right ou left
 			if (chosenBandLeft == null && chosenBandRight == null) {
 				// System.out.println("LEFT AND RIGHT MIDDLE FIT NULL");
+
 				return null;
 			} else if (chosenBandLeft == null && chosenBandRight != null) {
 				chosen = chosenBandRight.clone();
 				//				System.out.println(
 				//						"1 - CORE [" + circuit.getIndexCore() + "] ORANGE RIGHT REFERENCE FIRST FIT REQUISI ["
 				//								+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1] + "]");
+
 				return chosen;
 			} else if (chosenBandRight == null && chosenBandLeft != null) {
 				chosen = chosenBandLeft.clone();
 				//				System.out
 				//						.println("1 - CORE [" + circuit.getIndexCore() + "] ORANGE LEFT REFERENCE LAST FIT REQUISIO ["
 				//								+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1] + "]");
+
 				return chosen;
 			} else if (chosenBandLeft[1] - reference <= reference - chosenBandRight[0]) {
 				chosen = chosenBandLeft.clone();
 				//				System.out
 				//						.println("1 - CORE [" + circuit.getIndexCore() + "] ORANGE LEFT REFERENCE LAST FIT REQUISIO ["
 				//								+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1] + "]");
+
 				return chosen;
 			} else if (chosenBandLeft[1] - reference >= reference - chosenBandRight[0]) {
 				chosen = chosenBandRight.clone();
 				//				System.out.println(
 				//						"1 - CORE [" + circuit.getIndexCore() + "] ORANGE RIGHT REFERENCE FIRST FIT REQUISIO ["
 				//								+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1] + "]");
+
 				return chosen;
 			}
 		}
+
 		// (GREEN) Last Fit
 		else if (groupGreen.contains(circuit.getIndexCore())) {
 			int band[] = null;
+
 			for (int i = freeSpectrumBands.size() - 1; i >= 0; i--) {
 				band = freeSpectrumBands.get(i);
+
 				if (band[1] - band[0] + 1 >= numberOfSlots) {
 					// System.out.println("T3 = " + t3 + " BandaCompleta [" + band[0] + " - " +
 					// band[1] + "] REQUISIO [" + numberOfslots + "]");
@@ -652,6 +673,7 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//						System.out.println("1 - CORE [" + circuit.getIndexCore() + "] GREEN IN T3 REQUISIO ["
 						//								+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1] + "] BandaCompleta ["
 						//								+ band[0] + " - " + band[1] + "]");
+
 						return chosen;
 						// Scenario 2 (Before T3) [0] [1] < t3
 					} else if (band[1] < t3 && band[1] - numberOfSlots + 1 >= t2) {
@@ -660,16 +682,20 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//						System.out.println("1 - CORE [" + circuit.getIndexCore() + "] GREEN BEFORE T3 REQUISIO ["
 						//								+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1] + "] BandaCompleta ["
 						//								+ band[0] + " - " + band[1] + "]");
+
 						return chosen;
 					}
 				}
 			}
 		}
+
 		// CENTRAL(BLACK) Last Fit
 		else if (groupBlack.contains(circuit.getIndexCore())) {
 			int band[] = null;
+
 			for (int i = freeSpectrumBands.size() - 1; i >= 0; i--) {
 				band = freeSpectrumBands.get(i);
+
 				if (band[1] - band[0] + 1 >= numberOfSlots) {
 					// Cenrio 1 - Passando Inside de T3
 					if (band[0] <= t3 && band[1] >= t3 && band[1] - numberOfSlots + 1 >= t3) {
@@ -678,6 +704,7 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//						System.out.println("1 - CORE [" + circuit.getIndexCore() + "] BLACK LAST IN FIT REQUISIO ["
 						//								+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1] + "] BandaCompleta ["
 						//								+ band[0] + " - " + band[1] + "]");
+
 						return chosen;
 						// Cenrio 2 - Passando depois de T3
 					} else if (band[0] >= t3) {
@@ -686,15 +713,18 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//						System.out.println("1 - CORE [" + circuit.getIndexCore() + "] BLACK LAST AFTER FIT REQUISIO ["
 						//								+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1] + "] BandaCompleta ["
 						//								+ band[0] + " - " + band[1] + "]");
+
 						return chosen;
 					}
 				}
 			}
 		}
+
 		return null;
 	}
-	
+
 	// Segunda attempt de alocar
+
 	/**
 	 * Executes the policy2 operation.
 	 * @param numberOfslots the numberOfslots.
@@ -706,6 +736,7 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	public int[] policy2(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		// Checks whether the request is within the signal amplitude limits
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
+
 		if (numberOfSlots > maxAmplitude)
 			return null;
 		// Setando Divisores de Espectro
@@ -729,8 +760,10 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//						System.out.println("2 - CORE [" + circuit.getIndexCore() + "] BLUE IN T1 FIST FIT REQUISIO ["
 						//								+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1] + "] BandaCompleta ["
 						//								+ band[0] + " - " + band[1] + "]");
+
 						return chosen;
 					}
+
 					// Scenario 2 (After t1)
 					else if (band[0] > t1) {
 						chosen = band.clone();
@@ -738,11 +771,13 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//						System.out.println("2 - CORE [" + circuit.getIndexCore()
 						//								+ "] BLUE AFTER F1 FIST FIT REQUISIO [" + numberOfslots + "] ESPECTRO = [" + chosen[0]
 						//								+ " - " + chosen[1] + "] BandaCompleta [" + band[0] + " - " + band[1] + "]");
+
 						return chosen;
 					}
 				}
 			}
 		}
+
 		// (ORANGE) Last Fit <- t1 | First Fit -> t2
 		else if (groupOrange.contains(circuit.getIndexCore())) {
 			// Primeiro Bloco Last Fit T1
@@ -750,6 +785,7 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 			// Traversing the free spectrum vector from back to front
 			for (int i = freeSpectrumBands.size() - 1; i >= 0; i--) {
 				band = freeSpectrumBands.get(i);
+
 				if (band[1] - band[0] + 1 >= numberOfSlots) {
 					// Scenario 1 ( Passing through T1)
 					if (band[0] <= t1 && band[1] >= t1 && (t1 - numberOfSlots) >= band[0]) {
@@ -759,8 +795,10 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//						System.out.println("2 - CORE [" + circuit.getIndexCore()
 						//								+ "] ORANGE IN T1 LAST FIT REQUISIO [" + numberOfslots + "] ESPECTRO = [" + chosen[0]
 						//								+ " - " + chosen[1] + "] BandaCompleta [" + band[0] + " - " + band[1] + "]");
+
 						return chosen;
 					}
+
 					// Scenario 2 (Before T1)
 					else if (band[1] < t1) {
 						chosen = band.clone();
@@ -769,11 +807,13 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//								"2 - CORE [" + circuit.getIndexCore() + "] ORANGE BEFORE T1 LAST FIT REQUISIO ["
 						//										+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1]
 						//										+ "] BandaCompleta [" + band[0] + " - " + band[1] + "]");
+
 						return chosen;
 					}
 
 				}
 			}
+
 			// Segundo Bloco First Fit T2
 			for (int[] band1 : freeSpectrumBands) {
 				if (band1[1] - band1[0] + 1 >= numberOfSlots) {
@@ -785,8 +825,10 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//						System.out.println("2 - CORE [" + circuit.getIndexCore()
 						//								+ "] ORANGE IN T2 FIST FIT REQUISIO [" + numberOfslots + "] ESPECTRO = [" + chosen[0]
 						//								+ " - " + chosen[1] + "] BandaCompleta [" + band[0] + " - " + band[1] + "]");
+
 						return chosen;
 					}
+
 					// Scenario 2 (After t2)
 					else if (band1[0] >= t2) {
 						chosen = band1.clone();
@@ -795,11 +837,13 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//								"2 - CORE [" + circuit.getIndexCore() + "] ORANGE AFTER T2 FIST FIT REQUISIO ["
 						//										+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1]
 						//										+ "] BandaCompleta [" + band[0] + " - " + band[1] + "]");
+
 						return chosen;
 					}
 				}
 			}
 		}
+
 		// (GREEN) Last Fit <- t2 | First Fit -> t3
 		else if (groupGreen.contains(circuit.getIndexCore())) {
 			// Primeiro Bloco Last Fit T2
@@ -807,6 +851,7 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 			// Traversing the free spectrum vector from back to front
 			for (int i = freeSpectrumBands.size() - 1; i >= 0; i--) {
 				band = freeSpectrumBands.get(i);
+
 				if (band[1] - band[0] + 1 >= numberOfSlots) {
 					// Scenario 1 ( Passing through T2)
 					if (band[0] <= t2 && band[1] >= t2 && (t2 - numberOfSlots) >= band[0]) {
@@ -816,8 +861,10 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//						System.out.println("2 - CORE [" + circuit.getIndexCore() + "] GREEN IN T2 LAST FIT REQUISIO ["
 						//								+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1] + "] BandaCompleta ["
 						//								+ band[0] + " - " + band[1] + "]");
+
 						return chosen;
 					}
+
 					// Scenario 2 (Before T2)
 					else if (band[1] < t2) {
 						chosen = band.clone();
@@ -826,11 +873,13 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//								"2 - CORE [" + circuit.getIndexCore() + "] GREEN BEFORE T2 LAST FIT REQUISIO ["
 						//										+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1]
 						//										+ "] BandaCompleta [" + band[0] + " - " + band[1] + "]");
+
 						return chosen;
 					}
 
 				}
 			}
+
 			// Segundo Bloco First Fit T3
 			for (int[] band1 : freeSpectrumBands) {
 				if (band1[1] - band1[0] + 1 >= numberOfSlots) {
@@ -842,8 +891,10 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//						System.out.println("2 - CORE [" + circuit.getIndexCore()
 						//								+ "] GREEN IN T3 FIRST FIT REQUISIO [" + numberOfslots + "] ESPECTRO = [" + chosen[0]
 						//								+ " - " + chosen[1] + "] BandaCompleta [" + band[0] + " - " + band[1] + "]");
+
 						return chosen;
 					}
+
 					// Scenario 2 (After t3)
 					else if (band1[0] >= t3) {
 						chosen = band1.clone();
@@ -852,16 +903,20 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//								"2 - CORE [" + circuit.getIndexCore() + "] GREEN AFTER T3 FIRST FIT REQUISIO ["
 						//										+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1]
 						//										+ "] BandaCompleta [" + band[0] + " - " + band[1] + "]");
+
 						return chosen;
 					}
 				}
 			}
 		}
+
 		// CENTRAL(BLACK) Last Fit <- t3
 		else if (groupBlack.contains(circuit.getIndexCore())) {
 			int band[] = null;
+
 			for (int i = freeSpectrumBands.size() - 1; i >= 0; i--) {
 				band = freeSpectrumBands.get(i);
+
 				if (band[1] - band[0] + 1 >= numberOfSlots) {
 					// Scenario 1 ( Passes through t3)
 					if (band[0] <= t3 && band[1] >= t3 && (t3 - numberOfSlots) >= band[0]) {
@@ -871,8 +926,10 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//						System.out.println("2 - CORE [" + circuit.getIndexCore() + "] BLACK IN T3 LAST FIT REQUISIO ["
 						//								+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1] + "] BandaCompleta ["
 						//								+ band[0] + " - " + band[1] + "]");
+
 						return chosen;
 					}
+
 					// Scenario 2 (Before t3)
 					else if (band[1] < t3) {
 						chosen = band.clone();
@@ -881,6 +938,7 @@ public class Adein implements CoreAndSpectrumAssignmentAlgorithmInterface {
 						//								"2 - CORE [" + circuit.getIndexCore() + "] BLACK BEFORE T3 LAST FIT REQUISIO ["
 						//										+ numberOfslots + "] ESPECTRO = [" + chosen[0] + " - " + chosen[1]
 						//										+ "] BandaCompleta [" + band[0] + " - " + band[1] + "]");
+
 						return chosen;
 					}
 				}

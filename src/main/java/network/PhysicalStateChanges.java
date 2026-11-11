@@ -1,16 +1,11 @@
 package network;
 
 /**
- * Parte 54: counters of the changes made to the classical state of the network, per thread (a simulation runs in a
- * single thread, so these are the counters of the simulation being run):
- * <ul>
- *   <li>{@link #mutations()}: changes made to circuits that are already in the network (spectrum, core, modulation,
- *       power, route or requests changed after the allocation: reallocation, spectrum expansion, power
- *       adjustment...);</li>
- *   <li>{@link #memberships()}: circuits added to or removed from the circuit list of a core (one per core list).</li>
- * </ul>
- * The QKD session refresh uses them to know that nothing but the circuit being allocated or released changed since
- * the last refresh.
+ * Trace-only mutation/membership counters adapted from the experimental branch.
+ * In the v1 they deliberately DO NOT authorize skipping re-evaluation of QKD
+ * sessions, which may depend on non-local Raman, longitudinal PIChs, NLI and ASE.
+ * Tracing is enabled only by -Dsnets.perfStats=true and is not complete for
+ * direct mutations of collection views or per-link translucent configuration.
  */
 public final class PhysicalStateChanges {
 
@@ -26,17 +21,19 @@ public final class PhysicalStateChanges {
      * entered the network, or a circuit received a request list that cannot be tracked: the caches that depend on the
      * change tracking are then turned off for the process.
      */
-    private static volatile boolean untracked;
+    private static volatile boolean untracked = true; // v1 QKD/PICh changes are not exhaustively tracked
+    private static final java.util.concurrent.atomic.AtomicLong MUTATIONS = new java.util.concurrent.atomic.AtomicLong();
+    private static final java.util.concurrent.atomic.AtomicLong MEMBERSHIPS = new java.util.concurrent.atomic.AtomicLong();
 
     private PhysicalStateChanges() {
     }
 
     static void mutated() {
-        COUNTERS.get()[0]++;
+        if (simulator.PerfChecks.STATS) { COUNTERS.get()[0]++; MUTATIONS.incrementAndGet(); }
     }
 
     static void membershipChanged() {
-        COUNTERS.get()[1]++;
+        if (simulator.PerfChecks.STATS) { COUNTERS.get()[1]++; MEMBERSHIPS.incrementAndGet(); }
     }
 
     /** Changes made to circuits already in the network (this thread). */
@@ -48,6 +45,12 @@ public final class PhysicalStateChanges {
     public static long memberships() {
         return COUNTERS.get()[1];
     }
+
+    public static long totalMutations() { return MUTATIONS.get(); }
+    public static long totalMembershipChanges() { return MEMBERSHIPS.get(); }
+
+    /** No cache skips are based on this telemetry in v1 (PICh and per-span state are retained). */
+    public static boolean maySkipPhysicalRefresh() { return false; }
 
     static void markUntracked() {
         untracked = true;

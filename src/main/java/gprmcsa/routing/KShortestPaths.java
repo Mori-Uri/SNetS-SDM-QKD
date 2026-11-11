@@ -24,49 +24,49 @@ import simulationControl.Util;
 public class KShortestPaths implements KRoutingAlgorithmInterface {
 
 	// Used as a separator between the names of nodes
-    private static final String DIV = "-";
+	private static final String DIV = "-";
 
-    // Number of shortest routes to be computed for each pair(s, d)
-    private int k;
+	// Number of shortest routes to be computed for each pair(s, d)
+	private int k;
 
-    // List with the k shortest routes for all pairs (s, d)
-    private HashMap<String, List<Route>> routesForAllPairs;
+	// List with the k shortest routes for all pairs (s, d)
+	private HashMap<String, List<Route>> routesForAllPairs;
 
-    private Util util;
+	private Util util;
 
-    /**
+	/**
      * Creates a new instance of KShortestPaths
      */
-    public KShortestPaths() {
-        this.k = 3;
-        this.routesForAllPairs = new HashMap<>();
-    }
+	public KShortestPaths() {
+		this.k = 3;
+		this.routesForAllPairs = new HashMap<>();
+	}
 
-    /**
+	/**
      * Compute the k shortest routes for each pair(s, d)
      *
      * @param mesh Mesha - network topology
      * @param k    int - number of routes to be computed for each pair(s, d)
      */
-    public void computeAllRoutes(Mesh mesh, int k) {
-    	this.util = mesh.getUtil();
+	public void computeAllRoutes(Mesh mesh, int k) {
+		this.util = mesh.getUtil();
 
-    	this.k = k;
-    	this.routesForAllPairs = new HashMap<>();
+		this.k = k;
+		this.routesForAllPairs = new HashMap<>();
 
-        for (Node n1 : mesh.getNodeList()) {
-            for (Node n2 : mesh.getNodeList()) {
-                if (n1 == n2)
-                    continue;
+		for (Node n1 : mesh.getNodeList()) {
+			for (Node n2 : mesh.getNodeList()) {
+				if (n1 == n2)
+					continue;
 
-                routesForAllPairs.put(n1.getName() + DIV + n2.getName(), this.computeRoutes(n1, n2, mesh));
-            }
-        }
+				routesForAllPairs.put(n1.getName() + DIV + n2.getName(), this.computeRoutes(n1, n2, mesh));
+			}
+		}
 
-        salveKRoutesByPar(mesh.getNodeList());
-    }
+		salveKRoutesByPar(mesh.getNodeList());
+	}
 
-    /**
+	/**
      * Compute the k shortest paths between two nodes
      *
      * @param n1 Node
@@ -74,69 +74,72 @@ public class KShortestPaths implements KRoutingAlgorithmInterface {
      * @param mesh Mesh
      * @return List<Route>
      */
-    private List<Route> computeRoutes(Node n1, Node n2, Mesh mesh) {
-        TreeSet<Route> res = new TreeSet<>();
+	private List<Route> computeRoutes(Node n1, Node n2, Mesh mesh) {
+		TreeSet<Route> res = new TreeSet<>();
 
-        List<Vector<Node>> routesUnderConstruction = new ArrayList<>();
+		List<Vector<Node>> routesUnderConstruction = new ArrayList<>();
 
-        Vector<Node> ini = new Vector<>();
-        ini.add(n1);
+		Vector<Node> ini = new Vector<>();
+		ini.add(n1);
 
-        routesUnderConstruction.add(ini);
+		routesUnderConstruction.add(ini);
 
-        while (!routesUnderConstruction.isEmpty()) {
-        	//System.out.println("\n\n routes under construction");
-            for (Vector<Node> vector : routesUnderConstruction) {
-                String aux = "";
-                for (Node node : vector) {
-                    aux = aux + node.getName() + "->";
-                }
-                //System.out.println(aux);
-            }
+		while (!routesUnderConstruction.isEmpty()) {
+			//System.out.println("\n\n routes under construction");
 
-            Vector<Node> expand = routesUnderConstruction.remove(0);
+			for (Vector<Node> vector : routesUnderConstruction) {
+				String aux = "";
 
-            if (expand.get(expand.size() - 1).equals(n2)) {// route found
-                Route r = new Route(expand);
+				for (Node node : vector) {
+					aux = aux + node.getName() + "->";
+				}
 
-                res.add(r);
-                continue;
-            }
+				//System.out.println(aux);
+			}
 
-            for (Node node : mesh.getAdjacentsNodes(expand.get(expand.size() - 1))) {
-                if (expand.contains(node))
-                    continue; // Do not create routes with loops
-                @SuppressWarnings("unchecked")
+			Vector<Node> expand = routesUnderConstruction.remove(0);
+
+			if (expand.get(expand.size() - 1).equals(n2)) {// route found
+				Route r = new Route(expand);
+
+				res.add(r);
+				continue;
+			}
+
+			for (Node node : mesh.getAdjacentsNodes(expand.get(expand.size() - 1))) {
+				if (expand.contains(node))
+					continue; // Do not create routes with loops
+				@SuppressWarnings("unchecked")
 				Vector<Node> aux = (Vector<Node>) expand.clone();
-                aux.add(node);
-                routesUnderConstruction.add(aux);
-            }
-        }
+				aux.add(node);
+				routesUnderConstruction.add(aux);
+			}
+		}
 
-        if (res.size() > k)
-            return new ArrayList<>(res).subList(0, k);
-        else
-            return new ArrayList<>(res);
-    }
+		if (res.size() > k)
+			return new ArrayList<>(res).subList(0, k);
+		else
+			return new ArrayList<>(res);
+	}
 
-    /**
+	/**
      * Returns the k shortest paths between two nodes
      *
      * @param n1 Node
      * @param n2 Node
      * @return List<Route>
      */
-    public List<Route> getRoutes(Node n1, Node n2) {
-        return this.routesForAllPairs.get(n1.getName() + DIV + n2.getName());
-    }
+	public List<Route> getRoutes(Node n1, Node n2) {
+		return this.routesForAllPairs.get(n1.getName() + DIV + n2.getName());
+	}
 
-    /**
+	/**
      * This method saves in files all the routes for all the pairs.
      *
      * @param nodeList Vector<Node>
      */
-    private void salveKRoutesByPar(Vector<Node> nodeList) {
-    	List<String> routesList = new ArrayList<String>();
+	private void salveKRoutesByPar(Vector<Node> nodeList) {
+		List<String> routesList = new ArrayList<String>();
 
 		for(int i = 0; i < nodeList.size(); i++){
 			Node source = nodeList.get(i);
@@ -148,12 +151,15 @@ public class KShortestPaths implements KRoutingAlgorithmInterface {
 					String pair = source.getName() + DIV + destination.getName();
 
 					List<Route> routes = routesForAllPairs.get(pair);
+
 					for(int r = 0; r < routes.size(); r++){
 						Route rAux = routes.get(r);
 
 						StringBuilder sb = new StringBuilder();
+
 						for (int n = 0; n < rAux.getNodeList().size(); n++) {
 							sb.append(rAux.getNodeList().get(n).getName());
+
 							if(n < rAux.getNodeList().size() - 1){
 								sb.append("-");
 							}
@@ -166,12 +172,12 @@ public class KShortestPaths implements KRoutingAlgorithmInterface {
 		}
 
 		Gson gson = new GsonBuilder().create();
-        String json = gson.toJson(routesList);
+		String json = gson.toJson(routesList);
 
-        try {
-        	String separator = System.getProperty("file.separator");
+		try {
+			String separator = System.getProperty("file.separator");
 
-        	FileWriter fw = new FileWriter(util.projectPath + separator + "kRoutesByPar.txt");
+			FileWriter fw = new FileWriter(util.projectPath + separator + "kRoutesByPar.txt");
 			BufferedWriter out = new BufferedWriter(fw);
 
 			out.append(json);
@@ -179,12 +185,12 @@ public class KShortestPaths implements KRoutingAlgorithmInterface {
 			out.close();
 			fw.close();
 
-        } catch (Exception ex) {
-        	ex.printStackTrace();
-        }
-    }
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+	}
 
-    /**
+	/**
 	 * Returns the route list for all pairs
 	 *
 	 * @return Vector<Route>

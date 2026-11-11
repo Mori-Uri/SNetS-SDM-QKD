@@ -20,46 +20,47 @@ package qkd.physical;
  */
 public enum QKDCrosstalkReceiverTransferMode {
 
-    RECEIVER_REFERENCED,
-    DISTRIBUTED_QUANTUM_ATTENUATION_REFERENCE,
-    /**
+	RECEIVER_REFERENCED,
+	DISTRIBUTED_QUANTUM_ATTENUATION_REFERENCE,
+
+	/**
      * Part 26: P_Rx = P_n * ISO * h * L * 10^(-alpha L / 10), the inter-core crosstalk noise
      * of a classical channel that propagates with the QCh over the whole span (Moghaddam,
      * Beyranvand, Salehi, IEEE JSAC 39(9), 2021, Eq. (1): I_XT(L) = P_0 e^{-alpha L} h L).
      */
-    ATTENUATED_SPAN;
+	ATTENUATED_SPAN;
 
-    /**
+	/**
      * Parses the value used in scenario JSON files.
      */
-    public static QKDCrosstalkReceiverTransferMode fromConfig(String value) {
-        if (value == null || value.trim().isEmpty()) {
-            return RECEIVER_REFERENCED;
-        }
+	public static QKDCrosstalkReceiverTransferMode fromConfig(String value) {
+		if (value == null || value.trim().isEmpty()) {
+			return RECEIVER_REFERENCED;
+		}
 
-        String normalized = value.trim()
-                .toUpperCase()
-                .replace('-', '_')
-                .replace(' ', '_');
+		String normalized = value.trim()
+				.toUpperCase()
+				.replace('-', '_')
+				.replace(' ', '_');
 
-        if ("RECEIVER_REFERENCED".equals(normalized)
-                || "T_EQ_1".equals(normalized)
-                || "T1".equals(normalized)) {
-            return RECEIVER_REFERENCED;
-        }
+		if ("RECEIVER_REFERENCED".equals(normalized)
+				|| "T_EQ_1".equals(normalized)
+				|| "T1".equals(normalized)) {
+			return RECEIVER_REFERENCED;
+		}
 
-        if ("DISTRIBUTED_QUANTUM_ATTENUATION_REFERENCE".equals(normalized)
-                || "DISTRIBUTED".equals(normalized)
-                || "DISTRIBUTED_REFERENCE".equals(normalized)) {
-            return DISTRIBUTED_QUANTUM_ATTENUATION_REFERENCE;
-        }
+		if ("DISTRIBUTED_QUANTUM_ATTENUATION_REFERENCE".equals(normalized)
+				|| "DISTRIBUTED".equals(normalized)
+				|| "DISTRIBUTED_REFERENCE".equals(normalized)) {
+			return DISTRIBUTED_QUANTUM_ATTENUATION_REFERENCE;
+		}
 
-        if ("ATTENUATED".equals(normalized) || "ATTENUATED_SPAN".equals(normalized)
-                || "MOGHADDAM".equals(normalized)) {
-            return ATTENUATED_SPAN;
-        }
+		if ("ATTENUATED".equals(normalized) || "ATTENUATED_SPAN".equals(normalized)
+				|| "MOGHADDAM".equals(normalized)) {
+			return ATTENUATED_SPAN;
+		}
 
-        throw new IllegalArgumentException(
-                "Unknown QKD receiver transfer model: " + value);
-    }
+		throw new IllegalArgumentException(
+				"Unknown QKD receiver transfer model: " + value);
+	}
 }

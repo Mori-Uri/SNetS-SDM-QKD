@@ -37,181 +37,185 @@ import gprmcsa.trafficGrooming.TrafficGroomingAlgorithmInterface;
 @SuppressWarnings("serial")
 public class Simulation implements Serializable {
 
-    private Mesh mesh;
-    private ControlPlane controlPlane;
-    private Measurements measurements;
-    private Util util;
+	private Mesh mesh;
+	private ControlPlane controlPlane;
+	private Measurements measurements;
+	private Util util;
 
-    private int loadPoint;
-    private int replication;
-    /** Parte 45: cost of the algorithms (activeMetrics.AlgorithmCost), or null. */
-    private transient AlgorithmCostRecorder costRecorder;
+	private int loadPoint;
+	private int replication;
 
-    public Simulation(SimulationConfig sc, Mesh mesh, int loadPoint,
-            int replication, Util util) {
-        this.loadPoint = loadPoint;
-        this.replication = replication;
-        this.measurements = new Measurements(sc.getRequests(), loadPoint,
-                replication, mesh, sc.getActiveMetrics());
-        this.mesh = mesh;
-        this.util = util;
+	/** Parte 45: cost of the algorithms (activeMetrics.AlgorithmCost), or null. */
+	private transient AlgorithmCostRecorder costRecorder;
 
-        GPRMCSA legacyFactory = new GPRMCSA(sc.getGrooming(),
-                sc.getIntegratedRmlsa(), sc.getRouting(), sc.getkRouting(),
-                sc.getModulationSelection(), sc.getSpectrumAssignment(),
-                sc.getRegeneratorAssignment(),
-                sc.getCoreAndSpectrumAssignment(), sc.getReallocation(),
-                sc.getPowerAssignment());
+	public Simulation(SimulationConfig sc, Mesh mesh, int loadPoint,
+			int replication, Util util) {
+		this.loadPoint = loadPoint;
+		this.replication = replication;
+		this.measurements = new Measurements(sc.getRequests(), loadPoint,
+				replication, mesh, sc.getActiveMetrics());
+		this.mesh = mesh;
+		this.util = util;
 
-        final boolean qkdEnabled = mesh instanceof QKDMesh;
+		GPRMCSA legacyFactory = new GPRMCSA(sc.getGrooming(),
+				sc.getIntegratedRmlsa(), sc.getRouting(), sc.getkRouting(),
+				sc.getModulationSelection(), sc.getSpectrumAssignment(),
+				sc.getRegeneratorAssignment(),
+				sc.getCoreAndSpectrumAssignment(), sc.getReallocation(),
+				sc.getPowerAssignment());
 
-        TrafficGroomingAlgorithmInterface grooming =
-                legacyFactory.instantiateGrooming();
-        IntegratedRMLSAAlgorithmInterface integrated =
-                qkdEnabled && QKDAlgorithmFactory.isQkdIntegratedAlgorithm(sc.getIntegratedRmlsa())
-                        ? QKDAlgorithmFactory.instantiateIntegrated(sc.getIntegratedRmlsa())
-                        : legacyFactory.instantiateIntegratedRSA();
-        RoutingAlgorithmInterface routing = legacyFactory.instantiateRouting();
-        KRoutingAlgorithmInterface kRouting = legacyFactory.instantiateKRouting();
-        SpectrumAssignmentAlgorithmInterface spectrum =
-                legacyFactory.instantiateSpectrumAssignment();
-        ModulationSelectionAlgorithmInterface modulation =
-                legacyFactory.instantiateModulationSelection();
-        ReallocationAlgorithmInterface reallocation =
-                legacyFactory.instantiateReallocation();
-        PowerAssignmentAlgorithmInterface power =
-                legacyFactory.instantiatePowerAssignment();
-        RegeneratorAssignmentAlgorithmInterface regenerator =
-                legacyFactory.instantiateRegeneratorAssignment();
+		final boolean qkdEnabled = mesh instanceof QKDMesh;
 
-        /*
+		TrafficGroomingAlgorithmInterface grooming =
+				legacyFactory.instantiateGrooming();
+		IntegratedRMLSAAlgorithmInterface integrated =
+				qkdEnabled && QKDAlgorithmFactory.isQkdIntegratedAlgorithm(sc.getIntegratedRmlsa())
+						? QKDAlgorithmFactory.instantiateIntegrated(sc.getIntegratedRmlsa())
+						: legacyFactory.instantiateIntegratedRSA();
+		RoutingAlgorithmInterface routing = legacyFactory.instantiateRouting();
+		KRoutingAlgorithmInterface kRouting = legacyFactory.instantiateKRouting();
+		SpectrumAssignmentAlgorithmInterface spectrum =
+				legacyFactory.instantiateSpectrumAssignment();
+		ModulationSelectionAlgorithmInterface modulation =
+				legacyFactory.instantiateModulationSelection();
+		ReallocationAlgorithmInterface reallocation =
+				legacyFactory.instantiateReallocation();
+		PowerAssignmentAlgorithmInterface power =
+				legacyFactory.instantiatePowerAssignment();
+		RegeneratorAssignmentAlgorithmInterface regenerator =
+				legacyFactory.instantiateRegeneratorAssignment();
+
+		/*
          * Critical addon boundary: classical scenarios resolve CSA directly
          * through the untouched GPRMCSA factory. QKD scenarios resolve their
          * explicitly named QKD CSA through QKDAlgorithmFactory instead.
          */
-        CoreAndSpectrumAssignmentAlgorithmInterface coreAndSpectrum;
-        if (qkdEnabled) {
-            coreAndSpectrum = QKDAlgorithmFactory
-                    .instantiateCoreAndSpectrumAssignment(
-                            sc.getCoreAndSpectrumAssignment());
-        } else if (QKDAlgorithmFactory.isQkdCoreAndSpectrumAlgorithm(sc.getCoreAndSpectrumAssignment())) {
-            /* Parte 39: a classical run may name qabne/qfirstfit too (for example 6 cores with one core disabled
+		CoreAndSpectrumAssignmentAlgorithmInterface coreAndSpectrum;
+
+		if (qkdEnabled) {
+			coreAndSpectrum = QKDAlgorithmFactory
+					.instantiateCoreAndSpectrumAssignment(
+							sc.getCoreAndSpectrumAssignment());
+		} else if (QKDAlgorithmFactory.isQkdCoreAndSpectrumAlgorithm(sc.getCoreAndSpectrumAssignment())) {
+			/* Parte 39: a classical run may name qabne/qfirstfit too (for example 6 cores with one core disabled
              * and the same rotation as the QKD cases); the legacy factory does not know these names. */
-            coreAndSpectrum = QKDAlgorithmFactory
-                    .instantiateCoreAndSpectrumAssignment(
-                            sc.getCoreAndSpectrumAssignment());
-        } else {
-            coreAndSpectrum = legacyFactory
-                    .instantiateCoreAndSpectrumAssignment();
-        }
+			coreAndSpectrum = QKDAlgorithmFactory
+					.instantiateCoreAndSpectrumAssignment(
+							sc.getCoreAndSpectrumAssignment());
+		} else {
+			coreAndSpectrum = legacyFactory
+					.instantiateCoreAndSpectrumAssignment();
+		}
 
-        checkNotNull(grooming, "grooming: " + sc.getGrooming());
-        checkNotNull(integrated, "integrated: " + sc.getIntegratedRmlsa());
-        checkNotNull(routing, "routing: " + sc.getRouting());
-        checkNotNull(kRouting, "kRouting: " + sc.getkRouting());
-        checkNotNull(spectrum,
-                "spectrumAssignment: " + sc.getSpectrumAssignment());
-        checkNotNull(coreAndSpectrum,
-                (qkdEnabled ? "QKD addon " : "legacy ")
-                + "coreAndSpectrumAssignment: "
-                + sc.getCoreAndSpectrumAssignment());
-        checkNotNull(modulation,
-                "modulationSelection: " + sc.getModulationSelection());
-        checkNotNull(power, "powerAssignment: " + sc.getPowerAssignment());
-        checkNotNull(reallocation,
-                "reallocation: " + sc.getReallocation());
-        checkNotNull(regenerator,
-                "regeneratorAssignment: " + sc.getRegeneratorAssignment());
+		checkNotNull(grooming, "grooming: " + sc.getGrooming());
+		checkNotNull(integrated, "integrated: " + sc.getIntegratedRmlsa());
+		checkNotNull(routing, "routing: " + sc.getRouting());
+		checkNotNull(kRouting, "kRouting: " + sc.getkRouting());
+		checkNotNull(spectrum,
+				"spectrumAssignment: " + sc.getSpectrumAssignment());
+		checkNotNull(coreAndSpectrum,
+				(qkdEnabled ? "QKD addon " : "legacy ")
+				+ "coreAndSpectrumAssignment: "
+				+ sc.getCoreAndSpectrumAssignment());
+		checkNotNull(modulation,
+				"modulationSelection: " + sc.getModulationSelection());
+		checkNotNull(power, "powerAssignment: " + sc.getPowerAssignment());
+		checkNotNull(reallocation,
+				"reallocation: " + sc.getReallocation());
+		checkNotNull(regenerator,
+				"regeneratorAssignment: " + sc.getRegeneratorAssignment());
 
-        if (sc.getActiveMetrics() != null && sc.getActiveMetrics().AlgorithmCost) { // Parte 45
-            costRecorder = new AlgorithmCostRecorder();
-            grooming = costRecorder.wrap(grooming, TrafficGroomingAlgorithmInterface.class, "Grooming");
-            integrated = costRecorder.wrap(integrated, IntegratedRMLSAAlgorithmInterface.class, "IntegratedRMLSA");
-            routing = costRecorder.wrap(routing, RoutingAlgorithmInterface.class, "Routing");
-            kRouting = costRecorder.wrap(kRouting, KRoutingAlgorithmInterface.class, "KRouting");
-            spectrum = costRecorder.wrap(spectrum, SpectrumAssignmentAlgorithmInterface.class, "SpectrumAssignment");
-            modulation = costRecorder.wrap(modulation, ModulationSelectionAlgorithmInterface.class, "ModulationSelection");
-            coreAndSpectrum = costRecorder.wrap(coreAndSpectrum, CoreAndSpectrumAssignmentAlgorithmInterface.class,
-                    "CoreAndSpectrumAssignment");
-            reallocation = costRecorder.wrap(reallocation, ReallocationAlgorithmInterface.class, "Reallocation");
-            power = costRecorder.wrap(power, PowerAssignmentAlgorithmInterface.class, "PowerAssignment");
-        }
+		if (sc.getActiveMetrics() != null && sc.getActiveMetrics().AlgorithmCost) { // Parte 45
+			costRecorder = new AlgorithmCostRecorder();
+			grooming = costRecorder.wrap(grooming, TrafficGroomingAlgorithmInterface.class, "Grooming");
+			integrated = costRecorder.wrap(integrated, IntegratedRMLSAAlgorithmInterface.class, "IntegratedRMLSA");
+			routing = costRecorder.wrap(routing, RoutingAlgorithmInterface.class, "Routing");
+			kRouting = costRecorder.wrap(kRouting, KRoutingAlgorithmInterface.class, "KRouting");
+			spectrum = costRecorder.wrap(spectrum, SpectrumAssignmentAlgorithmInterface.class, "SpectrumAssignment");
+			modulation = costRecorder.wrap(modulation, ModulationSelectionAlgorithmInterface.class, "ModulationSelection");
+			coreAndSpectrum = costRecorder.wrap(coreAndSpectrum, CoreAndSpectrumAssignmentAlgorithmInterface.class,
+					"CoreAndSpectrumAssignment");
+			reallocation = costRecorder.wrap(reallocation, ReallocationAlgorithmInterface.class, "Reallocation");
+			power = costRecorder.wrap(power, PowerAssignmentAlgorithmInterface.class, "PowerAssignment");
+		}
 
-        if (sc.getNetworkType() == GPRMCSA.TRANSPARENT) {
-            if (qkdEnabled) {
-                controlPlane = new QKDControlPlane(
-                        (QKDMesh) mesh,
-                        sc.getRmlsaType(),
-                        grooming,
-                        integrated,
-                        routing,
-                        kRouting,
-                        spectrum,
-                        modulation,
-                        coreAndSpectrum,
-                        reallocation,
-                        power);
-                ((QKDControlPlane) controlPlane).setCostRecorder(costRecorder); // Parte 45
-            } else {
-                /*
+		if (sc.getNetworkType() == GPRMCSA.TRANSPARENT) {
+			if (qkdEnabled) {
+				controlPlane = new QKDControlPlane(
+						(QKDMesh) mesh,
+						sc.getRmlsaType(),
+						grooming,
+						integrated,
+						routing,
+						kRouting,
+						spectrum,
+						modulation,
+						coreAndSpectrum,
+						reallocation,
+						power);
+				((QKDControlPlane) controlPlane).setCostRecorder(costRecorder); // Parte 45
+			} else {
+				/*
                  * Legacy transparent path: same original SNetS components. The
                  * Part 25 subclass only observes each decision to write
                  * BlockingDetails.csv (same transient rule: 10 % of the requests).
                  */
-                controlPlane = new qkd.metrics.ObservedClassicalControlPlane(mesh, sc.getRmlsaType(),
-                        grooming, integrated, routing, kRouting, spectrum,
-                        modulation, coreAndSpectrum, reallocation, power,
-                        0.1 * sc.getRequests());
-            }
-        } else if (sc.getNetworkType() == GPRMCSA.TRANSLUCENT) {
-            if (qkdEnabled) {
-                throw new IllegalArgumentException(
-                        "QKD addon currently supports transparent networks only");
-            }
-            controlPlane = new TranslucentControlPlane(mesh,
-                    sc.getRmlsaType(), grooming, integrated, routing, kRouting,
-                    spectrum, regenerator, modulation, coreAndSpectrum,
-                    reallocation, power);
-        }
-    }
+				controlPlane = new qkd.metrics.ObservedClassicalControlPlane(mesh, sc.getRmlsaType(),
+						grooming, integrated, routing, kRouting, spectrum,
+						modulation, coreAndSpectrum, reallocation, power,
+						0.1 * sc.getRequests());
+			}
 
-    /** Parte 45: cost recorder of this simulation, or null when activeMetrics.AlgorithmCost is off. */
-    public AlgorithmCostRecorder getCostRecorder() {
-        return costRecorder;
-    }
+		} else if (sc.getNetworkType() == GPRMCSA.TRANSLUCENT) {
+			if (qkdEnabled) {
+				throw new IllegalArgumentException(
+						"QKD addon currently supports transparent networks only");
+			}
 
-    private static void checkNotNull(Object obj, String name) {
-        if (obj == null) {
-            throw new IllegalArgumentException(
-                    "Class/algorithm not found -> " + name);
-        }
-    }
+			controlPlane = new TranslucentControlPlane(mesh,
+					sc.getRmlsaType(), grooming, integrated, routing, kRouting,
+					spectrum, regenerator, modulation, coreAndSpectrum,
+					reallocation, power);
+		}
+	}
 
-    public int getLoadPoint() {
-        return loadPoint;
-    }
+	/** Parte 45: cost recorder of this simulation, or null when activeMetrics.AlgorithmCost is off. */
+	public AlgorithmCostRecorder getCostRecorder() {
+		return costRecorder;
+	}
 
-    public int getReplication() {
-        return replication;
-    }
+	private static void checkNotNull(Object obj, String name) {
+		if (obj == null) {
+			throw new IllegalArgumentException(
+					"Class/algorithm not found -> " + name);
+		}
+	}
 
-    public Mesh getMesh() {
-        return mesh;
-    }
+	public int getLoadPoint() {
+		return loadPoint;
+	}
 
-    public void setMesh(Mesh mesh) {
-        this.mesh = mesh;
-    }
+	public int getReplication() {
+		return replication;
+	}
 
-    public ControlPlane getControlPlane() {
-        return controlPlane;
-    }
+	public Mesh getMesh() {
+		return mesh;
+	}
 
-    public Measurements getMeasurements() {
-        return measurements;
-    }
+	public void setMesh(Mesh mesh) {
+		this.mesh = mesh;
+	}
 
-    public Util getUtil() {
-        return this.util;
-    }
+	public ControlPlane getControlPlane() {
+		return controlPlane;
+	}
+
+	public Measurements getMeasurements() {
+		return measurements;
+	}
+
+	public Util getUtil() {
+		return this.util;
+	}
 }

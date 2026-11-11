@@ -11,28 +11,28 @@ import simulator.Simulation;
  * @author Iallen
  */
 public class HoldRequestListener implements EventListener, java.io.Serializable {
-    private Simulation simulation;
+	private Simulation simulation;
 
-    /**
+	/**
      * Creates a new instance of HoldRequestListener.
      */
-    public HoldRequestListener(Simulation simulation) {
-        this.simulation = simulation;
-    }
+	public HoldRequestListener(Simulation simulation) {
+		this.simulation = simulation;
+	}
 
-    /**
+	/**
      * Run a certain 'e' event.
      */
-    @Override
-    public void execute(Event e) throws Exception {
-        RequestForConnection request = (RequestForConnection) e.getObject();
-        simulation.getControlPlane().finalizeConnection(request);
+	@Override
+	public void execute(Event e) throws Exception {
+		RequestForConnection request = (RequestForConnection) e.getObject();
+		simulation.getControlPlane().finalizeConnection(request);
 
-        if(simulation.getMeasurements().getConsumedEnergyMetric() != null){
-            RequestForConnection rfc = new RequestForConnection();
-            rfc.setTimeOfRequestHours(e.getTimeHours());
-            simulation.getMeasurements().getConsumedEnergyMetric().addNewObservation(simulation.getControlPlane(), true, rfc);
-        }
-    }
+		if(simulation.getMeasurements().getConsumedEnergyMetric() != null){
+			RequestForConnection rfc = new RequestForConnection();
+			rfc.setTimeOfRequestHours(e.getTimeHours());
+			simulation.getMeasurements().getConsumedEnergyMetric().addNewObservation(simulation.getControlPlane(), true, rfc);
+		}
+	}
 
 }

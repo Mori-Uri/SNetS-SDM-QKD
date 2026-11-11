@@ -49,16 +49,6 @@ saíram iguais aos da execução sem interrupção (ou equivalentes, pela regra 
 - A leitura e a gravação rodam numa thread com pilha de 1 GB, porque a serialização Java é recursiva e o grafo de
   objetos de redes grandes estoura a pilha padrão (visto no C05, rede USA).
 
-### Parte 52: ligados por padrão, cancelar sem perder e continuar
-
-- **Padrão:** sem o grupo `saveState` no `simulation`, os save states ficam **ligados** (a cada 10 min). `"enabled": false` desliga.
-- **Cancelar sem perder:** o botão Cancelar do launcher cria `savestate/STOP`. O simulador grava o estado de cada simulação entre dois eventos e termina com o código 3, sem gravar resultados. Ctrl+C e o fechamento da janela de console fazem o mesmo.
-- **Queda de energia:** não pode ser avisada; vale o último estado gravado (no máximo um intervalo antes).
-- **Continuar:** "Continuar execução" no caso, ou em Execuções → Interrompidas (uma, várias em fila ou em paralelo), roda o caso de novo. As simulações concluídas não são refeitas e as outras continuam do ponto gravado, com os mesmos resultados de uma execução sem interrupção (Q01 e Q07 conferidos, inclusive com o processo morto à força).
-- **`savestate/progresso.json`:** o que está gravado (concluídas, em andamento com as requisições feitas, sem início), a data, os arquivos do caso e o JAR. O launcher usa esse arquivo para mostrar o caso como interrompido.
-- **Quando o estado é ignorado:** o hash do estado inclui o JAR do simulador, então um estado de outro JAR é ignorado, como já acontecia com arquivos do caso alterados.
-- **Fim do caso:** a pasta `savestate` é apagada quando o caso termina e os resultados são gravados (`"keepAfterFinish": true` a mantém).
-
 ## Custo computacional dos algoritmos
 
 Ative a métrica **AlgorithmCost** (aba **Métricas**). Ela gera `<caso>_AlgorithmCost.csv`:
@@ -97,5 +87,3 @@ Mudanças, todas com o mesmo resultado bit a bit:
 
 **Ganho.** No caso Q01 (QKD, metro de 8 nós, todas as métricas ligadas, 1 thread), o tempo caiu de 25,8 s para
 19,9 s (−23 %). O ganho é maior com mais valores de c na fragmentação relativa e com mais eventos pendentes.
-
-Descrição detalhada de cada mudança, verificações contra outras versões e próximos ganhos de desempenho: `docs/MUDANCAS_DESEMPENHO_E_SAVE_STATES.md` (Parte 53).

@@ -38,6 +38,7 @@ public class DataSetInfoResultManager implements ResultManagerInterface {
 				reps.put(dsilp.getReplication(), (DataSetInformation)dsilp);
 			}
 		}
+
 		DataSetInformation dsil = (DataSetInformation) llms.get(0).get(0);
 		loadPoints = new ArrayList<>(dsi.keySet());
 		replications = new ArrayList<>(dsi.values().iterator().next().keySet());
@@ -61,6 +62,7 @@ public class DataSetInfoResultManager implements ResultManagerInterface {
 			for (Integer rep : replications) {
 				res.append(sep + "rep" + rep);
 			}
+
 			res.append("\n");
 
 			res.append(resultQuantDifferent());
@@ -90,9 +92,11 @@ public class DataSetInfoResultManager implements ResultManagerInterface {
 	 */
 	private String resultDataSetByPointAndReplication(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			for (Integer replic : replications) {
 				List<DataSetInterface> dataSetList = dsi.get(loadPoint).get(replic).getDataSetList();
+
 				for (DataSetInterface datasetLine : dataSetList) {
 					res.append(loadPoint + sep + replic + sep + " " + sep);
 					String strDataSetLine = datasetLine.dataSetToString();
@@ -101,6 +105,7 @@ public class DataSetInfoResultManager implements ResultManagerInterface {
 				}
 			}
 		}
+
 		return res.toString();
 	}
 
@@ -122,14 +127,17 @@ public class DataSetInfoResultManager implements ResultManagerInterface {
 	 */
 	private void saveDataSetByAllPointAndAllReplication(){
 		List<DataSetInterface> lines = new ArrayList<>();
+
 		for (Integer loadPoint : loadPoints) {
 			for (Integer replic : replications) {
 				List<DataSetInterface> dataSetList = dsi.get(loadPoint).get(replic).getDataSetList();
+
 				for (DataSetInterface datasetLine : dataSetList) {
 					lines.add(datasetLine);
 				}
 			}
 		}
+
 		String complementName = "_lpAll_rpAll";
 		DataSetManager.createDatasetFileCSV(lines, projectPath, complementName);
 	}
@@ -140,13 +148,17 @@ public class DataSetInfoResultManager implements ResultManagerInterface {
 	 */
 	private String resultQuantDifferent(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			res.append("Different Quantity" + sep + loadPoint + sep + "all" + sep + "all" + sep + "all" + sep + " ");
+
 			for (Integer replic : replications) {
 				res.append(sep + dsi.get(loadPoint).get(replic).getDifferentQuantity());
 			}
+
 			res.append("\n");
 		}
+
 		return res.toString();
 	}
 

@@ -70,6 +70,16 @@
         }
       }
       if (!Array.isArray(net.modulations) || !net.modulations.length) add('err', 'network', 'Nenhum formato de modulação definido.');
+      for (const [i, mod] of (Array.isArray(net.modulations) ? net.modulations : []).entries()) {
+        if (mod && Object.prototype.hasOwnProperty.call(mod, 'SNR') && Object.prototype.hasOwnProperty.call(mod, 'OSNR'))
+          add('err', 'network', `Modulação ${i + 1}: não informe OSNR e SNR simultaneamente.`);
+        const limit = mod && (mod.OSNR !== undefined ? mod.OSNR : mod.SNR);
+        if (limit !== undefined && !Number.isFinite(Number(limit)))
+          add('err', 'network', `Modulação ${i + 1}: limiar OSNR inválido.`);
+      }
+      if (isPlainObject(net.qkd) && Object.prototype.hasOwnProperty.call(net.qkd, 'pichSnrCheckEnabled')
+          && Object.prototype.hasOwnProperty.call(net.qkd, 'pichOsnrCheckEnabled'))
+        add('err', 'network', 'Não informe pichOsnrCheckEnabled e pichSnrCheckEnabled simultaneamente.');
       if (isPlainObject(net.qkd) && net.qkd.enabled) {
         if (net.qkd.quantumCoreId !== undefined && cores.length && !idSet.has(Number(net.qkd.quantumCoreId))) {
           add('err', 'network', `qkd.quantumCoreId = ${net.qkd.quantumCoreId} não corresponde a nenhum núcleo.`);
@@ -80,6 +90,10 @@
         }
         if (net.qkd.qchGranularity !== undefined && !['route', 'link', 'span'].includes(String(net.qkd.qchGranularity).toLowerCase())) add('err', 'network', 'qkd.qchGranularity deve ser route, link ou span.');
         if (net.qkd.qchSlotPolicy !== undefined && !['abne', 'firstfit', 'lowestloss', 'maxskr'].includes(String(net.qkd.qchSlotPolicy).toLowerCase())) add('err', 'network', 'qkd.qchSlotPolicy deve ser abne, firstfit, lowestloss ou maxskr.');
+        if (String(net.qkd.qchSlotPolicy || '').toLowerCase() === 'maxskr' && String(net.qkd.qchGranularity || '').toLowerCase() !== 'route') add('err', 'network', 'qkd.qchSlotPolicy=maxskr requer qchGranularity=route.');
+        if (net.qkd.maximumQber !== undefined && !(Number(net.qkd.maximumQber) >= 0 && Number(net.qkd.maximumQber) <= 1)) add('err', 'network', 'qkd.maximumQber deve estar em [0,1].');
+        if (net.qkd.qberThresholdEnabled && net.qkd.maximumQber === undefined) add('info', 'network', 'QBER independente ativo com máximo padrão 0,11 (11%).');
+        if ((net.qkd.pichOsnrCheckEnabled === false || (net.qkd.pichOsnrCheckEnabled === undefined && net.qkd.pichSnrCheckEnabled === false))) add('warn', 'network', 'A QoT/OSNR do PICh foi desativada explicitamente; para experimentos finais ative-a.');
         // 1.18.0: QCh guard band and PICh placement
         if (net.qkd.qchGuardBand !== undefined && !(Number.isInteger(Number(net.qkd.qchGuardBand)) && Number(net.qkd.qchGuardBand) >= 0)) add('err', 'network', 'qkd.qchGuardBand deve ser um inteiro ≥ 0.');
         if (net.qkd.pichGuardBand !== undefined && !(Number.isInteger(Number(net.qkd.pichGuardBand)) && Number(net.qkd.pichGuardBand) >= -1)) add('err', 'network', 'qkd.pichGuardBand deve ser −1 (guardBand da rede) ou um inteiro ≥ 0.');
@@ -130,6 +144,31 @@
     if (isPlainObject(sim)) {
       for (const k of ['requests', 'loadPoints', 'replications', 'threads']) {
         if (k in sim && (!Number.isInteger(sim[k]) || sim[k] < 1)) add('err', 'simulation', `${k} deve ser inteiro ≥ 1.`);
+      }
+      if (isPlainObject(sim.qkdKeyDemand)) {
+        const kd = sim.qkdKeyDemand;
+        const profile = String(kd.profile || 'custom').toLowerCase();
+        if (!['custom', 'moghaddam2021', 'dibaj2024'].includes(profile)) add('err', 'simulation', 'qkdKeyDemand.profile deve ser custom, moghaddam2021 ou dibaj2024.');
+        if (Object.prototype.hasOwnProperty.call(kd, 'updateIntervalsMileseconds')) add('err', 'simulation', 'updateIntervalsMileseconds foi removido. Use updateIntervalsMiliseconds (milissegundos).');
+        const intervalNames = ['updateIntervalSeconds', 'updateIntervalsMicroseconds', 'updateIntervalsMilliseconds', 'updateIntervalsMiliseconds'];
+        const present = intervalNames.filter((k) => Object.prototype.hasOwnProperty.call(kd, k) && kd[k] !== null);
+        if (present.length > 1) add('err', 'simulation', 'qkdKeyDemand: apenas UM campo de intervalo é permitido (' + present.join(', ') + ').');
+        if (profile !== 'custom' && present.some((k) => k !== 'updateIntervalSeconds')) add('err', 'simulation', 'Perfis bibliográficos não aceitam campos legados de intervalo.');
+        const factors = { updateIntervalSeconds: 1, updateIntervalsMicroseconds: 1e-6, updateIntervalsMilliseconds: 1e-3, updateIntervalsMiliseconds: 1e-3 };
+        for (const k of present) {
+          const a = kd[k];
+          if (!Array.isArray(a) || !a.length || a.some((v) => typeof v !== 'number' || !Number.isFinite(v) || !(v * factors[k] > 0)))
+            add('err', 'simulation', 'qkdKeyDemand.' + k + ': forneça intervalos finitos e positivos.');
+        }
+        if (present.length === 1 && profile === 'custom') {
+          const k = present[0];
+          const sample = Array.isArray(kd[k]) ? kd[k][0] * factors[k] : NaN;
+          if (sample > 0 && Number.isFinite(sample)) add('info', 'simulation', 'QKD: campo ' + k + ' convertido para segundos; exemplo: ' + sample + ' s, ' + (Number(kd.keySizeBits) || 256) / sample / 1e6 + ' Mbit/s.');
+        }
+
+        if (profile !== 'custom' && kd.keySizeBits !== undefined && Number(kd.keySizeBits) !== 256) add('err', 'simulation', 'Perfis bibliográficos QKD exigem chaves de 256 bits.');
+        if (kd.preferGeneratorFixedRate !== false && profile !== 'custom' && isPlainObject(tr) && (tr.requestGenerators || []).some((g) => g.keyRateMbps !== undefined))
+          add('warn', 'simulation', 'traffic.keyRateMbps terá prioridade sobre o perfil ' + profile + ' (desative preferGeneratorFixedRate para reproduzir a demanda bibliográfica).');
       }
       if (sim.replications === 1) add('warn', 'simulation', 'Com 1 replicação não é possível calcular intervalo de confiança.');
       if (info && sim.threads > info.cpus) add('info', 'simulation', `threads = ${sim.threads}, mas esta máquina tem ${info.cpus} processadores lógicos.`);
@@ -189,21 +228,78 @@
       if (String(sim.integratedRmlsa).toLowerCase() === 'qrmsta' && (!qkdOn || sim.rmlsaType !== 1)) {
         add('err', 'simulation', '"qrmsta" é um RMLSA integrado do addon QKD: exige network.qkd.enabled = true e rmlsaType = 1.');
       }
-      // Parte 50: a granularidade (route, link ou span) é validada acima; a regra antiga só aceitava link e span
+      if (qkdOn && net.qkd.qchGranularity && !['route', 'link', 'span'].includes(net.qkd.qchGranularity)) add('err', 'network', 'qkd.qchGranularity deve ser route, link ou span.');
       if (qkdOn && net.qkd.wavelengthPolicy && !['fixed', 'grid'].includes(net.qkd.wavelengthPolicy)) add('err', 'network', 'qkd.wavelengthPolicy deve ser "fixed" ou "grid".');
       if (qkdOn && net.qkd.tdmSlots !== undefined && !(Number.isInteger(net.qkd.tdmSlots) && net.qkd.tdmSlots >= 0)) add('err', 'network', 'qkd.tdmSlots deve ser inteiro ≥ 0.');
     }
 
     // ---------------- physical layer
     if (isPlainObject(phy)) {
+      for (const retired of ['johannissonSciUseIntegral', 'johannissonXciUseIntegral',
+                             'habibiEgnFallbackEnabled', 'habibiEgnNarrowbandGHz', 'johannissonUseIntegral']) {
+        if (Object.prototype.hasOwnProperty.call(phy, retired))
+          add('err', 'physicalLayer', `Campo descontinuado: ${retired}. Utilize johannissonNliMode, habibiNliMode e nliNarrowbandGHz.`);
+      }
       if ('spanLength' in phy && !(phy.spanLength > 0)) add('err', 'physicalLayer', 'spanLength deve ser > 0.');
       if ('fiberLoss' in phy && !(phy.fiberLoss >= 0)) add('err', 'physicalLayer', 'fiberLoss deve ser ≥ 0.');
+      for (const modeKey of ['johannissonNliMode', 'habibiNliMode']) {
+        if (phy[modeKey] !== undefined
+            && !['approximate', 'integral', 'adaptive'].includes(String(phy[modeKey]).toLowerCase()))
+          add('err', 'physicalLayer', modeKey + ' deve ser approximate, integral ou adaptive.');
+      }
+      if (phy.nliNarrowbandGHz !== undefined && !(typeof phy.nliNarrowbandGHz === 'number'
+          && Number.isFinite(phy.nliNarrowbandGHz) && phy.nliNarrowbandGHz > 0))
+        add('err', 'physicalLayer', 'nliNarrowbandGHz deve ser a largura física positiva, em GHz.');
+      if ((phy.habibiNliMode === 'integral' || phy.johannissonNliMode === 'integral')
+          && Number(phy.polarizationModes) === 1)
+        add('warn', 'physicalLayer', 'A integral GN de Poggiolini usa o fator Manakov para 2 polarizações; sua utilização com polarizationModes=1 requer validação científica específica.');
+      if (phy.typeOfTestQoT !== undefined && ![0, 1].includes(phy.typeOfTestQoT))
+        add('err', 'physicalLayer', 'typeOfTestQoT deve ser 0 (limiar OSNR) ou 1 (BER calculada da OSNR).');
+      if (phy.crosstalkModel !== undefined && ![0, 1].includes(phy.crosstalkModel))
+        add('err', 'physicalLayer', 'crosstalkModel deve ser 0 (separado) ou 1 (junto).');
+      if (phy.typeOfAmplifierGain !== undefined && ![0, 1].includes(phy.typeOfAmplifierGain))
+        add('err', 'physicalLayer', 'typeOfAmplifierGain deve ser 0 (fixo) ou 1 (saturado).');
+      if (phy.berModel !== undefined && !['jurandir', 'legacyRectangularAwgn'].includes(phy.berModel))
+        add('err', 'physicalLayer', 'berModel deve ser jurandir ou legacyRectangularAwgn.');
+      if (phy.berThreshold !== undefined && phy.berThreshold !== null
+          && !(typeof phy.berThreshold === 'number' && Number.isFinite(phy.berThreshold)
+            && phy.berThreshold > 0 && phy.berThreshold < 0.5))
+        add('err', 'physicalLayer', 'berThreshold deve estar estritamente entre 0 e 0,5 (BER pré-FEC).');
+      if (phy.typeOfTestQoT === 1 && phy.berThreshold === undefined)
+        add('info', 'physicalLayer', 'Modo BER sem berThreshold: limite de BER derivado do limiar de OSNR da modulação; não adiciona margens.');
+      if (phy.typeOfAmplifierGain === 1)
+        add('warn', 'physicalLayer', 'O ganho saturado ainda não é integralmente validado para todos os modos de amplificação.');
+      for (const key of ['muxInsertionLoss', 'demuxInsertionLoss', 'switchInsertionLoss']) {
+        if (phy[key] !== undefined && !(typeof phy[key] === 'number' && Number.isFinite(phy[key]) && phy[key] >= 0))
+          add('err', 'physicalLayer', key + ' deve ser um número finito em dB ≥ 0.');
+      }
+      if ((phy.muxInsertionLoss === undefined || phy.demuxInsertionLoss === undefined) && phy.switchInsertionLoss !== undefined)
+        add('info', 'physicalLayer', 'MUX/DEMUX ausentes: o simulador usa switchInsertionLoss como fallback individual; utilize os novos campos para valores independentes.');
       const r = phy.qkdReceiver;
       if (isPlainObject(r) && 'receiverOpticalEfficiency' in r && !(r.receiverOpticalEfficiency >= 0 && r.receiverOpticalEfficiency <= 1)) {
         add('err', 'physicalLayer', 'qkdReceiver.receiverOpticalEfficiency deve estar em [0, 1].');
       }
     }
+    const mb = isPlainObject(model.qkdPhysicalLayer) && model.qkdPhysicalLayer.multiband;
+    if (isPlainObject(mb) && Object.prototype.hasOwnProperty.call(mb, 'bidirectionalFiber')) {
+      add('err', 'qkdPhysicalLayer', 'Campo bidirectionalFiber descontinuado. O SNetS usa duas fibras fisicas independentes, uma para cada sentido. Remova essa propriedade do JSON.');
+    }
+    if (isPlainObject(mb)) {
+      const correction = String(mb.antiStokesCorrection || 'nenhuma').toLowerCase();
+      if (!['nenhuma', 'medida', 'none', 'measured'].includes(correction)) add('err', 'qkdPhysicalLayer', 'multiband.antiStokesCorrection deve ser nenhuma ou medida.');
+      if (correction === 'medida' && String(mb.architecture || 'MB').toUpperCase() === 'MF') add('info', 'qkdPhysicalLayer', 'Correção Raman anti-Stokes em MF só produz efeito se houver fonte Raman ativa.');
+      if (correction === 'medida') add('info', 'qkdPhysicalLayer', 'A correção anti-Stokes é empírica para SMF-28; não representa calibração universal de MCF.');
+    }
     const qp = model.qkdPhysicalLayer;
+    if (isPlainObject(qp) && isPlainObject(qp.opticalBudget)) {
+      for (const key of ['txMuxLossDb', 'rxDemuxLossDb', 'bypassLossDb', 'residualAseReceiverW']) {
+        if (qp.opticalBudget[key] !== undefined && !(typeof qp.opticalBudget[key] === 'number' && Number.isFinite(qp.opticalBudget[key]) && qp.opticalBudget[key] >= 0))
+          add('err', 'qkdPhysicalLayer', 'opticalBudget.' + key + ' deve ser um número finito ≥ 0 (' + (key === 'residualAseReceiverW' ? 'W' : 'dB') + ').');
+      }
+    }
+    if (isPlainObject(qp) && isPlainObject(qp.pich) && qp.pich.launchPowerDbm !== undefined &&
+        !(typeof qp.pich.launchPowerDbm === 'number' && Number.isFinite(qp.pich.launchPowerDbm)))
+      add('err', 'qkdPhysicalLayer', 'pich.launchPowerDbm deve ser numérico e finito (dBm).');
     if (isPlainObject(qp) && isPlainObject(qp.detector)) {
       for (const k of ['receiverOpticalEfficiency', 'detectorEfficiency', 'darkCountProbability']) {
         const v = qp.detector[k];

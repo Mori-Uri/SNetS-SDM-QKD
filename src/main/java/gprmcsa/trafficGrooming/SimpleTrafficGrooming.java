@@ -75,6 +75,7 @@ public class SimpleTrafficGrooming implements TrafficGroomingAlgorithmInterface 
 					circuit.addRequest(rfc);
 					rfc.getCircuits().add(circuit);
 					System.out.println();
+
 					return true;
 				}
 			}
@@ -100,11 +101,13 @@ public class SimpleTrafficGrooming implements TrafficGroomingAlgorithmInterface 
 		int res[] = new int[2];
 
 		int numLowerFreeSlots = 0;
+
 		if(lowerFreeSlots != null){
 			numLowerFreeSlots = lowerFreeSlots[1] - lowerFreeSlots[0] + 1;
 		}
 
 		int numUpperFreeSlots = 0;
+
 		if(upperFreeSlots != null){
 			numUpperFreeSlots = upperFreeSlots[1] - upperFreeSlots[0] + 1;
 		}

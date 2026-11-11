@@ -21,67 +21,68 @@ import java.io.Serializable;
  */
 public final class QKDKeyDemand implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private final int keySizeBits;
-    private final double updateIntervalMicroseconds;
-    private final double requiredKeyRateBps;
+	private final int keySizeBits;
+	private final double updateIntervalSeconds;
+	private final double requiredKeyRateBps;
 
-    public QKDKeyDemand(int keySizeBits,
-            double updateIntervalMicroseconds) {
-        if (keySizeBits <= 0) {
-            throw new IllegalArgumentException("keySizeBits must be > 0");
-        }
-        if (!Double.isFinite(updateIntervalMicroseconds)
-                || updateIntervalMicroseconds <= 0.0) {
-            throw new IllegalArgumentException(
-                    "updateIntervalMicroseconds must be finite and > 0");
-        }
+	public QKDKeyDemand(int keySizeBits,
+			double updateIntervalSeconds) {
+		if (keySizeBits <= 0) {
+			throw new IllegalArgumentException("keySizeBits must be > 0");
+		}
 
-        this.keySizeBits = keySizeBits;
-        this.updateIntervalMicroseconds = updateIntervalMicroseconds;
-        this.requiredKeyRateBps = calculateRequiredKeyRateBps(
-                keySizeBits, updateIntervalMicroseconds);
-    }
+		if (!Double.isFinite(updateIntervalSeconds)
+				|| updateIntervalSeconds <= 0.0) {
+			throw new IllegalArgumentException(
+					"updateIntervalSeconds must be finite and > 0");
+		}
 
-    public static double calculateRequiredKeyRateBps(
-            int keySizeBits,
-            double updateIntervalMicroseconds) {
-        if (keySizeBits <= 0) {
-            throw new IllegalArgumentException("keySizeBits must be > 0");
-        }
-        if (!Double.isFinite(updateIntervalMicroseconds)
-                || updateIntervalMicroseconds <= 0.0) {
-            throw new IllegalArgumentException(
-                    "updateIntervalMicroseconds must be finite and > 0");
-        }
+		this.keySizeBits = keySizeBits;
+		this.updateIntervalSeconds = updateIntervalSeconds;
+		this.requiredKeyRateBps = calculateRequiredKeyRateBps(
+				keySizeBits, updateIntervalSeconds);
+	}
 
-        final double intervalSeconds = updateIntervalMicroseconds * 1.0e-6;
-        return keySizeBits / intervalSeconds;
-    }
+	public static double calculateRequiredKeyRateBps(
+			int keySizeBits,
+			double updateIntervalSeconds) {
+		if (keySizeBits <= 0) {
+			throw new IllegalArgumentException("keySizeBits must be > 0");
+		}
 
-    public int getKeySizeBits() {
-        return keySizeBits;
-    }
+		if (!Double.isFinite(updateIntervalSeconds)
+				|| updateIntervalSeconds <= 0.0) {
+			throw new IllegalArgumentException(
+					"updateIntervalSeconds must be finite and > 0");
+		}
 
-    public double getUpdateIntervalMicroseconds() {
-        return updateIntervalMicroseconds;
-    }
+		return keySizeBits / updateIntervalSeconds;
+	}
 
-    public double getRequiredKeyRateBps() {
-        return requiredKeyRateBps;
-    }
+	public int getKeySizeBits() {
+		return keySizeBits;
+	}
 
-    public double getRequiredKeyRateMbps() {
-        return requiredKeyRateBps / 1.0e6;
-    }
+	public double getUpdateIntervalSeconds() {
+		return updateIntervalSeconds;
+	}
 
-    @Override
-    public String toString() {
-        return "QKDKeyDemand{" +
-                "keySizeBits=" + keySizeBits +
-                ", updateIntervalUs=" + updateIntervalMicroseconds +
-                ", requiredKeyRateMbps=" + getRequiredKeyRateMbps() +
-                '}';
-    }
+	public double getRequiredKeyRateBps() {
+		return requiredKeyRateBps;
+	}
+
+	public double getRequiredKeyRateMbps() {
+		return requiredKeyRateBps / 1.0e6;
+	}
+
+	@Override
+	public String toString() {
+		return "QKDKeyDemand{" +
+				"keySizeBits=" + keySizeBits +
+				", updateIntervalSeconds=" + updateIntervalSeconds +
+				", requiredKeyRateMbps=" + getRequiredKeyRateMbps() +
+				'}';
+	}
 }

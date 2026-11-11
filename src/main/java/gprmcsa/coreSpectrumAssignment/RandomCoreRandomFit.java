@@ -23,7 +23,6 @@ public class RandomCoreRandomFit implements CoreAndSpectrumAssignmentAlgorithmIn
 		this.numberOfCores = -1;
 	}
 
-
 	/**
 	 * Returns the assign core and spectrum.
 	 * @param numberOfSlots the numberOfSlots.
@@ -38,23 +37,22 @@ public class RandomCoreRandomFit implements CoreAndSpectrumAssignmentAlgorithmIn
 		}
 
 		int chosenCore = coreAssignment();
-    	List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), chosenCore);
+		List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), chosenCore);
 
-        int chosen[] = policy(numberOfSlots, composition, circuit, cp);
-        circuit.setSpectrumAssigned(chosen);
-        circuit.setIndexCore(chosenCore);
+		int chosen[] = policy(numberOfSlots, composition, circuit, cp);
+		circuit.setSpectrumAssigned(chosen);
+		circuit.setIndexCore(chosenCore);
 
-        //System.out.println(chosen[0]);
+		//System.out.println(chosen[0]);
 		//System.out.println(chosen[1]);
 		//System.out.println("core: "+chosenCore);
 		//System.out.println("quant. de slots: "+ (chosen[1]-chosen[0]+1));
 		//System.out.println("----");
 
+		if (chosen == null)
+			return false;
 
-        if (chosen == null)
-        	return false;
-
-        return true;
+		return true;
 	}
 
 	/**
@@ -67,6 +65,7 @@ public class RandomCoreRandomFit implements CoreAndSpectrumAssignmentAlgorithmIn
 		//int a = generator.nextInt()%this.numberOfCores;
 		int a = generator.nextInt(this.numberOfCores);
 		//System.out.println("randomly selected core: "+a);
+
 		return a;
 	}
 
@@ -81,8 +80,9 @@ public class RandomCoreRandomFit implements CoreAndSpectrumAssignmentAlgorithmIn
 	@Override
 	public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
+
 		if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
+		int chosen[] = null;
 		ArrayList<int[]> bandList = new ArrayList<int[]>();
 
 		for (int[] band : freeSpectrumBands) { //checks and guard the free bands that can establish the requisition

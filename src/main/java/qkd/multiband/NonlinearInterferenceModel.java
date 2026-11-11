@@ -35,39 +35,40 @@ import java.util.Locale;
  */
 public final class NonlinearInterferenceModel implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    public static final double DEFAULT_GAMMA_PER_W_KM = 1.2;
-    public static final double DEFAULT_BETA2_PS2_PER_KM = -22.317;
-    public static final double DEFAULT_BETA3_PS3_PER_KM = 0.1331;
-    public static final double DEFAULT_REFERENCE_HZ = 193.5e12;
+	public static final double DEFAULT_GAMMA_PER_W_KM = 1.2;
+	public static final double DEFAULT_BETA2_PS2_PER_KM = -22.317;
+	public static final double DEFAULT_BETA3_PS3_PER_KM = 0.1331;
+	public static final double DEFAULT_REFERENCE_HZ = 193.5e12;
 
-    private final double gammaPerWKm;
-    private final double beta2S2PerKm;
-    private final double beta3S3PerKm;
-    private final double referenceHz;
+	private final double gammaPerWKm;
+	private final double beta2S2PerKm;
+	private final double beta3S3PerKm;
+	private final double referenceHz;
 
-    public NonlinearInterferenceModel(double gammaPerWKm, double beta2Ps2PerKm, double beta3Ps3PerKm,
-            double referenceHz) {
-        if (!(gammaPerWKm >= 0.0) || !Double.isFinite(beta2Ps2PerKm) || !Double.isFinite(beta3Ps3PerKm)
-                || !(referenceHz > 0.0)) {
-            throw new IllegalArgumentException("invalid NLI parameters");
-        }
-        this.gammaPerWKm = gammaPerWKm;
-        this.beta2S2PerKm = beta2Ps2PerKm * 1e-24;
-        this.beta3S3PerKm = beta3Ps3PerKm * 1e-36;
-        this.referenceHz = referenceHz;
-    }
+	public NonlinearInterferenceModel(double gammaPerWKm, double beta2Ps2PerKm, double beta3Ps3PerKm,
+			double referenceHz) {
+		if (!(gammaPerWKm >= 0.0) || !Double.isFinite(beta2Ps2PerKm) || !Double.isFinite(beta3Ps3PerKm)
+				|| !(referenceHz > 0.0)) {
+			throw new IllegalArgumentException("invalid NLI parameters");
+		}
 
-    /** SSMF values of [MEHDI24]/[DIBAJ25]. */
-    public static NonlinearInterferenceModel standard() {
-        return new NonlinearInterferenceModel(DEFAULT_GAMMA_PER_W_KM, DEFAULT_BETA2_PS2_PER_KM,
-                DEFAULT_BETA3_PS3_PER_KM, DEFAULT_REFERENCE_HZ);
-    }
+		this.gammaPerWKm = gammaPerWKm;
+		this.beta2S2PerKm = beta2Ps2PerKm * 1e-24;
+		this.beta3S3PerKm = beta3Ps3PerKm * 1e-36;
+		this.referenceHz = referenceHz;
+	}
 
-    public double getGammaPerWKm() { return gammaPerWKm; }
+	/** SSMF values of [MEHDI24]/[DIBAJ25]. */
+	public static NonlinearInterferenceModel standard() {
+		return new NonlinearInterferenceModel(DEFAULT_GAMMA_PER_W_KM, DEFAULT_BETA2_PS2_PER_KM,
+				DEFAULT_BETA3_PS3_PER_KM, DEFAULT_REFERENCE_HZ);
+	}
 
-    /**
+	public double getGammaPerWKm() { return gammaPerWKm; }
+
+	/**
      * NLI power spectral density at frequency {@code fHz}.
      *
      * @param psdWPerHz PSD of the classical channels on a uniform grid (W/Hz); element k covers
@@ -80,128 +81,272 @@ public final class NonlinearInterferenceModel implements Serializable {
      * @param alphaQuantum loss at the QCh (neper/km)
      * @return G_NLI(f) in W/Hz
      */
-    public double psdWPerHz(double[] psdWPerHz, double startHz, double stepHz, double fHz, double lengthKm,
-            double alphaClassical, double alphaQuantum) {
-        final int n = psdWPerHz.length;
-        if (n == 0 || gammaPerWKm == 0.0 || lengthKm <= 0.0) {
-            return 0.0;
-        }
-        // f3 = f1 + f2 - f must fall inside the grid: no product can reach f otherwise (e.g. QCh in O/E, PSD in C)
-        final double endHz = startHz + n * stepHz;
-        if (2.0 * endHz - fHz < startHz || 2.0 * startHz - fHz > endHz) {
-            return 0.0;
-        }
-        final double c = -(3.0 * alphaClassical - alphaQuantum) / 2.0;
-        final double out = Math.exp(-alphaQuantum * lengthKm);
-        final double fourPi2 = 4.0 * Math.PI * Math.PI;
-        final double first = startHz + 0.5 * stepHz;
-        // cells within REFINE_CELLS of the phase-matching lines f1 = f or f2 = f are sub-sampled S x S times
-        final double ridge = REFINE_CELLS * stepHz;
-        final int sub = Math.max(1, Math.min(MAX_SUBSAMPLES, (int) Math.ceil(stepHz / RIDGE_RESOLUTION_HZ)));
-        double sum = 0.0;
-        for (int i = 0; i < n; i++) {
-            final double g1 = psdWPerHz[i];
-            if (g1 == 0.0) continue;
-            final double f1 = first + i * stepHz;
-            for (int k = 0; k < n; k++) {
-                final double g2 = psdWPerHz[k];
-                if (g2 == 0.0) continue;
-                final double f2 = first + k * stepHz;
-                final double f3 = f1 + f2 - fHz;
-                final int m = (int) Math.floor((f3 - startHz) / stepHz);
-                if (m < 0 || m >= n) continue;
-                final double g3 = psdWPerHz[m];
-                if (g3 == 0.0) continue;
-                final double disp = beta2S2PerKm + Math.PI * beta3S3PerKm * (f1 + f2 - 2.0 * referenceHz);
-                final double x = f1 - fHz;
-                final double y = f2 - fHz;
-                final double eta;
-                if (sub > 1 && (Math.abs(x) < ridge || Math.abs(y) < ridge)) {
-                    double acc = 0.0;
-                    for (int a = 0; a < sub; a++) {
-                        final double xa = x + ((a + 0.5) / sub - 0.5) * stepHz;
-                        for (int b = 0; b < sub; b++) {
-                            final double yb = y + ((b + 0.5) / sub - 0.5) * stepHz;
-                            acc += efficiency(c, fourPi2 * xa * yb * disp, lengthKm);
-                        }
-                    }
-                    eta = acc / (sub * (double) sub);
-                } else {
-                    eta = efficiency(c, fourPi2 * x * y * disp, lengthKm);
-                }
-                sum += g1 * g2 * g3 * eta;
-            }
-        }
-        return (16.0 / 27.0) * gammaPerWKm * gammaPerWKm * out * sum * stepHz * stepHz;
-    }
+	public double psdWPerHz(double[] psdWPerHz, double startHz, double stepHz, double fHz, double lengthKm,
+			double alphaClassical, double alphaQuantum) {
+		final int n = psdWPerHz.length;
 
-    /** Cells next to the phase-matching lines that are sub-sampled. */
-    static final double REFINE_CELLS = 3.0;
-    /** Target resolution of the sub-sampling near the phase-matching lines (Hz). */
-    static final double RIDGE_RESOLUTION_HZ = 0.15e9;
-    /** Upper bound of the sub-sampling per axis. */
-    static final int MAX_SUBSAMPLES = 128;
+		if (n == 0 || gammaPerWKm == 0.0 || lengthKm <= 0.0) {
+			return 0.0;
+		}
 
-    /** Power-weighted mean frequency of a PSD grid (where the loss of the classical band is taken). */
-    public static double weightedCentreHz(double[] psd, double startHz, double stepHz) {
-        double w = 0.0;
-        double fw = 0.0;
-        for (int k = 0; k < psd.length; k++) {
-            w += psd[k];
-            fw += psd[k] * (startHz + (k + 0.5) * stepHz);
-        }
-        return w > 0.0 ? fw / w : startHz + psd.length * stepHz / 2.0;
-    }
+		// f3 = f1 + f2 - f must fall inside the grid: no product can reach f otherwise (e.g. QCh in O/E, PSD in C)
+		final double endHz = startHz + n * stepHz;
 
-    /** |(e^{(c + j d) L} - 1)/(c + j d)|^2 in km^2 (limit L^2 for c = d = 0). */
-    static double efficiency(double c, double d, double lengthKm) {
-        final double den = c * c + d * d;
-        if (den < 1e-24) {
-            return lengthKm * lengthKm;
-        }
-        final double e = Math.exp(c * lengthKm);
-        final double re = e * Math.cos(d * lengthKm) - 1.0;
-        final double im = e * Math.sin(d * lengthKm);
-        return (re * re + im * im) / den;
-    }
+		if (2.0 * endHz - fHz < startHz || 2.0 * startHz - fHz > endHz) {
+			return 0.0;
+		}
 
-    /**
+		final double c = -(3.0 * alphaClassical - alphaQuantum) / 2.0;
+		final double out = Math.exp(-alphaQuantum * lengthKm);
+		final double fourPi2 = 4.0 * Math.PI * Math.PI;
+		final double first = startHz + 0.5 * stepHz;
+
+		// cells within REFINE_CELLS of the phase-matching lines f1 = f or f2 = f are sub-sampled S x S times
+		final double ridge = REFINE_CELLS * stepHz;
+		final int sub = Math.max(1, Math.min(MAX_SUBSAMPLES, (int) Math.ceil(stepHz / RIDGE_RESOLUTION_HZ)));
+		double sum = 0.0;
+
+		for (int i = 0; i < n; i++) {
+			final double g1 = psdWPerHz[i];
+
+			if (g1 == 0.0) continue;
+			final double f1 = first + i * stepHz;
+
+			for (int k = 0; k < n; k++) {
+				final double g2 = psdWPerHz[k];
+
+				if (g2 == 0.0) continue;
+				final double f2 = first + k * stepHz;
+				final double f3 = f1 + f2 - fHz;
+				final int m = (int) Math.floor((f3 - startHz) / stepHz);
+
+				if (m < 0 || m >= n) continue;
+				final double g3 = psdWPerHz[m];
+
+				if (g3 == 0.0) continue;
+				final double disp = beta2S2PerKm + Math.PI * beta3S3PerKm * (f1 + f2 - 2.0 * referenceHz);
+				final double x = f1 - fHz;
+				final double y = f2 - fHz;
+				final double eta;
+
+				if (sub > 1 && (Math.abs(x) < ridge || Math.abs(y) < ridge)) {
+					double acc = 0.0;
+
+					for (int a = 0; a < sub; a++) {
+						final double xa = x + ((a + 0.5) / sub - 0.5) * stepHz;
+
+						for (int b = 0; b < sub; b++) {
+							final double yb = y + ((b + 0.5) / sub - 0.5) * stepHz;
+							acc += efficiency(c, fourPi2 * xa * yb * disp, lengthKm);
+						}
+					}
+
+					eta = acc / (sub * (double) sub);
+				} else {
+					eta = efficiency(c, fourPi2 * x * y * disp, lengthKm);
+				}
+
+				sum += g1 * g2 * g3 * eta;
+			}
+		}
+
+		return (16.0 / 27.0) * gammaPerWKm * gammaPerWKm * out * sum * stepHz * stepHz;
+	}
+
+	/**
+     * Piecewise-incoherent GN model for a forward-only amplifier grid.
+     * Each local GN source is evaluated using the classical PSD at its section
+     * input. Only quantum loss (never EDFA gain) transfers the generated noise
+     * from that section's output to the quantum receiver. Coherent inter-span
+     * accumulation, ISRS and gain spectral tilt are not represented.
+     *
+     * This uses the same f1/f2 integration and phase-matching kernel as the
+     * legacy single-span model, so it converges to that model for a single
+     * passive section. Sections align with amplifier positions and are at
+     * most 20 km long to avoid treating large gain/loss gradients as uniform.
+     */
+	public double longitudinalPsdWPerHz(double[] inputPsd, double startHz, double stepHz,
+			double quantumFrequencyHz, double spanStartKm, double spanEndKm,
+			double alphaClassical, double alphaQuantum, ClassicalPowerEvolution evolution) {
+		if (evolution == null || spanEndKm <= spanStartKm) {
+			throw new IllegalArgumentException("longitudinal GN requires a valid evolution and span");
+		}
+
+		if (inputPsd.length == 0) return 0.0;
+
+		// Cubic PSD scaling; evaluate the GN kernel only once for each section.
+		final double spacing = evolution.getAmplifierSpacingKm();
+		double z = spanStartKm;
+		double total = 0.0;
+		while (z < spanEndKm - 1e-9) {
+			final double nextAmplifier = (Math.floor((z + 1e-8) / spacing) + 1.0) * spacing;
+			final double end = Math.min(spanEndKm, Math.min(nextAmplifier, z + 20.0));
+
+			if (end <= z) throw new IllegalStateException("invalid amplifier grid");
+			final double powerRatio = evolution.powerRatio(0.0, z, alphaClassical);
+			final double[] local = new double[inputPsd.length];
+
+			for (int k = 0; k < inputPsd.length; k++) local[k] = inputPsd[k] * powerRatio;
+			final double generated = psdWPerHz(local, startHz, stepHz, quantumFrequencyHz,
+					end - z, alphaClassical, alphaQuantum);
+			total += generated * Math.exp(-alphaQuantum * (spanEndKm - end));
+			z = end;
+		}
+
+		return total;
+	}
+
+	/** One co-propagating classical source occupying inclusive SNetS slot indices. */
+	public static final class LongitudinalSource {
+		public final int startSlot, endSlot;
+		public final double launchPowerW, startKm, endKm;
+		public LongitudinalSource(int startSlot, int endSlot, double launchPowerW,
+				double startKm, double endKm) {
+			if (startSlot < 1 || endSlot < startSlot || !Double.isFinite(launchPowerW)
+					|| launchPowerW < 0 || !Double.isFinite(startKm) || startKm < 0
+					|| !Double.isFinite(endKm) || endKm <= startKm)
+				throw new IllegalArgumentException("invalid longitudinal classical source");
+			this.startSlot = startSlot; this.endSlot = endSlot;
+			this.launchPowerW = launchPowerW;
+			this.startKm = startKm; this.endKm = endKm;
+		}
+	}
+
+	/**
+     * Forward-only longitudinal GN with explicit PICh launch/drop positions.
+     * No source contributes before its start or after its end. Segment edges
+     * split at amplifier positions, trusted-node sources and 20 km at most.
+     * Contributions from different fibre sections add INCOHERENTLY.
+     */
+	public double longitudinalSourcePsdWPerHz(java.util.List<LongitudinalSource> sources,
+			int numSlots, double startHz, double slotHz, double quantumFrequencyHz,
+			double spanStartKm, double spanEndKm, double alphaClassical, double alphaQuantum,
+			ClassicalPowerEvolution evolution) {
+		if (evolution == null || spanEndKm <= spanStartKm || numSlots <= 0)
+			throw new IllegalArgumentException("invalid longitudinal GN geometry");
+
+		if (sources.isEmpty()) return 0.0;
+		double z = spanStartKm;
+		double total = 0.0;
+		final double spacing = evolution.getAmplifierSpacingKm();
+		while (z + 1e-8 < spanEndKm) {
+			final double nextAmp = (Math.floor((z + 1e-8) / spacing) + 1) * spacing;
+			double end = Math.min(spanEndKm, Math.min(nextAmp, z + 20.0));
+
+			for (LongitudinalSource src : sources) {
+				if (src.startKm > z + 1e-8 && src.startKm < end) end = src.startKm;
+
+				if (src.endKm > z + 1e-8 && src.endKm < end) end = src.endKm;
+			}
+
+			if (end <= z) throw new IllegalStateException("non-increasing GN section");
+			final double[] local = new double[numSlots];
+			final double midpoint = (z + end) / 2.0;
+
+			for (LongitudinalSource src : sources) {
+				if (src.startKm > midpoint || src.endKm < midpoint) continue;
+				final int first = Math.max(1,src.startSlot);
+				final int last = Math.min(numSlots,src.endSlot);
+
+				if (first > last) continue;
+				final double ratio = evolution.powerRatio(src.startKm,z,alphaClassical,
+						startHz + (src.startSlot + src.endSlot - 1) * 0.5 * slotHz);
+				final double density = src.launchPowerW * ratio / ((src.endSlot-src.startSlot+1)*slotHz);
+
+				for (int k=first;k<=last;k++) local[k-1] += density;
+			}
+
+			final double section = psdWPerHz(local,startHz,slotHz,quantumFrequencyHz,
+					end-z,alphaClassical,alphaQuantum);
+			total += section * Math.exp(-alphaQuantum*(spanEndKm-end));
+			z = end;
+		}
+
+		return total;
+	}
+
+	/** Cells next to the phase-matching lines that are sub-sampled. */
+	static final double REFINE_CELLS = 3.0;
+
+	/** Target resolution of the sub-sampling near the phase-matching lines (Hz). */
+	static final double RIDGE_RESOLUTION_HZ = 0.15e9;
+
+	/** Upper bound of the sub-sampling per axis. */
+	static final int MAX_SUBSAMPLES = 128;
+
+	/** Power-weighted mean frequency of a PSD grid (where the loss of the classical band is taken). */
+	public static double weightedCentreHz(double[] psd, double startHz, double stepHz) {
+		double w = 0.0;
+		double fw = 0.0;
+
+		for (int k = 0; k < psd.length; k++) {
+			w += psd[k];
+			fw += psd[k] * (startHz + (k + 0.5) * stepHz);
+		}
+
+		return w > 0.0 ? fw / w : startHz + psd.length * stepHz / 2.0;
+	}
+
+	/** |(e^{(c + j d) L} - 1)/(c + j d)|^2 in km^2 (limit L^2 for c = d = 0). */
+	static double efficiency(double c, double d, double lengthKm) {
+		final double den = c * c + d * d;
+
+		if (den < 1e-24) {
+			return lengthKm * lengthKm;
+		}
+
+		final double e = Math.exp(c * lengthKm);
+		final double re = e * Math.cos(d * lengthKm) - 1.0;
+		final double im = e * Math.sin(d * lengthKm);
+
+		return (re * re + im * im) / den;
+	}
+
+	/**
      * PSD grid of a set of classical channels (each a flat rectangle of its bandwidth around its centre).
      *
      * @return {startHz, stepHz, psd...}: grid covering all channels
      */
-    public static double[][] grid(java.util.List<ClassicalChannel> channels, double stepHz) {
-        double lo = Double.MAX_VALUE;
-        double hi = -Double.MAX_VALUE;
-        for (ClassicalChannel ch : channels) {
-            if (ch.getBandwidthHz() <= 0.0) continue;
-            lo = Math.min(lo, ch.getFrequencyHz() - ch.getBandwidthHz() / 2);
-            hi = Math.max(hi, ch.getFrequencyHz() + ch.getBandwidthHz() / 2);
-        }
-        if (lo >= hi) {
-            return new double[][] {{0.0, stepHz}, {}};
-        }
-        final int n = (int) Math.ceil((hi - lo) / stepHz - 1e-9);
-        final double[] psd = new double[n];
-        for (ClassicalChannel ch : channels) {
-            final double bw = ch.getBandwidthHz();
-            if (bw <= 0.0) continue;
-            final double a = ch.getFrequencyHz() - bw / 2;
-            final double b = ch.getFrequencyHz() + bw / 2;
-            final double g = ch.getPowerW() / bw;
-            for (int k = 0; k < n; k++) {
-                final double x0 = lo + k * stepHz;
-                final double x1 = x0 + stepHz;
-                final double overlap = Math.min(b, x1) - Math.max(a, x0);
-                if (overlap > 0.0) psd[k] += g * overlap / stepHz;
-            }
-        }
-        return new double[][] {{lo, stepHz}, psd};
-    }
+	public static double[][] grid(java.util.List<ClassicalChannel> channels, double stepHz) {
+		double lo = Double.MAX_VALUE;
+		double hi = -Double.MAX_VALUE;
 
-    @Override
-    public String toString() {
-        return String.format(Locale.ROOT, "GN[gamma=%.3f /W/km, beta2=%.3f ps2/km, beta3=%.4f ps3/km]", gammaPerWKm,
-                beta2S2PerKm * 1e24, beta3S3PerKm * 1e36);
-    }
+		for (ClassicalChannel ch : channels) {
+			if (ch.getBandwidthHz() <= 0.0) continue;
+			lo = Math.min(lo, ch.getFrequencyHz() - ch.getBandwidthHz() / 2);
+			hi = Math.max(hi, ch.getFrequencyHz() + ch.getBandwidthHz() / 2);
+		}
+
+		if (lo >= hi) {
+			return new double[][] {{0.0, stepHz}, {}};
+		}
+
+		final int n = (int) Math.ceil((hi - lo) / stepHz - 1e-9);
+		final double[] psd = new double[n];
+
+		for (ClassicalChannel ch : channels) {
+			final double bw = ch.getBandwidthHz();
+
+			if (bw <= 0.0) continue;
+			final double a = ch.getFrequencyHz() - bw / 2;
+			final double b = ch.getFrequencyHz() + bw / 2;
+			final double g = ch.getPowerW() / bw;
+
+			for (int k = 0; k < n; k++) {
+				final double x0 = lo + k * stepHz;
+				final double x1 = x0 + stepHz;
+				final double overlap = Math.min(b, x1) - Math.max(a, x0);
+
+				if (overlap > 0.0) psd[k] += g * overlap / stepHz;
+			}
+		}
+
+		return new double[][] {{lo, stepHz}, psd};
+	}
+
+	@Override
+	public String toString() {
+		return String.format(Locale.ROOT, "GN[gamma=%.3f /W/km, beta2=%.3f ps2/km, beta3=%.4f ps3/km]", gammaPerWKm,
+				beta2S2PerKm * 1e24, beta3S3PerKm * 1e36);
+	}
 }

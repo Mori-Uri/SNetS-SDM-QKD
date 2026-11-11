@@ -89,6 +89,7 @@
     const pol = String(q.qchSlotPolicy || 'abne').toLowerCase();
     const rule = abneRuleName(core, n);
     const lanes = gran !== 'route' && String(q.spanLanePlacement || 'first') === 'wavelength';
+    if (pol === 'maxskr') return el('div.notice.info', { style: { marginTop: '10px' } }, 'maxskr: avalia a SKR de todas as bandas livres da rota, incluindo a interferência dos DChs/PIChs; escolhe a maior SKR mínima da rota e aplica a admissão SKR/QBER. Só route; custo proporcional ao número de candidatos.');
     if (pol === 'abne') return el('div.notice.info', { style: { marginTop: '10px' } }, 'QChs no núcleo ' + core + ' em ' + rule + ', a mesma regra que o ABNE/ACINE usa nesse núcleo para os circuitos clássicos.'
       + (lanes ? ' Atenção: spanLanePlacement = "wavelength" define a posição dos QChs e prevalece sobre esta regra.' : ''));
     if (pol === 'firstfit' && !rule.startsWith('first')) return el('div.notice.warn', { style: { marginTop: '10px' } }, 'O núcleo QKD ' + core + ' teria ' + rule + ' no ABNE/ACINE, mas os QChs estão em first fit (slots do início). ',
@@ -106,7 +107,7 @@
     const fixedOk = classical.some((c) => Number(c.id) === Number(q.pichCoreId));
     return el('section.panel',
       el('h2', 'Canal público (PICh)'),
-      el('p.lead', 'Canal clássico da discussão pública do BB84 (peneiramento, correção de erros, amplificação de privacidade). Ocupa slots num núcleo clássico, nunca no núcleo QKD nem num núcleo desativado; a potência dele não entra no crosstalk.'),
+      el('p.lead', 'Canal clássico da discussão pública do BB84 (peneiramento, correção de erros, amplificação de privacidade). Ocupa slots num núcleo clássico, nunca no núcleo QKD nem num núcleo desativado; sua potência pode contribuir para crosstalk, Raman e NLI, conforme arquitetura e mecanismos habilitados.'),
       el('div.fields',
         num('pichSlots', 'Slots de cada PICh', '0 = não modelar o PICh', { int: true, redraw: true }),
         on ? sel('pichMode', 'Modelo do PICh', [
@@ -123,6 +124,12 @@
           ['lastfit', 'lastfit — maior slot livre'],
           ['abne', 'abne — regra do ABNE/ACINE do núcleo escolhido']]) : null,
         on ? sel('pichGuardBand', 'Banda de guarda do PICh', [[-1, 'a mesma dos circuitos clássicos (guardBand da rede = ' + guardNet + ')'], [0, '0 — sem banda de guarda'], [1, '1 slot'], [2, '2 slots']].concat(pg > 2 ? [[pg, pg + ' slots']] : [])) : null),
+      on ? el('div.checks', { style: { marginTop: '12px' } },
+        el('label.check', el('input', { type: 'checkbox', checked: (q.pichOsnrCheckEnabled !== undefined ? q.pichOsnrCheckEnabled : q.pichSnrCheckEnabled) !== false, on: { change: (ev) => App.setValue('network', ['qkd', 'pichOsnrCheckEnabled'], ev.target.checked) } }), ' Verificar QoT/OSNR/XT dos PIChs (padrão: ligado)'),
+        el('label.check', el('input', { type: 'checkbox', checked: !!q.pichRxPowerCheckEnabled, on: { change: (ev) => { App.setValue('network', ['qkd', 'pichRxPowerCheckEnabled'], ev.target.checked); App.renderTab(); } } }), ' Verificar potência recebida no PICh (opcional)'),
+        el('label.check', el('input', { type: 'checkbox', checked: !!q.pichLongitudinalReuse, on: { change: (ev) => App.setValue('network', ['qkd', 'pichLongitudinalReuse'], ev.target.checked) } }), ' Reutilização espectral entre PIChs em trechos disjuntos')) : null,
+      on && q.pichRxPowerCheckEnabled ? el('div.fields', num('pichReceiverSensitivityDbm', 'Sensibilidade mínima do PICh', 'dBm; configurar conforme receptor')) : null,
+      on ? el('p.small.muted', 'A QoT própria do PICh e a proteção de PIChs ativos incluem DChs interferentes, conforme os modelos físicos clássicos habilitados. O PICh contribui para interferência QCh quando há sobreposição física e espectral.') : null,
       on && policy === 'fixed' && !fixedOk ? el('p.small.warn', 'Escolha o núcleo fixo do PICh (um núcleo clássico ativo); sem ele o simulador recusa o caso.') : null,
       el('p.small.muted', 'A banda de guarda dos circuitos clássicos fica na aba Rede, grupo Geral (guardBand = ' + guardNet + ' slot' + (guardNet === 1 ? '' : 's') + '). Entre os QChs no núcleo QKD vale a "Banda de guarda entre QChs" acima (padrão 0).'));
   }
@@ -207,7 +214,7 @@
       if (isPlainObject(sim)) {
         if (!isPlainObject(sim.activeMetrics)) sim.activeMetrics = {};
         sim.activeMetrics.QKDMetrics = true;
-        if (!isPlainObject(sim.qkdKeyDemand)) sim.qkdKeyDemand = { keySizeBits: 256, updateIntervalsMicroseconds: [128.0], randomSeed: 2024 };
+        if (!isPlainObject(sim.qkdKeyDemand)) sim.qkdKeyDemand = { keySizeBits: 256, updateIntervalSeconds: [0.064, 0.128, 0.256], randomSeed: 2024 };
         if (sim.qkdProtectedRequestProbability === undefined) sim.qkdProtectedRequestProbability = 0.0;
         if (sim.qkdExactRequestCount === undefined) sim.qkdExactRequestCount = true;
         if (sim.qkdWarmupFraction === undefined) sim.qkdWarmupFraction = 0.1;
@@ -288,7 +295,8 @@
         sel('qchSlotPolicy', 'Ordem de escolha do slot do QCh', [
           ['abne', 'abne — regra do ABNE/ACINE para o núcleo QKD (centro: medium fit; par: last fit; ímpar: first fit)'],
           ['firstfit', 'firstfit — menor índice de slot primeiro']].concat(gran === 'route' ? [
-          ['lowestloss', 'lowestloss — slot mais próximo do mínimo de atenuação']] : []), true),
+          ['lowestloss', 'lowestloss — slot mais próximo do mínimo de atenuação'],
+          ['maxskr', 'maxskr — maior SKR mínima entre os trechos da rota (avalia todas as faixas livres)']] : []), true),
         num('qchGuardBand', 'Banda de guarda entre QChs', 'slots no núcleo QKD; 0 = sem guarda (como até a Parte 39)', { int: true }),
         sel('wavelengthPolicy', 'Comprimento de onda do QCh', [
           ['grid', 'grid — λ do slot na grade de 12,5 GHz (a SKR depende do slot)'],
@@ -299,11 +307,24 @@
       qchRuleNote(q, gran),
       el('div.notice.info', { style: { marginTop: '10px' } },
         gran === 'route'
-          ? 'Admissão de uma requisição protegida: (1) RMSCA clássico; (2) OSNR/XT do candidato e proteção das sessões QKD ativas; (3) rota QKD — a rota clássica e, se falhar, até ' + (q.alternativeRoutes || 0) + ' alternativa(s); (4) espectro QKD — o primeiro slot livre em todos os enlaces da rota cuja SKR em todos os trechos atende à demanda de chave' + (q.pichSlots > 0 ? '; (5) PICh com ' + q.pichSlots + ' slot(s) num núcleo clássico ao longo da rota.' : '.')
+          ? 'Admissão de uma requisição protegida: (1) RMSCA clássico; (2) OSNR/XT do candidato e proteção das sessões QKD ativas; (3) rota QKD — a rota clássica e, se falhar, até ' + (q.alternativeRoutes || 0) + ' alternativa(s); (4) espectro QKD — ' + (String(q.qchSlotPolicy || '') === 'maxskr' ? 'seleção de maior SKR mínima entre as bandas livres, respeitando QBER opcional' : 'primeira banda admitida pela SKR/QBER') + (q.pichSlots > 0 ? '; (5) PICh com ' + q.pichSlots + ' slot(s) num núcleo clássico ao longo da rota.' : '.')
           : 'Os modos link/span existem para reproduzir o artigo-base; o cenário da qualificação usa "route".')));
 
     // ------------------------------- 1.18.0: public interaction channel (PICh)
     root.append(pichPanel(net, q, num, sel));
+
+    // Independent QBER admission gate is optional. SKR always includes the measured QBER.
+    root.append(el('section.panel',
+      el('h2', 'Admissão quântica e coexistência física'),
+      el('p.lead', 'O BB84 sempre utiliza QBER para calcular SKR. O limite máximo de QBER é uma segunda restrição opcional, desativada para reproduzir Dibaj/Moghaddam.'),
+      el('div.checks',
+        el('label.check', el('input', { type: 'checkbox', checked: !!q.qberThresholdEnabled,
+          on: { change: (ev) => { App.setValue('network', ['qkd', 'qberThresholdEnabled'], ev.target.checked); App.renderTab(); } } }), ' Aplicar limiar independente de QBER'),
+        el('label.check', el('input', { type: 'checkbox', checked: !!q.longitudinalXtEnabled,
+          on: { change: (ev) => App.setValue('network', ['qkd', 'longitudinalXtEnabled'], ev.target.checked) } }), ' Calcular XT longitudinal até o receptor QKD')),
+      q.qberThresholdEnabled ? el('div.fields', num('maximumQber', 'QBER máxima (fração)', '0 a 1; 0,11 equivale a 11%; selecionar segundo protocolo', { min: 0 })) : null,
+      el('p.small.muted', 'Limiar de 11%: referência teórica BB84, NÃO imposto por Moghaddam/Dibaj. A evolução longitudinal usa potências e atenuações do caminho físico real.')));
+
 
     // ------------------------------- planning
     const plan = planning(net, Number(q.qtndKm));
@@ -389,9 +410,9 @@
     // ------------------------------- demand
     if (isPlainObject(sim)) {
       const kd = isPlainObject(sim.qkdKeyDemand) ? sim.qkdKeyDemand : null;
-      const rates = kd && Array.isArray(kd.updateIntervalsMicroseconds) ? kd.updateIntervalsMicroseconds.map((us) => (kd.keySizeBits || 256) / us) : [];
+      const rates = demandIntervals(kd).map((seconds) => ((kd && kd.keySizeBits) || 256) / (seconds * 1e6));
       const tr = trafficQkdSummary();
-      if (!isPlainObject(sim.qkdKeyDemand)) sim.qkdKeyDemand = { keySizeBits: 256, updateIntervalsMicroseconds: [128.0], randomSeed: 2024 };
+      if (!isPlainObject(sim.qkdKeyDemand)) sim.qkdKeyDemand = { keySizeBits: 256, updateIntervalSeconds: [0.064, 0.128, 0.256], randomSeed: 2024 };
       const simNum = (path, label, unit, check) => {
         const cur = path.reduce((o, k) => (o ? o[k] : undefined), sim);
         const i = el('input.input.num', { type: 'text', value: cur === undefined ? '' : String(cur).replace('.', ',') });
@@ -415,20 +436,38 @@
         });
         return field(label, i, unit);
       };
-      const intervals = el('input.input.mono', { type: 'text', value: kd ? (kd.updateIntervalsMicroseconds || []).join(', ') : '' });
+      const intervals = el('input.input.mono', { type: 'text', value: demandIntervals(kd).join(', '), disabled: String((kd && kd.profile) || 'custom').toLowerCase() !== 'custom' });
       intervals.addEventListener('change', () => {
-        const arr = intervals.value.split(/[;,\s]+/).filter(Boolean).map((x) => parseNumber(x));
-        const ok = arr.length && arr.every((x) => x > 0);
+        const arr = (intervals.value.indexOf(';') >= 0 ? intervals.value.split(/[;\s]+/) : intervals.value.split(/[,\s]+/)).filter(Boolean).map((x) => parseNumber(x));
+        const ok = arr.length && arr.every((x) => Number.isFinite(x) && x > 0);
         intervals.classList.toggle('invalid', !ok);
-        if (ok) { App.setValue('simulation', ['qkdKeyDemand'], Object.assign({ keySizeBits: 256, randomSeed: 2024 }, kd || {}, { updateIntervalsMicroseconds: arr })); App.renderTab(); }
+        if (ok) { App.setValue('simulation', ['qkdKeyDemand'], Object.assign({ keySizeBits: 256, randomSeed: 2024 }, kd || {}, { updateIntervalSeconds: arr })); App.renderTab(); }
       });
+      const profileSel = el('select.input',
+        el('option', { value: 'custom' }, 'Personalizado (intervalos em segundos)'),
+        el('option', { value: 'moghaddam2021' }, 'Moghaddam (2021): 64/128/256 ms → 0,004/0,002/0,001 Mbit/s'),
+        el('option', { value: 'dibaj2024' }, 'Dibaj (2024): 64/128/256 µs → 4/2/1 Mbit/s'));
+      profileSel.value = String((kd && kd.profile) || 'custom').toLowerCase();
+      profileSel.addEventListener('change', () => {
+        const old = isPlainObject(sim.qkdKeyDemand) ? sim.qkdKeyDemand : {};
+        const next = Object.assign({}, old, { profile: profileSel.value });
+        if (profileSel.value !== 'custom') {
+          next.keySizeBits = 256;
+          next.updateIntervalSeconds = demandIntervals(next);
+        } else {
+          next.updateIntervalSeconds = demandIntervals(old);
+        }
+        App.setValue('simulation', ['qkdKeyDemand'], next); App.renderTab();
+      });
+      const priorFixedRate = el('input', { type: 'checkbox', checked: !kd || kd.preferGeneratorFixedRate !== false });
+      priorFixedRate.addEventListener('change', () => App.setValue('simulation', ['qkdKeyDemand', 'preferGeneratorFixedRate'], priorFixedRate.checked));
       // Parte 34: how the demand is chosen (uniform draw or following the classical bit rate)
       const modeSel = el('select.input',
         el('option', { value: 'uniform' }, 'Sorteio uniforme entre os intervalos'),
         el('option', { value: 'byBitRate' }, 'Pela taxa da requisição clássica (mesmas proporções)'));
       modeSel.value = isByBitRate() ? 'byBitRate' : 'uniform';
       modeSel.addEventListener('change', () => {
-        const cur = Object.assign({ keySizeBits: 256, updateIntervalsMicroseconds: [64.0, 128.0, 256.0], randomSeed: 2024 }, isPlainObject(sim.qkdKeyDemand) ? sim.qkdKeyDemand : {});
+        const cur = Object.assign({ keySizeBits: 256, updateIntervalSeconds: [0.064, 0.128, 0.256], randomSeed: 2024 }, isPlainObject(sim.qkdKeyDemand) ? sim.qkdKeyDemand : {});
         if (modeSel.value === 'byBitRate') cur.mode = 'byBitRate'; else { delete cur.mode; delete cur.keyRateMbpsByBitRate; }
         App.setValue('simulation', ['qkdKeyDemand'], cur); App.renderTab();
       });
@@ -456,7 +495,7 @@
                 el('td.small.muted', r.explicit ? el('button.btn.small.ghost', { type: 'button', on: { click: () => setExplicit(r, null) } }, 'automático (' + fmtNum(r.auto, 3) + ')') : 'automático'));
             })))) : el('p.small.warn', 'O arquivo traffic não tem geradores com bitRate.'),
           el('p.small.muted', 'Resultado: ' + [...keyShare.entries()].sort((a, b) => a[0] - b[0]).map(([k, v]) => fmtNum(k, 3) + ' Mbit/s em ' + fmtNum(100 * v, 1) + ' %').join(' · ') + ' das requisições protegidas (a fração protegida é a mesma para todas as taxas, salvo qkdProtectedProbability por gerador).'),
-          el('p.small.muted', 'Regra automática: as taxas clássicas, da menor para a maior, recebem as taxas de chave dos intervalos, da menor para a maior. Com mais taxas clássicas do que de chave, taxas vizinhas dividem a mesma chave; edite a tabela para outra combinação (grava simulation.qkdKeyDemand.keyRateMbpsByBitRate). Geradores com keyRateMbps continuam usando o valor fixo.'),
+          el('p.small.muted', 'Regra automática: as taxas clássicas, da menor para a maior, recebem as taxas de chave dos intervalos, da menor para a maior. Com mais taxas clássicas do que de chave, taxas vizinhas dividem a mesma chave; edite a tabela para outra combinação (grava simulation.qkdKeyDemand.keyRateMbpsByBitRate). Geradores com keyRateMbps usam o valor fixo apenas quando preferGeneratorFixedRate = true.'),
           anyEx ? el('div', el('button.btn.small.ghost', { type: 'button', on: { click: () => { const cur = Object.assign({}, sim.qkdKeyDemand); delete cur.keyRateMbpsByBitRate; App.setValue('simulation', ['qkdKeyDemand'], cur); App.renderTab(); } } }, 'Voltar tudo ao automático')) : null,
           tr.anyKeyField ? el('p.small.warn', 'Atenção: há geradores com keyRateMbps no arquivo traffic; eles não seguem esta tabela. Para usar a tabela em todos, marque "Não fixar" no painel de tráfego QKD e aplique.') : null);
       }
@@ -469,10 +508,13 @@
         qkdKvBoxes(tr),
         el('div.fields', { style: { marginTop: '12px' } },
           simPct(['qkdProtectedRequestProbability'], 'Fração protegida padrão (%)', 'de 0 a 100 %; vale para os geradores sem qkdProtectedProbability'),
+          field('Perfil de demanda de chaves', profileSel, 'Selecionar explicitamente o artigo ou intervalos próprios; os perfis fixam o tamanho da chave em 256 bits'),
           simNum(['qkdKeyDemand', 'keySizeBits'], 'Tamanho da chave', 'bits', (v) => v > 0 && Number.isInteger(v)),
-          field('Intervalos de renovação da chave', intervals, 'µs; ' + (rates.length ? rates.map((r) => fmtNum(r, 3)).join(' / ') + ' Mbit/s' : '—')),
+          field('Intervalos de renovação da chave', intervals, 'segundos; use ponto decimal e separe por vírgulas, ou vírgula decimal e separe por ; — ' + (rates.length ? rates.map((r) => fmtNum(r, 3)).join(' / ') + ' Mbit/s' : '—')),
           simNum(['qkdWarmupFraction'], 'Warm-up das métricas QKD', 'fração das chegadas', (v) => v >= 0 && v < 1),
           field('Escolha da demanda (sem keyRateMbps)', modeSel, 'simulation.qkdKeyDemand.mode')),
+        el('div.checks', { style: { marginTop: '8px' } },
+          el('label.check', priorFixedRate, ' Priorizar traffic.keyRateMbps quando informado (desmarque para usar sempre o perfil Moghaddam/Dibaj)')),
         bbBox,
         el('div.checks', { style: { marginTop: '8px' } },
           el('label.check', exact, ' Número exato de requisições (sem a "cauda" de 1 chegada por gerador)'),
@@ -488,6 +530,14 @@
   // ------------------------------------------------------------------ 1.14.0: study variations in one place
 
   /** Current key demand choice of the case: 'fixed' (all generators with the same keyRateMbps), 'uniform', 'byBitRate' or 'mixed'. */
+  function demandIntervals(kd) {
+    const profile = String((kd && kd.profile) || 'custom').toLowerCase();
+    if (profile === 'moghaddam2021') return [0.064, 0.128, 0.256];
+    if (profile === 'dibaj2024') return [0.000064, 0.000128, 0.000256];
+    return kd && Array.isArray(kd.updateIntervalSeconds) && kd.updateIntervalSeconds.length
+      ? kd.updateIntervalSeconds : [0.064, 0.128, 0.256];
+  }
+
   function keyChoice() {
     const tr = st().model.traffic;
     const gens = isPlainObject(tr) && Array.isArray(tr.requestGenerators) ? tr.requestGenerators : [];
@@ -534,7 +584,7 @@
     // key demand
     const kc = keyChoice();
     const fixedIn = numIn(kc.kind === 'fixed' ? kc.value : 2, () => {}, (v) => v > 0);
-    const keySel = selIn(kc.kind === 'mixed' ? 'mixed' : kc.kind, [['fixed', 'Fixa (mesmo valor em todas)'], ['uniform', 'Sorteada entre 1, 2 e 4 Mbit/s'], ['byBitRate', 'Pela taxa clássica da requisição'], ['mixed', 'Misturada (geradores diferentes)']], () => {});
+    const keySel = selIn(kc.kind === 'mixed' ? 'mixed' : kc.kind, [['fixed', 'Fixa (mesmo valor em todas)'], ['uniform', 'Sorteada entre os intervalos configurados'], ['byBitRate', 'Pela taxa clássica da requisição'], ['mixed', 'Misturada (geradores diferentes)']], () => {});
     const applyKey = () => {
       const kind = keySel.value;
       if (kind === 'mixed') return;
@@ -543,15 +593,15 @@
       const tr = deepClone(m.traffic);
       for (const g of tr.requestGenerators) { if (kind === 'fixed') g.keyRateMbps = kv; else delete g.keyRateMbps; }
       App.setValue('traffic', ['requestGenerators'], tr.requestGenerators);
-      const kd = Object.assign({ keySizeBits: 256, updateIntervalsMicroseconds: [64.0, 128.0, 256.0], randomSeed: 2024 }, isPlainObject(sim.qkdKeyDemand) ? sim.qkdKeyDemand : {});
+      const kd = Object.assign({ keySizeBits: 256, updateIntervalSeconds: [0.064, 0.128, 0.256], randomSeed: 2024 }, isPlainObject(sim.qkdKeyDemand) ? sim.qkdKeyDemand : {});
       if (kind === 'byBitRate') kd.mode = 'byBitRate'; else { delete kd.mode; delete kd.keyRateMbpsByBitRate; }
       App.setValue('simulation', ['qkdKeyDemand'], kd);
-      App.toast('Demanda de chave: ' + (kind === 'fixed' ? kv + ' Mbit/s fixa' : kind === 'uniform' ? 'sorteada (1/2/4)' : 'pela taxa clássica'), 'ok');
+      App.toast('Demanda de chave: ' + (kind === 'fixed' ? kv + ' Mbit/s fixa' : kind === 'uniform' ? 'sorteada (conforme intervalos)' : 'pela taxa clássica'), 'ok');
       App.renderTab();
     };
     row('Demanda de chave', el('div.toolbar', { style: { margin: 0 } }, keySel, fixedIn, el('span.small.muted', 'Mbit/s (só "Fixa")'),
       el('button.btn.small', { type: 'button', on: { click: applyKey } }, 'Aplicar')),
-    'Taxa de chave que cada sessão precisa. Fixa: igual para todas (keyRateMbps). Sorteada: 1, 2 ou 4 Mbit/s ao acaso (política do arquivo simulation). Pela taxa clássica: a menor taxa clássica pede a menor chave (tabela no quadro "Demanda QKD" abaixo). No modo "link", um QCh atende várias sessões até somar a SKR dele; demanda maior → mais QChs ativos por enlace (mais espectro do núcleo quântico e mais Q-TRx, logo mais custo) e mais bloqueio quando o núcleo quântico ou os QTx/QRx acabam.', 'traffic.keyRateMbps / simulation.qkdKeyDemand');
+    'Taxa de chave que cada sessão precisa. Fixa: igual para todas (keyRateMbps). Sorteada: taxas calculadas dos intervalos em segundos do arquivo simulation. Pela taxa clássica: a menor taxa clássica pede a menor chave (tabela no quadro "Demanda QKD" abaixo). No modo "link", um QCh atende várias sessões até somar a SKR dele; demanda maior → mais QChs ativos por enlace (mais espectro do núcleo quântico e mais Q-TRx, logo mais custo) e mais bloqueio quando o núcleo quântico ou os QTx/QRx acabam.', 'traffic.keyRateMbps / simulation.qkdKeyDemand');
     // PICh
     row('PICh (slots por canal)', numIn(q.pichSlots || 0, (v) => setQ('pichSlots', Math.round(v)), (v) => v >= 0 && Number.isInteger(v)),
       'Canal clássico público do BB84, num núcleo clássico, em cada enlace da rota QKD. 0 = não modelado. Maior → tira espectro do tráfego clássico (mais bloqueio clássico) e pode bloquear sessões por falta de PICh.', 'network.qkd.pichSlots');
@@ -608,7 +658,7 @@
     const gens = isPlainObject(tr) && Array.isArray(tr.requestGenerators) ? tr.requestGenerators : [];
     const kd = isPlainObject(sim.qkdKeyDemand) ? sim.qkdKeyDemand : {};
     const bits = Number(kd.keySizeBits) || 256;
-    const keys = [...new Set((Array.isArray(kd.updateIntervalsMicroseconds) && kd.updateIntervalsMicroseconds.length ? kd.updateIntervalsMicroseconds : [64, 128, 256]).map((us) => bits / Number(us)))].sort((a, b) => a - b);
+    const keys = [...new Set(demandIntervals(kd).map((seconds) => bits / (Number(seconds) * 1e6)))].sort((a, b) => a - b);
     const lamOf = new Map();
     let tot = 0;
     for (const g of gens) {
@@ -638,8 +688,8 @@
     const gens = isPlainObject(tr) && Array.isArray(tr.requestGenerators) ? tr.requestGenerators : [];
     const globalP = Number(sim.qkdProtectedRequestProbability) || 0;
     const kd = isPlainObject(sim.qkdKeyDemand) ? sim.qkdKeyDemand : null;
-    const policyMean = kd && Array.isArray(kd.updateIntervalsMicroseconds) && kd.updateIntervalsMicroseconds.length
-      ? kd.updateIntervalsMicroseconds.reduce((s, us) => s + (kd.keySizeBits || 256) / us, 0) / kd.updateIntervalsMicroseconds.length : NaN;
+    const keyPeriods = demandIntervals(kd);
+    const policyMean = kd ? keyPeriods.reduce((s, seconds) => s + (kd.keySizeBits || 256) / (seconds * 1e6), 0) / keyPeriods.length : NaN;
     let lam = 0, lamP = 0, keyW = 0, withFields = 0, erl = 0, erlInc = 0;
     const probs = new Map(), keys = new Map();
     const bb = isByBitRate() ? keyByBitRateTable() : null;
@@ -685,7 +735,7 @@
     ['Fração protegida (qkdProtectedProbability)', 'Probabilidade de cada requisição deste gerador ser protegida por QKD, sorteada requisição a requisição. No launcher é digitada em %: 0 % = nenhuma; 100 % = todas (no arquivo fica de 0 a 1). Não é fração da banda nem da carga: a carga clássica do gerador continua a mesma, só parte das requisições passa a pedir também chave quântica.', 'Ex.: 20 % → em média 1 de cada 5 requisições do gerador é protegida.'],
     ['Fração padrão (simulation)', 'qkdProtectedRequestProbability, na aba Simulação: vale para os geradores que não têm o campo próprio.'],
     ['Demanda de chave (keyRateMbps)', 'Taxa de chave secreta que a sessão QKD precisa entregar, em Mbit/s, enquanto a conexão estiver ativa. A sessão só é aceita se a taxa de chave segura (SKR) de todos os trechos da rota QKD for pelo menos esta demanda.', 'Ex.: chave AES de 256 bits renovada a cada 128 µs = 256/128 = 2 Mbit/s.'],
-    ['Política qkdKeyDemand (sem keyRateMbps)', 'A demanda é sorteada para cada requisição protegida: tamanho da chave ÷ intervalo de renovação, com o intervalo escolhido ao acaso da lista do arquivo simulation.', 'Padrão: 256 bits e 64, 128 ou 256 µs → 4, 2 ou 1 Mbit/s.'],
+    ['Política qkdKeyDemand (sem keyRateMbps)', 'A demanda é sorteada para cada requisição protegida: tamanho da chave ÷ intervalo de renovação, com o intervalo escolhido ao acaso da lista do arquivo simulation.', 'Referência Moghaddam: 0,064/0,128/0,256 s (4/2/1 kbit/s). Dibaj: 0,000064/0,000128/0,000256 s (4/2/1 Mbit/s).'],
     ['Demanda pela taxa clássica (mode = byBitRate)', 'Em vez de sortear, cada requisição protegida pede a taxa de chave que corresponde à sua taxa clássica: a menor taxa clássica recebe a menor taxa de chave, e assim por diante. Como a requisição protegida é uma requisição clássica sorteada, as demandas de chave ficam nas mesmas proporções das taxas clássicas.', 'Ex.: 100/200/400 Gb/s → 1/2/4 Mbit/s. Ajuste na aba QKD.'],
     ['Requisições protegidas (esperado)', 'Média das frações protegidas ponderada pela carga de cada gerador: a porcentagem das requisições da simulação que devem pedir QKD.'],
     ['Lista QKD dedicada', 'Geradores extras com fração 1, para estudar só pares escolhidos. Eles somam carga à rede: cada requisição também ocupa espectro clássico.'],
@@ -783,7 +833,7 @@
       el('div.stack-s', { style: { margin: '12px 0 0' } },
         el('h3', 'Demanda de chave (vale para as duas ações abaixo)'),
         el('div.fields', field('Demanda fixa por requisição', inp('key'), 'Mbit/s → campo keyRateMbps de cada gerador')),
-        el('label.check', usePolicy, ' Não fixar: usar a política qkdKeyDemand da aba QKD (sorteio de 1, 2 ou 4 Mbit/s, ou pela taxa clássica da requisição se o modo for "byBitRate")')),
+        el('label.check', usePolicy, ' Não fixar: usar a política qkdKeyDemand da aba QKD (sorteio das taxas configuradas em segundos, ou pela taxa clássica da requisição se o modo for "byBitRate")')),
       el('div.table-wrap', { style: { margin: '12px 0' } }, el('table.grid.data',
         el('thead', el('tr', el('th', 'Taxa'), el('th.num', 'Geradores'), el('th.num', 'Com campos QKD'), el('th.num', 'Fração protegida'), el('th.num', 'Chave (Mbit/s)'))),
         el('tbody', [...byRate.entries()].sort((a, b) => a[0] - b[0]).map(([r, e]) => el('tr',

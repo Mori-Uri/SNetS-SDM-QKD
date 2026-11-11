@@ -5,6 +5,7 @@ import gprmcsa.routing.Route;
 import request.RequestForConnection;
 
 import java.io.Serializable;
+import com.google.gson.annotations.SerializedName;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,6 +15,8 @@ import java.util.List;
  * @author Iallen
  */
 public class Circuit implements Comparable<Object>, Serializable, Cloneable {
+	/** Optional pair-kernel cache, never serialized. */
+	transient volatile ThreadLocal<GnPairCache> gnPairs;
 
 	//To identify the type of circuit blocking
 	public static final int NO_BLOCKING = 0;
@@ -36,8 +39,10 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	protected Modulation modulation;
 	protected List<RequestForConnection> requests; // Requests attended by this circuit
 
-	protected double SNR; // dB
-	protected double SNR_linear;
+	@SerializedName(value = "OSNR", alternate = {"SNR"})
+	protected double OSNR; // optical OSNR, dB
+	@SerializedName(value = "OSNR_linear", alternate = {"SNR_linear"})
+	protected double OSNR_linear; // optical OSNR, linear
 	protected boolean QoT;
 	protected boolean QoTForOther;
 	protected double xt; // dB
@@ -63,7 +68,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 */
 	public Circuit() {
 		this.id = quantity++;
-		this.requests = new TrackedRequestList(this); // Parte 54
+		this.requests = new ArrayList<>();
 
 		this.QoT = true; // Assuming that a request always starts with admissible QoT
 		this.QoTForOther = true; // Assuming that it is admissible for the other requirements
@@ -76,7 +81,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 
 		this.peso = 0.0;
 
-		setSNR(PhysicalLayer.maxOSNR);
+		setOSNR(PhysicalLayer.maxOSNR);
 		setXt(Crosstalk.lowestXT);
 	}
 
@@ -125,9 +130,8 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 * @param route the route to set
 	 */
 	public void setRoute(Route route) {
-		physicalChange(); // Parte 54: links of the old route
 		this.route = route;
-		physicalChange(); // Parte 54: links of the new route
+		PhysicalStateChanges.mutated();
 	}
 
 	/**
@@ -136,30 +140,6 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 * @return the requiredBitRate
 	 */
 	public double getRequiredBitRate() {
-		if (simulator.PerfChecks.ENABLED && requests instanceof TrackedRequestList) {
-			// Parte 57 (desempenho): the sum is kept while the list of requests (same list, same stamp) and the bit
-			// rates of the requests (global counter of RequestForConnection.setRequiredBitRate) do not change. When
-			// anything changes it is summed again, over the same list in the same order: the same value, bit for bit.
-			final TrackedRequestList list = (TrackedRequestList) requests;
-			final long stamp = list.stamp();
-			final long rates = RequestForConnection.bitRateChanges();
-			if (rateCacheValid && rateCacheList == list && rateCacheStamp == stamp && rateCacheRates == rates) {
-				if (simulator.PerfChecks.VERIFY) simulator.PerfChecks.same(rateCacheValue, requiredBitRateOriginal(), "taxa do circuito");
-				return rateCacheValue;
-			}
-			final double v = requiredBitRateOriginal();
-			rateCacheList = list;
-			rateCacheStamp = stamp;
-			rateCacheRates = rates;
-			rateCacheValue = v;
-			rateCacheValid = true;
-			return v;
-		}
-		return requiredBitRateOriginal();
-	}
-
-	/** The original sum of getRequiredBitRate (Parte 57). */
-	private double requiredBitRateOriginal() {
 		double res = 0.0;
 
 		for (RequestForConnection r : requests) {
@@ -169,27 +149,6 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 		return res;
 	}
 
-	/** Parte 59: GN terms of the other circuits on this one (see GnPairCache); not saved in save states. */
-	transient GnPairCache gnPairs;
-
-	/** Parte 57: sum of the bit rates kept by getRequiredBitRate; not saved in save states. */
-	private transient boolean rateCacheValid;
-	private transient TrackedRequestList rateCacheList;
-	private transient long rateCacheStamp;
-	private transient long rateCacheRates;
-	private transient double rateCacheValue;
-
-	/**
-	 * Parte 57 (desempenho): power consumption of the transponder of this circuit, kept by
-	 * EnergyConsumption.computeTransponderPowerConsumption with the inputs it was computed from.
-	 */
-	transient boolean powerCacheValid;
-	transient Object powerCacheRoute;
-	transient Object powerCacheModulation;
-	transient int powerCacheSa0;
-	transient int powerCacheSa1;
-	transient double powerCacheValue;
-
 	/**
 	 * Compute the residual capacity of circuit in terms of bit rate
 	 *
@@ -198,6 +157,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	public double getResidualCapacity() {
 		double rb = getRequiredBitRate();
 		double cap = getModulation().potentialBitRate(spectrumAssigned[1] - spectrumAssigned[0] + 1);
+
 		return cap - rb;
 	}
 
@@ -237,8 +197,9 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 		if (sa != null && sa[0] > sa[1]) {
 			throw new UnsupportedOperationException();
 		}
+
 		spectrumAssigned = sa;
-		physicalChange(); // Parte 54
+		PhysicalStateChanges.mutated();
 	}
 
 	/**
@@ -257,7 +218,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 */
 	public void setModulation(Modulation modulation) {
 		this.modulation = modulation;
-		physicalChange(); // Parte 54
+		PhysicalStateChanges.mutated();
 	}
 
 	/**
@@ -267,7 +228,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 */
 	public void addRequest(RequestForConnection rfc) {
 		requests.add(rfc);
-		physicalChange(); // Parte 54 (also when the list is not a TrackedRequestList)
+		PhysicalStateChanges.mutated();
 	}
 
 	/**
@@ -277,7 +238,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 */
 	public void removeRequest(RequestForConnection rfc) {
 		requests.remove(rfc);
-		physicalChange(); // Parte 54
+		PhysicalStateChanges.mutated();
 	}
 
 	/**
@@ -294,35 +255,25 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
      *
      * @param requests
      */
-    public void setRequests(List<RequestForConnection> requests) {
-    	this.requests = requests;
-    	// Parte 54: a shared list tells this circuit too when it changes; any other list cannot be tracked
-    	if (requests instanceof TrackedRequestList) {
-    		((TrackedRequestList) requests).addOwner(this);
-    	} else if (requests != null) {
-    		PhysicalStateChanges.markUntracked();
-    	}
-    	physicalChange();
-    }
-
-	/**
-	 * Returns the SNR
-	 *
-	 * @return the SNR double
-	 */
-	public double getSNR() {
-		return SNR;
+	public void setRequests(List<RequestForConnection> requests) {
+		this.requests = requests;
+		PhysicalStateChanges.mutated();
 	}
 
-	/**
-	 * Sets the SNR
-	 *
-	 * @param SNR the SNR to set double
-	 */
-	public void setSNR(double SNR) {
-		this.SNR = SNR;
-		this.SNR_linear = PhysicalLayer.ratioOfDB(SNR);
+	/** Returns optical OSNR in decibels. */
+	public double getOSNR() { return OSNR; }
+
+	/** Stores optical OSNR in decibels, updating the corresponding linear value. */
+	public void setOSNR(double osnrDb) {
+		this.OSNR = osnrDb;
+		this.OSNR_linear = PhysicalLayer.ratioOfDB(osnrDb);
 	}
+
+	/** @deprecated Compatibility alias: this value was always OSNR in dB. */
+	@Deprecated public double getSNR() { return getOSNR(); }
+
+	/** @deprecated Compatibility alias: this value was always OSNR in dB. */
+	@Deprecated public void setSNR(double osnrDb) { setOSNR(osnrDb); }
 
 	/**
 	 * Returns the QoT
@@ -493,6 +444,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 		if (o != null) {
 			return this.id == ((Circuit) o).getId();
 		}
+
 		return false;
 	}
 
@@ -520,9 +472,8 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 * @param launchPowerLinear double
 	 */
 	public void setLaunchPowerLinear(double launchPowerLinear) {
-		final boolean same = Double.doubleToRawLongBits(this.launchPowerLinear) == Double.doubleToRawLongBits(launchPowerLinear);
 		this.launchPowerLinear = launchPowerLinear;
-		if (!same) physicalChange(); // Parte 54
+		PhysicalStateChanges.mutated();
 	}
 
 	/**
@@ -534,6 +485,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 		if (guardBand == -1) {
 			System.err.println("Guard band not selected.");
 		}
+
 		return guardBand;
 	}
 
@@ -544,7 +496,6 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 */
 	public void setGuardBand(int guardBand) {
 		this.guardBand = guardBand;
-		physicalChange(); // Parte 54
 	}
 
 	/**
@@ -563,6 +514,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 		if (indexCore == -1) {
 			System.err.println("Core not selected.");
 		}
+
 		return indexCore;
 	}
 
@@ -572,48 +524,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 */
 	public void setIndexCore(int indexCore) {
 		this.indexCore = indexCore;
-		physicalChange(); // Parte 54
-	}
-
-	/*
-	 * Parte 54 (desempenho): number of core circuit lists that contain this circuit (it is in the network while > 0).
-	 * When a circuit in the network changes its spectrum, core, modulation, power, route or requests, the links of its
-	 * route are marked as changed (Link.touch) and the global change counter moves. The QoT cache of PhysicalLayer and
-	 * the QKD session refresh rely on this to never reuse a value computed before the change.
-	 */
-	protected int coreLists;
-
-	/** Parte 54: QoT terms per link (see QotLinkCache); not saved in save states. */
-	transient QotLinkCache.Entry[] qotCache;
-
-	/** Parte 54: called by Core when this circuit enters a core circuit list. */
-	void enteredCoreList() {
-		coreLists++;
-		if (this instanceof TranslucentCircuit) {
-			PhysicalStateChanges.markUntracked();
-		}
-	}
-
-	/** Parte 54: called by Core when this circuit leaves a core circuit list. */
-	void leftCoreList() {
-		if (coreLists > 0) coreLists--;
-	}
-
-	/** Parte 54: true while the circuit is in the circuit list of some core. */
-	public boolean isInNetwork() {
-		return coreLists > 0;
-	}
-
-	/** Parte 54: a physical parameter of this circuit changed (see coreLists). */
-	protected void physicalChange() {
-		if (coreLists > 0) {
-			PhysicalStateChanges.mutated();
-			if (route != null && route.getLinkList() != null) {
-				for (Link link : route.getLinkList()) {
-					link.touch();
-				}
-			}
-		}
+		PhysicalStateChanges.mutated();
 	}
 
 	/**
@@ -735,6 +646,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 
 	// Class used to represent modulation in the ML format, in the form 0 0 0
 	// added by Jurandir
+
 	/**
 	 * Returns the modulation ml.
 	 * @return the modulation ml.
@@ -803,31 +715,26 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 */
 	@Override
 	public Circuit clone() throws CloneNotSupportedException {
-		final Circuit c = (Circuit) super.clone();
-		c.coreLists = 0; // Parte 54: the copy is not in any core list
-		c.qotCache = null;
-		if (c.requests instanceof TrackedRequestList) {
-			((TrackedRequestList) c.requests).addOwner(c); // Parte 54: the copy shares the list
-		}
-		return c;
+		Circuit copy = (Circuit) super.clone();
+		// Caches belong to the individual circuit, not to its cloned state.
+		copy.gnPairs = null;
+		return copy;
 	}
 
-	/**
-	 * Returns the sn rlinear.
-	 * @return the sn rlinear.
-	 */
-	public double getSNRlinear() {
-		return SNR_linear;
+	/** Returns optical OSNR as a linear PSD ratio. */
+	public double getOSNRlinear() { return OSNR_linear; }
+
+	/** Stores optical OSNR as a linear PSD ratio. */
+	public void setOSNRlinear(double osnrLinear) {
+		this.OSNR_linear = osnrLinear;
+		this.OSNR = PhysicalLayer.ratioForDB(osnrLinear);
 	}
 
-	/**
-	 * Sets the sn rlinear.
-	 * @param sNR_linear the sNR_linear.
-	 */
-	public void setSNRlinear(double sNR_linear) {
-		this.SNR_linear = sNR_linear;
-		this.SNR = PhysicalLayer.ratioForDB(SNR_linear);
-	}
+	/** @deprecated Compatibility alias: this value was always linear OSNR. */
+	@Deprecated public double getSNRlinear() { return getOSNRlinear(); }
+
+	/** @deprecated Compatibility alias: this value was always linear OSNR. */
+	@Deprecated public void setSNRlinear(double osnrLinear) { setOSNRlinear(osnrLinear); }
 
 	/**
 	 * Returns the x tlinear.

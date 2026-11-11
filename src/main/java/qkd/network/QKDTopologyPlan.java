@@ -16,93 +16,103 @@ import java.util.List;
  */
 public final class QKDTopologyPlan implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private final QKDNetworkParameters parameters;
-    private final List<QKDLinkPlan> links;
+	private final QKDNetworkParameters parameters;
+	private final List<QKDLinkPlan> links;
 
-    public QKDTopologyPlan(QKDNetworkParameters parameters,
-            List<QKDLinkPlan> links) {
-        if (parameters == null) {
-            throw new IllegalArgumentException("parameters cannot be null");
-        }
-        if (links == null) {
-            throw new IllegalArgumentException("links cannot be null");
-        }
-        this.parameters = parameters;
-        this.links = Collections.unmodifiableList(
-                new ArrayList<QKDLinkPlan>(links));
-    }
+	public QKDTopologyPlan(QKDNetworkParameters parameters,
+			List<QKDLinkPlan> links) {
+		if (parameters == null) {
+			throw new IllegalArgumentException("parameters cannot be null");
+		}
 
-    public QKDNetworkParameters getParameters() {
-        return parameters;
-    }
+		if (links == null) {
+			throw new IllegalArgumentException("links cannot be null");
+		}
 
-    public boolean isEnabled() {
-        return parameters.isEnabled();
-    }
+		this.parameters = parameters;
+		this.links = Collections.unmodifiableList(
+				new ArrayList<QKDLinkPlan>(links));
+	}
 
-    public List<QKDLinkPlan> getLinks() {
-        return links;
-    }
+	public QKDNetworkParameters getParameters() {
+		return parameters;
+	}
 
-    public int getPhysicalLinkCount() {
-        return links.size();
-    }
+	public boolean isEnabled() {
+		return parameters.isEnabled();
+	}
 
-    public int getTotalSpanCount() {
-        int total = 0;
-        for (QKDLinkPlan link : links) {
-            total += link.getSpanCount();
-        }
-        return total;
-    }
+	public List<QKDLinkPlan> getLinks() {
+		return links;
+	}
 
-    /**
+	public int getPhysicalLinkCount() {
+		return links.size();
+	}
+
+	public int getTotalSpanCount() {
+		int total = 0;
+
+		for (QKDLinkPlan link : links) {
+			total += link.getSpanCount();
+		}
+
+		return total;
+	}
+
+	/**
      * Counts logical trusted-node boundaries per directed SNetS link.
      *
      * <p>At this stage reciprocal directed links are intentionally not merged
      * into one physical trusted-node object. No Q-TRx/resource allocation is
      * performed yet, so this count is diagnostic only.</p>
      */
-    public int getTotalVirtualTrustedNodeBoundaries() {
-        int total = 0;
-        for (QKDLinkPlan link : links) {
-            total += link.getVirtualTrustedNodeCount();
-        }
-        return total;
-    }
+	public int getTotalVirtualTrustedNodeBoundaries() {
+		int total = 0;
 
-    /** Part 23: trusted-node sites inside the links (span boundaries), counted once per fiber pair. */
-    public int getTrustedNodeCount() {
-        java.util.Set<String> seen = new java.util.HashSet<String>();
-        int count = 0;
-        for (QKDLinkPlan l : getLinks()) {
-            String a = l.getSource(), b = l.getDestination();
-            String key = a.compareTo(b) <= 0 ? a + "|" + b : b + "|" + a;
-            if (seen.add(key)) count += Math.max(0, l.getSpanCount() - 1);
-        }
-        return count;
-    }
+		for (QKDLinkPlan link : links) {
+			total += link.getVirtualTrustedNodeCount();
+		}
 
-    public QKDLinkPlan findLink(String source, String destination) {
-        for (QKDLinkPlan link : links) {
-            if (link.getSource().equals(source)
-                    && link.getDestination().equals(destination)) {
-                return link;
-            }
-        }
-        return null;
-    }
+		return total;
+	}
 
-    @Override
-    public String toString() {
-        return "QKDTopologyPlan{" +
-                "parameters=" + parameters +
-                ", physicalLinks=" + getPhysicalLinkCount() +
-                ", spans=" + getTotalSpanCount() +
-                ", virtualTrustedNodeBoundaries="
-                + getTotalVirtualTrustedNodeBoundaries() +
-                '}';
-    }
+	/** Part 23: trusted-node sites inside the links (span boundaries), counted once per fiber pair. */
+	public int getTrustedNodeCount() {
+		java.util.Set<String> seen = new java.util.HashSet<String>();
+		int count = 0;
+
+		for (QKDLinkPlan l : getLinks()) {
+			String a = l.getSource(), b = l.getDestination();
+			String key = a.compareTo(b) <= 0 ? a + "|" + b : b + "|" + a;
+
+			if (seen.add(key)) count += Math.max(0, l.getSpanCount() - 1);
+		}
+
+		return count;
+	}
+
+	public QKDLinkPlan findLink(String source, String destination) {
+		for (QKDLinkPlan link : links) {
+			if (link.getSource().equals(source)
+					&& link.getDestination().equals(destination)) {
+				return link;
+			}
+		}
+
+		return null;
+	}
+
+	@Override
+	public String toString() {
+		return "QKDTopologyPlan{" +
+				"parameters=" + parameters +
+				", physicalLinks=" + getPhysicalLinkCount() +
+				", spans=" + getTotalSpanCount() +
+				", virtualTrustedNodeBoundaries="
+				+ getTotalVirtualTrustedNodeBoundaries() +
+				'}';
+	}
 }

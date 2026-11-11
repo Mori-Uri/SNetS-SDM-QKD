@@ -14,151 +14,126 @@ import java.util.Iterator;
  */
 public class GroomingStatistics extends Measurement {
 
-    private int observations;
-    /** Parte 54: stamp of the current observation (see computeReqByCirc). */
-    private int countStamp;
-    private double sumReqByCirc;
-    private int maxVirtualHops;
-    private double sumVirtualHops;
-    private int attendedRequests;
-    private int maxReqByCirc;
+	private int observations;
+	private double sumReqByCirc;
+	private int maxVirtualHops;
+	private double sumVirtualHops;
+	private int attendedRequests;
+	private int maxReqByCirc;
 
-    /**
+	/**
      * Creates a new instance of Measurement
      *
      * @param loadPoint   int
      * @param replication int
      */
-    public GroomingStatistics(int loadPoint, int replication) {
-        super(loadPoint, replication);
+	public GroomingStatistics(int loadPoint, int replication) {
+		super(loadPoint, replication);
 
-        this.resultManager = new GroomingStatisticsResultManager();
+		this.resultManager = new GroomingStatisticsResultManager();
 
-        observations = 0;
-        sumReqByCirc = 0.0;
-        maxVirtualHops = 0;
-        sumVirtualHops = 0.0;
-        attendedRequests = 0;
-        maxReqByCirc = 0;
-    }
+		observations = 0;
+		sumReqByCirc = 0.0;
+		maxVirtualHops = 0;
+		sumVirtualHops = 0.0;
+		attendedRequests = 0;
+		maxReqByCirc = 0;
+	}
 
-    /**
+	/**
      * Adds the new observation.
      * @param cp the cp.
      * @param success the success.
      * @param request the request.
      */
-    @Override
-    public void addNewObservation(ControlPlane cp, boolean success, RequestForConnection request) {
-        observations++;
-        sumReqByCirc += computeReqByCirc(cp);
-        if(success){
-            attendedRequests++;
-            sumVirtualHops += request.getCircuits().size();
-            if(request.getCircuits().size()>maxVirtualHops){
-                maxVirtualHops = request.getCircuits().size();
-            }
-        }
-    }
+	@Override
+	public void addNewObservation(ControlPlane cp, boolean success, RequestForConnection request) {
+		observations++;
+		sumReqByCirc += computeReqByCirc(cp);
 
-    /**
+		if(success){
+			attendedRequests++;
+			sumVirtualHops += request.getCircuits().size();
+
+			if(request.getCircuits().size()>maxVirtualHops){
+				maxVirtualHops = request.getCircuits().size();
+			}
+		}
+	}
+
+	/**
      * Returns the file name.
      * @return the file name.
      */
-    @Override
-    public String getFileName() {
-        return SimulationRequest.Result.FILE_GROOMING_STATISTICS;
-    }
+	@Override
+	public String getFileName() {
+		return SimulationRequest.Result.FILE_GROOMING_STATISTICS;
+	}
 
-    /**
+	/**
      * Returns the req by circ.
      * @return the req by circ.
      */
-    public double getReqByCirc(){
-        return sumReqByCirc/(double)observations;
-    }
+	public double getReqByCirc(){
+		return sumReqByCirc/(double)observations;
+	}
 
-    /**
+	/**
      * Returns the virtual hops.
      * @return the virtual hops.
      */
-    public double getVirtualHops(){
-        return sumVirtualHops/(double)attendedRequests;
-    }
+	public double getVirtualHops(){
+		return sumVirtualHops/(double)attendedRequests;
+	}
 
-    /**
+	/**
      * Returns the max virtual hops.
      * @return the max virtual hops.
      */
-    public int getMaxVirtualHops() {
-        return maxVirtualHops;
-    }
+	public int getMaxVirtualHops() {
+		return maxVirtualHops;
+	}
 
-    /**
+	/**
      * Returns the max req by circ.
      * @return the max req by circ.
      */
-    public int getMaxReqByCirc() {
-        return maxReqByCirc;
-    }
+	public int getMaxReqByCirc() {
+		return maxReqByCirc;
+	}
 
-    /**
+	/**
      * Computes the req by circ.
      * @param cp the cp.
      * @return the result of the operation.
      */
-    private double computeReqByCirc(ControlPlane cp) {
-        if (simulator.PerfChecks.ENABLED) {
-            // Parte 54 (desempenho): the distinct active requests are counted with a stamp in each request instead of
-            // a new HashSet per observation (a request served by several circuits still counts once). Same counts,
-            // so the same ratio.
-            final int stamp = ++countStamp == 0 ? ++countStamp : countStamp;
-            int distinct = 0;
-            for (Circuit next : cp.getConnections()) {
-                for (RequestForConnection r : next.getRequests()) {
-                    if (r.markCounted(stamp)) {
-                        distinct++;
-                    }
-                }
-                if (next.getRequests().size() > maxReqByCirc) {
-                    maxReqByCirc = next.getRequests().size();
-                }
-            }
-            final double acli = distinct;
-            final double acirc = cp.getConnections().size();
-            if (simulator.PerfChecks.VERIFY) {
-                final HashSet<RequestForConnection> check = new HashSet<>();
-                for (Circuit next : cp.getConnections()) check.addAll(next.getRequests());
-                if (check.size() != distinct) throw new IllegalStateException("snets.verifyPerf: contagem de requisicoes difere");
-            }
-            if (Double.isNaN(acli / acirc)) {
-                return 0.0;
-            }
-            return acli / acirc;
-        }
-        Iterator<Circuit> iterator = cp.getConnections().iterator();
-        HashSet<RequestForConnection> activeClients = new HashSet<>(); //HashSet will ignore same requests in more than one circuit.
+	private double computeReqByCirc(ControlPlane cp) {
+		Iterator<Circuit> iterator = cp.getConnections().iterator();
+		HashSet<RequestForConnection> activeClients = new HashSet<>(); //HashSet will ignore same requests in more than one circuit.
 
-        while(iterator.hasNext()){
-            Circuit next = iterator.next();
-            activeClients.addAll(next.getRequests());
-            //System.out.println(next.getRequests().size());
-            //System.out.println(activeClients.size());
-            if(next.getRequests().size()>maxReqByCirc){
-                maxReqByCirc = next.getRequests().size();
-            }
-        }
-        //System.out.println();
+		while(iterator.hasNext()){
+			Circuit next = iterator.next();
+			activeClients.addAll(next.getRequests());
+			//System.out.println(next.getRequests().size());
+			//System.out.println(activeClients.size());
 
-        double acli = activeClients.size();
-        double acirc = cp.getConnections().size();
+			if(next.getRequests().size()>maxReqByCirc){
+				maxReqByCirc = next.getRequests().size();
+			}
+		}
 
-        if(Double.isNaN(acli/acirc)){
-            return 0.0;
-        }
+		//System.out.println();
 
-        //System.out.println("Entered here: "+acli);
-        //System.out.println("Entered here 2: "+acirc);
-        return acli/acirc;
-    }
+		double acli = activeClients.size();
+		double acirc = cp.getConnections().size();
+
+		if(Double.isNaN(acli/acirc)){
+			return 0.0;
+		}
+
+		//System.out.println("Entered here: "+acli);
+		//System.out.println("Entered here 2: "+acirc);
+
+		return acli/acirc;
+	}
 }

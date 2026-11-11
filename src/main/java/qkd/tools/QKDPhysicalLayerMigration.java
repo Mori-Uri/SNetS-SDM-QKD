@@ -29,111 +29,133 @@ import com.google.gson.JsonParser;
  */
 public final class QKDPhysicalLayerMigration {
 
-    private static final Gson PRETTY = new GsonBuilder().setPrettyPrinting().create();
-    private static int migrated, skipped;
+	private static final Gson PRETTY = new GsonBuilder().setPrettyPrinting().create();
+	private static int migrated, skipped;
 
-    private QKDPhysicalLayerMigration() {
-    }
+	private QKDPhysicalLayerMigration() {
+	}
 
-    public static void main(String[] args) throws Exception {
-        if (args.length == 0) {
-            System.out.println("usage: QKDPhysicalLayerMigration <case or folder> [--dry-run]");
-            return;
-        }
-        boolean dry = args.length > 1 && "--dry-run".equals(args[1]);
-        walk(new File(args[0]), dry, 0);
-        System.out.println("migrated=" + migrated + " skipped=" + skipped + (dry ? " (dry run)" : ""));
-    }
+	public static void main(String[] args) throws Exception {
+		if (args.length == 0) {
+			System.out.println("usage: QKDPhysicalLayerMigration <case or folder> [--dry-run]");
 
-    private static void walk(File dir, boolean dry, int depth) throws IOException {
-        if (!dir.isDirectory() || depth > 8) return;
-        File phy = findConfigFile(dir, "physicalLayer");
-        if (phy != null) migrate(dir, dry);
-        File[] kids = dir.listFiles();
-        if (kids == null) return;
-        for (File k : kids) if (k.isDirectory() && !k.getName().startsWith(".")) walk(k, dry, depth + 1);
-    }
+			return;
+		}
 
-    /** Migrates one case folder; returns true when something was written. */
-    public static boolean migrate(File caseDir, boolean dry) throws IOException {
-        File phy = findConfigFile(caseDir, "physicalLayer");
-        if (phy == null) { skipped++; return false; }
-        File existingTarget = findConfigFile(caseDir, "qkdPhysicalLayer");
-        File target = existingTarget != null ? existingTarget
-                : new File(caseDir, "qkdPhysicalLayer" + (phy.getName().toLowerCase().endsWith(".json") ? ".json" : ""));
-        String text = new String(Files.readAllBytes(phy.toPath()), StandardCharsets.UTF_8);
-        JsonElement el;
-        try {
-            el = new JsonParser().parse(text);
-        } catch (RuntimeException e) {
-            skipped++;
-            return false;
-        }
-        if (!el.isJsonObject()) { skipped++; return false; }
-        JsonObject root = el.getAsJsonObject();
-        boolean has = root.has("qkdPhysical") || root.has("qkdReceiver");
-        if (!has || existingTarget != null) { skipped++; return false; }
-        JsonObject out = split(root);
-        boolean qkd = qkdEnabled(caseDir);
-        System.out.println((dry ? "[dry] " : "") + (qkd ? "migrating " : "removing unused QKD blocks (QKD disabled) ") + caseDir.getPath());
-        if (!dry) {
-            Files.write(new File(caseDir, phy.getName() + ".before_p26").toPath(), text.getBytes(StandardCharsets.UTF_8));
-            if (qkd) Files.write(target.toPath(), PRETTY.toJson(out).getBytes(StandardCharsets.UTF_8));
-            Files.write(phy.toPath(), PRETTY.toJson(root).getBytes(StandardCharsets.UTF_8));
-        }
-        migrated++;
-        return true;
-    }
+		boolean dry = args.length > 1 && "--dry-run".equals(args[1]);
+		walk(new File(args[0]), dry, 0);
+		System.out.println("migrated=" + migrated + " skipped=" + skipped + (dry ? " (dry run)" : ""));
+	}
 
-    /** True when the network file of the case has qkd.enabled = true. */
-    static boolean qkdEnabled(File caseDir) {
-        try {
-            File net = findConfigFile(caseDir, "network");
-            if (net == null) return false;
-            JsonElement el = new JsonParser().parse(new String(Files.readAllBytes(net.toPath()), StandardCharsets.UTF_8));
-            if (!el.isJsonObject() || !el.getAsJsonObject().has("qkd")) return false;
-            JsonElement q = el.getAsJsonObject().get("qkd");
-            return q.isJsonObject() && q.getAsJsonObject().has("enabled") && q.getAsJsonObject().get("enabled").getAsBoolean();
-        } catch (Exception e) {
-            return false;
-        }
-    }
+	private static void walk(File dir, boolean dry, int depth) throws IOException {
+		if (!dir.isDirectory() || depth > 8) return;
+		File phy = findConfigFile(dir, "physicalLayer");
 
+		if (phy != null) migrate(dir, dry);
+		File[] kids = dir.listFiles();
 
-    /** Resolves baseName.json first and then the legacy extensionless name. */
-    private static File findConfigFile(File dir, String baseName) {
-        File json = new File(dir, baseName + ".json");
-        if (json.isFile()) return json;
-        File legacy = new File(dir, baseName);
-        return legacy.isFile() ? legacy : null;
-    }
+		if (kids == null) return;
 
-    /**
+		for (File k : kids) if (k.isDirectory() && !k.getName().startsWith(".")) walk(k, dry, depth + 1);
+	}
+
+	/** Migrates one case folder; returns true when something was written. */
+	public static boolean migrate(File caseDir, boolean dry) throws IOException {
+		File phy = findConfigFile(caseDir, "physicalLayer");
+
+		if (phy == null) { skipped++; return false; }
+		File existingTarget = findConfigFile(caseDir, "qkdPhysicalLayer");
+		File target = existingTarget != null ? existingTarget
+				: new File(caseDir, "qkdPhysicalLayer" + (phy.getName().toLowerCase().endsWith(".json") ? ".json" : ""));
+		String text = new String(Files.readAllBytes(phy.toPath()), StandardCharsets.UTF_8);
+		JsonElement el;
+
+		try {
+			el = new JsonParser().parse(text);
+		} catch (RuntimeException e) {
+			skipped++;
+
+			return false;
+		}
+
+		if (!el.isJsonObject()) { skipped++; return false; }
+		JsonObject root = el.getAsJsonObject();
+		boolean has = root.has("qkdPhysical") || root.has("qkdReceiver");
+
+		if (!has || existingTarget != null) { skipped++; return false; }
+		JsonObject out = split(root);
+		boolean qkd = qkdEnabled(caseDir);
+		System.out.println((dry ? "[dry] " : "") + (qkd ? "migrating " : "removing unused QKD blocks (QKD disabled) ") + caseDir.getPath());
+
+		if (!dry) {
+			Files.write(new File(caseDir, phy.getName() + ".before_p26").toPath(), text.getBytes(StandardCharsets.UTF_8));
+
+			if (qkd) Files.write(target.toPath(), PRETTY.toJson(out).getBytes(StandardCharsets.UTF_8));
+			Files.write(phy.toPath(), PRETTY.toJson(root).getBytes(StandardCharsets.UTF_8));
+		}
+
+		migrated++;
+
+		return true;
+	}
+
+	/** True when the network file of the case has qkd.enabled = true. */
+	static boolean qkdEnabled(File caseDir) {
+		try {
+			File net = findConfigFile(caseDir, "network");
+
+			if (net == null) return false;
+			JsonElement el = new JsonParser().parse(new String(Files.readAllBytes(net.toPath()), StandardCharsets.UTF_8));
+
+			if (!el.isJsonObject() || !el.getAsJsonObject().has("qkd")) return false;
+			JsonElement q = el.getAsJsonObject().get("qkd");
+
+			return q.isJsonObject() && q.getAsJsonObject().has("enabled") && q.getAsJsonObject().get("enabled").getAsBoolean();
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	/** Resolves baseName.json first and then the legacy extensionless name. */
+	private static File findConfigFile(File dir, String baseName) {
+		File json = new File(dir, baseName + ".json");
+
+		if (json.isFile()) return json;
+		File legacy = new File(dir, baseName);
+
+		return legacy.isFile() ? legacy : null;
+	}
+
+	/**
      * Removes the legacy blocks from {@code physicalLayer} (in place) and returns
      * the grouped {@code qkdPhysicalLayer} object.
      */
-    public static JsonObject split(JsonObject physicalLayer) {
-        JsonObject q = physicalLayer.has("qkdPhysical") && physicalLayer.get("qkdPhysical").isJsonObject()
-                ? physicalLayer.getAsJsonObject("qkdPhysical") : new JsonObject();
-        JsonObject r = physicalLayer.has("qkdReceiver") && physicalLayer.get("qkdReceiver").isJsonObject()
-                ? physicalLayer.getAsJsonObject("qkdReceiver") : new JsonObject();
-        physicalLayer.remove("qkdPhysical");
-        physicalLayer.remove("qkdReceiver");
-        JsonObject out = new JsonObject();
-        out.add("source", pick(q, "meanPhotonNumber", "pulseIntervalPs", "qchPowerDbm", "qchBandwidthGHz"));
-        out.add("protocol", pick(q, "errorCorrectionInefficiency", "misalignmentError"));
-        JsonObject det = pick(q, "detectorEfficiency", "darkCountProbability");
-        for (Map.Entry<String, JsonElement> e : pick(r, "detectorGateWindowPs", "receiverOpticalEfficiency").entrySet())
-            det.add(e.getKey(), e.getValue());
-        out.add("detector", det);
-        out.add("fiber", pick(q, "attenuationFloorDbPerKm", "attenuationQuadraticDbPerKmNm2", "attenuationCenterNm"));
-        out.add("crosstalk", pick(r, "intercoreCrosstalkEnabled", "receiverTransferModel"));
-        return out;
-    }
+	public static JsonObject split(JsonObject physicalLayer) {
+		JsonObject q = physicalLayer.has("qkdPhysical") && physicalLayer.get("qkdPhysical").isJsonObject()
+				? physicalLayer.getAsJsonObject("qkdPhysical") : new JsonObject();
+		JsonObject r = physicalLayer.has("qkdReceiver") && physicalLayer.get("qkdReceiver").isJsonObject()
+				? physicalLayer.getAsJsonObject("qkdReceiver") : new JsonObject();
+		physicalLayer.remove("qkdPhysical");
+		physicalLayer.remove("qkdReceiver");
+		JsonObject out = new JsonObject();
+		out.add("source", pick(q, "meanPhotonNumber", "pulseIntervalPs", "qchPowerDbm", "qchBandwidthGHz"));
+		out.add("protocol", pick(q, "errorCorrectionInefficiency", "misalignmentError"));
+		JsonObject det = pick(q, "detectorEfficiency", "darkCountProbability");
 
-    private static JsonObject pick(JsonObject from, String... keys) {
-        JsonObject o = new JsonObject();
-        for (String k : keys) if (from.has(k)) o.add(k, from.get(k));
-        return o;
-    }
+		for (Map.Entry<String, JsonElement> e : pick(r, "detectorGateWindowPs", "receiverOpticalEfficiency").entrySet())
+			det.add(e.getKey(), e.getValue());
+		out.add("detector", det);
+		out.add("fiber", pick(q, "attenuationFloorDbPerKm", "attenuationQuadraticDbPerKmNm2", "attenuationCenterNm"));
+		out.add("crosstalk", pick(r, "intercoreCrosstalkEnabled", "receiverTransferModel"));
+
+		return out;
+	}
+
+	private static JsonObject pick(JsonObject from, String... keys) {
+		JsonObject o = new JsonObject();
+
+		for (String k : keys) if (from.has(k)) o.add(k, from.get(k));
+
+		return o;
+	}
 }

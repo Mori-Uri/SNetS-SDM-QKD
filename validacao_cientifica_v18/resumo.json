@@ -1,0 +1,60 @@
+{
+  "parameters": {
+    "alpha_field_per_m": 2.3025850929940463e-05,
+    "alpha_power_per_m": 4.605170185988093e-05,
+    "beta2_s2_per_m": 2.13e-26,
+    "gamma_Wminus1_mminus1": 0.0013,
+    "span_m": 100000.0,
+    "bandwidth_hz": 32000000000.0,
+    "spacing_hz": 33600000000.0,
+    "channels": 15,
+    "phi": 1.0,
+    "xi": 1.592605298066217e+23,
+    "leff_m": 21497.576854210958
+  },
+  "gn_normalized_1span_db": 30.145822690371208,
+  "egn_normalized_1span_db": 28.086034039150537,
+  "gn_normalized_50span_db": 47.1355227337314,
+  "egn_normalized_50span_db": 45.07573408251073,
+  "reference_approx_errors_max_db": 0.14582269037121165,
+  "johannisson_narrow": [
+    {
+      "bandwidth_ghz": 12.5,
+      "delta_ghz": 33.6,
+      "rho": 0.7132695605325986,
+      "sci_eq11_w_hz": 1.4382283772771948e-07,
+      "sci_eq16_w_hz": -1.1244770498245942e-07,
+      "xci_eq11_w_hz": 1.0447317528678713e-07,
+      "xci_eq16_w_hz": 1.2526337654475295e-07,
+      "sci_ratio_16_over_11": -0.7818487436281962,
+      "xci_ratio_16_over_11": 1.1990003768995732
+    },
+    {
+      "bandwidth_ghz": 25.0,
+      "delta_ghz": 33.6,
+      "rho": 2.8530782421303944,
+      "sci_eq11_w_hz": 5.277244376766352e-08,
+      "sci_eq16_w_hz": 4.3611811034412033e-08,
+      "xci_eq11_w_hz": 2.955229548633895e-08,
+      "xci_eq16_w_hz": 3.251089253560695e-08,
+      "sci_ratio_16_over_11": 0.826412572940867,
+      "xci_ratio_16_over_11": 1.100113950560479
+    }
+  ],
+  "direct_double_integral": [
+    {
+      "bandwidth_ghz": 12.5,
+      "direct_double_integral": 5.401237723451797e+19,
+      "analytical_eq15_integral": 5.401237723451795e+19,
+      "relative_error": 3.033378799244814e-16
+    },
+    {
+      "bandwidth_ghz": 25.0,
+      "direct_double_integral": 1.222277184605457e+20,
+      "analytical_eq15_integral": 1.2222771846054563e+20,
+      "relative_error": 5.36179524787208e-16
+    }
+  ],
+  "xt_figure23_normalized": 0.4,
+  "xt_if_guard_included": 0.5
+}

@@ -22,377 +22,348 @@ import util.RandGenerator;
  */
 public class Mesh implements Serializable {
 
-    private Vector<Node> nodeList;
-    private Vector<Link> linkList;
-    private Vector<Pair> pairList;
+	private Vector<Node> nodeList;
+	private Vector<Link> linkList;
+	private Vector<Pair> pairList;
 
-    private int guarBand;
+	private int guarBand;
 
-    private PhysicalLayer physicalLayer;
-    private OthersConfig othersConfig;
+	private PhysicalLayer physicalLayer;
+	private OthersConfig othersConfig;
 
-    private double totalPowerConsumption;
-    private double totalPowerConsumptionTransponders;
-    private double totalPowerConsumptionOXCs;
-    private double totalPowerConsumptionAmplifiers;
-    private double totalDataTransmitted;
+	private double totalPowerConsumption;
+	private double totalPowerConsumptionTransponders;
+	private double totalPowerConsumptionOXCs;
+	private double totalPowerConsumptionAmplifiers;
+	private double totalDataTransmitted;
 
-    private List<Modulation> avaliableModulations;
-    private HashMap<String, HashMap<Double, Double>> modTrDistance;
+	private List<Modulation> avaliableModulations;
+	private HashMap<String, HashMap<Double, Double>> modTrDistance;
 
-    private Util util;
+	private Util util;
 
-    /**
+	/**
      * Creates a new instance of Mesh.
      *
      * @param nc NetworkConfig
      * @param tc TrafficConfig
      */
-    public Mesh(NetworkConfig nc, TrafficConfig tc, PhysicalLayerConfig plc, OthersConfig oc, HashMap<String, HashMap<Double, Double>> modTrDistance, Util util) {
-        this(nc, tc, plc, oc, modTrDistance, util, null);
-    }
+	public Mesh(NetworkConfig nc, TrafficConfig tc, PhysicalLayerConfig plc, OthersConfig oc, HashMap<String, HashMap<Double, Double>> modTrDistance, Util util) {
+		this(nc, tc, plc, oc, modTrDistance, util, null);
+	}
 
-    /**
+	/**
      * Optional deterministic traffic seed used by experiment scenarios. When
      * null, the original SNetS behavior (time-based Random seed) is preserved.
      */
-    public Mesh(NetworkConfig nc, TrafficConfig tc, PhysicalLayerConfig plc, OthersConfig oc,
-            HashMap<String, HashMap<Double, Double>> modTrDistance, Util util,
-            Long trafficRandomSeed) {
-        this.util = util;
-        this.guarBand = nc.getGuardBand();
-        this.othersConfig = oc;
+	public Mesh(NetworkConfig nc, TrafficConfig tc, PhysicalLayerConfig plc, OthersConfig oc,
+			HashMap<String, HashMap<Double, Double>> modTrDistance, Util util,
+			Long trafficRandomSeed) {
+		this.util = util;
+		this.guarBand = nc.getGuardBand();
+		this.othersConfig = oc;
 
-        RandGenerator randGenerator = trafficRandomSeed == null
-                ? new RandGenerator() : new RandGenerator(trafficRandomSeed.longValue());
-        HashMap<String, Node> nodesAux = new HashMap<>();
+		RandGenerator randGenerator = trafficRandomSeed == null
+				? new RandGenerator() : new RandGenerator(trafficRandomSeed.longValue());
+		HashMap<String, Node> nodesAux = new HashMap<>();
 
-        // Create nodes
-        this.nodeList = new Vector<>();
-        for (NetworkConfig.NodeConfig nodeConf : nc.getNodes()) {
-            Node aux = new Node(nodeConf.getName(), nodeConf.getTransmitters(), nodeConf.getReceivers(), nodeConf.getRegenerators(),nc.getBvtSpectralAmplitude());
-            this.nodeList.add(aux);
-            nodesAux.put(aux.getName(), aux);
-        }
+		// Create nodes
+		this.nodeList = new Vector<>();
 
-        // Create links
-        this.linkList = new Vector<>();
-        for (NetworkConfig.LinkConfig linkConf : nc.getLinks()) {
-            Link lAux = new Link(nodesAux.get(linkConf.getSource()).getOxc(), nodesAux.get(linkConf.getDestination()).getOxc(), linkConf.getSlots(), linkConf.getSpectrum(), linkConf.getSize(), nc.getCores());
-            linkList.add(lAux);
-            nodesAux.get(linkConf.getSource()).getOxc().addLink(lAux);
-        }
+		for (NetworkConfig.NodeConfig nodeConf : nc.getNodes()) {
+			Node aux = new Node(nodeConf.getName(), nodeConf.getTransmitters(), nodeConf.getReceivers(), nodeConf.getRegenerators(),nc.getBvtSpectralAmplitude());
+			this.nodeList.add(aux);
+			nodesAux.put(aux.getName(), aux);
+		}
 
-        // Create the pairs
-        this.pairList = new Vector<>();
-        HashMap<String, HashMap<String, Pair>> pairsAux = new HashMap<>();
-        for (Node src : this.nodeList) {
-            pairsAux.put(src.getName(), new HashMap<>());
-            for (Node dest : this.nodeList) {
-                if(!src.equals(dest)) {
-                    Pair pAux = new Pair(src, dest);
-                    pairList.add(pAux);
-                    pairsAux.get(src.getName()).put(dest.getName(), pAux);
-                }
-            }
-        }
+		// Create links
+		this.linkList = new Vector<>();
 
-        // Add request generators in pairs
-        for (TrafficConfig.RequestGeneratorConfig rgc : tc.getRequestGenerators()) {
-            Pair p = pairsAux.get(rgc.getSource()).get(rgc.getDestination());
-            p.addRequestGenerator(new RequestGenerator(p, rgc.getBitRate(), rgc.getHoldRate(), rgc.getArrivalRate(), rgc.getArrivalRateIncrease(), randGenerator));
-            util.bitRateList.add(rgc.getBitRate()); //Used to write to the archive the results of the simulation
-        }
+		for (NetworkConfig.LinkConfig linkConf : nc.getLinks()) {
+			Link lAux = new Link(nodesAux.get(linkConf.getSource()).getOxc(), nodesAux.get(linkConf.getDestination()).getOxc(), linkConf.getSlots(), linkConf.getSpectrum(), linkConf.getSize(), nc.getCores());
+			linkList.add(lAux);
+			nodesAux.get(linkConf.getSource()).getOxc().addLink(lAux);
+		}
 
-        // Information related to the physical layer of the network
-        this.physicalLayer = new PhysicalLayer(plc, this, util);
+		// Create the pairs
+		this.pairList = new Vector<>();
+		HashMap<String, HashMap<String, Pair>> pairsAux = new HashMap<>();
 
-        // Instance the modulation formats
-        this.avaliableModulations = new ArrayList<>();
-        for (NetworkConfig.ModulationConfig modConf : nc.getModulations()) {
-        	Modulation mod = new Modulation(modConf.getName(), modConf.getMaxRange(), modConf.getM(), modConf.getSNR(), plc.getRateOfFEC(), linkList.get(0).getCore(0).getSlotSpectrumBand(), physicalLayer.getPolarizationModes(), modConf.getXT());
-        	avaliableModulations.add(mod);
-        }
+		for (Node src : this.nodeList) {
+			pairsAux.put(src.getName(), new HashMap<>());
 
-        if (avaliableModulations.isEmpty()) {
-        	this.avaliableModulations = ModulationSelector.configureModulations(this);
-        }
+			for (Node dest : this.nodeList) {
+				if(!src.equals(dest)) {
+					Pair pAux = new Pair(src, dest);
+					pairList.add(pAux);
+					pairsAux.get(src.getName()).put(dest.getName(), pAux);
+				}
+			}
+		}
 
-        // Computing of the distances of the modulation formats
-        if (physicalLayer.isActiveQoT()) {
-        	if (modTrDistance == null) {
-        		this.modTrDistance = physicalLayer.computesModulationsDistances(this, this.avaliableModulations);
-        	} else {
-        		this.modTrDistance = modTrDistance;
-        	}
-        }
-    }
+		// Add request generators in pairs
+		for (TrafficConfig.RequestGeneratorConfig rgc : tc.getRequestGenerators()) {
+			Pair p = pairsAux.get(rgc.getSource()).get(rgc.getDestination());
+			p.addRequestGenerator(new RequestGenerator(p, rgc.getBitRate(), rgc.getHoldRate(), rgc.getArrivalRate(), rgc.getArrivalRateIncrease(), randGenerator));
+			util.bitRateList.add(rgc.getBitRate()); //Used to write to the archive the results of the simulation
+		}
 
-    /**
+		// Information related to the physical layer of the network
+		this.physicalLayer = new PhysicalLayer(plc, this, util);
+
+		// Instance the modulation formats
+		this.avaliableModulations = new ArrayList<>();
+
+		for (NetworkConfig.ModulationConfig modConf : nc.getModulations()) {
+			Modulation mod = new Modulation(modConf.getName(), modConf.getMaxRange(), modConf.getM(), modConf.getOSNRthresholdDb(), plc.getRateOfFEC(), linkList.get(0).getCore(0).getSlotSpectrumBand(), physicalLayer.getPolarizationModes(), modConf.getXT());
+			avaliableModulations.add(mod);
+		}
+
+		if (avaliableModulations.isEmpty()) {
+			this.avaliableModulations = ModulationSelector.configureModulations(this);
+		}
+
+		// Computing of the distances of the modulation formats
+		if (physicalLayer.isActiveQoT()) {
+			if (modTrDistance == null) {
+				this.modTrDistance = physicalLayer.computesModulationsDistances(this, this.avaliableModulations);
+			} else {
+				this.modTrDistance = modTrDistance;
+			}
+		}
+	}
+
+	/**
      * Returns the modulation transmission range by transmission rate
      *
      * @param modulation Modulation
      * @param bitRate double
      * @return double - max transmission range
      */
-    public double getModulationDistanceByBitRate(Modulation modulation, double bitRate) {
-    	Double distance = null;
+	public double getModulationDistanceByBitRate(Modulation modulation, double bitRate) {
+		Double distance = null;
 
-    	if (physicalLayer.isActiveQoT()) {
-    		distance = modTrDistance.get(modulation.getName()).get(bitRate);
+		if (physicalLayer.isActiveQoT()) {
+			distance = modTrDistance.get(modulation.getName()).get(bitRate);
 
-    		if(distance == null) {
-    			distance = physicalLayer.computeModulationDistanceByBitRate(modulation, bitRate, this);
-    			modTrDistance.get(modulation.getName()).put(bitRate, distance);
-    		}
+			if(distance == null) {
+				distance = physicalLayer.computeModulationDistanceByBitRate(modulation, bitRate, this);
+				modTrDistance.get(modulation.getName()).put(bitRate, distance);
+			}
 
-    	} else {
-    		distance = modulation.getMaxRange();
-    	}
+		} else {
+			distance = modulation.getMaxRange();
+		}
 
-    	return distance;
-    }
+		return distance;
+	}
 
-    /**
+	/**
      * Returns a link to a given pair of source and destination nodes
      *
      * @param source String
      * @param destination String
      * @return Link
      */
-    public Link getLink(String source, String destination) {
-        for (int i = 0; i < linkList.size(); i++) {
-            if ((linkList.get(i).getSource().getName() == source) && (linkList.get(i).getDestination().getName() == destination)) {
-                return linkList.get(i);
-            }
-        }
-        return null;
-    }
+	public Link getLink(String source, String destination) {
+		for (int i = 0; i < linkList.size(); i++) {
+			if ((linkList.get(i).getSource().getName() == source) && (linkList.get(i).getDestination().getName() == destination)) {
+				return linkList.get(i);
+			}
+		}
 
-    /**
+		return null;
+	}
+
+	/**
      * Returns a Vector with all the links.
      *
      * @return Vector<Link>
      */
-    public Vector<Link> getLinkList() {
-        return linkList;
-    }
+	public Vector<Link> getLinkList() {
+		return linkList;
+	}
 
-    /**
+	/**
      * Getter for property nodeList.
      *
      * @return Vector<Node> Vector with nodes.
      */
-    public Vector<Node> getNodeList() {
-        return nodeList;
-    }
+	public Vector<Node> getNodeList() {
+		return nodeList;
+	}
 
-    /**
+	/**
      * Find a Node based on the name
      *
      * @param name String
      * @return Node
      */
-    public Node searchNode(String name) {
-        for (int i = 0; i < this.nodeList.size(); i++) {
-            Node tmp = nodeList.get(i);
-            if (tmp.getName().equals(name)) {
-                return tmp;
-            }
-        }
-        return null;
-    }
+	public Node searchNode(String name) {
+		for (int i = 0; i < this.nodeList.size(); i++) {
+			Node tmp = nodeList.get(i);
 
-    /**
+			if (tmp.getName().equals(name)) {
+				return tmp;
+			}
+		}
+
+		return null;
+	}
+
+	/**
      * Returns the reachable nodes from a given node
      *
      * @param n Node
      * @return List<Node>
      */
-    public List<Node> getAdjacentsNodes(Node n) {
-        List<Node> res = new ArrayList<>();
-        for (Oxc o : n.getOxc().getAllAdjacents()) {
-            res.add(searchNode(o.getName()));
-        }
-        return res;
-    }
+	public List<Node> getAdjacentsNodes(Node n) {
+		List<Node> res = new ArrayList<>();
 
-    /**
+		for (Oxc o : n.getOxc().getAllAdjacents()) {
+			res.add(searchNode(o.getName()));
+		}
+
+		return res;
+	}
+
+	/**
      * Return the list of source and destination node pairs
      *
      * @return Vector<Pair> the pairList
      */
-    public Vector<Pair> getPairList() {
-        return pairList;
-    }
+	public Vector<Pair> getPairList() {
+		return pairList;
+	}
 
-    /**
+	/**
      * Returns the guard band
      *
      * @return int
      */
-    public int getGuardBand() {
-        return this.guarBand;
-    }
+	public int getGuardBand() {
+		return this.guarBand;
+	}
 
-    /**
+	/**
      * This method returns the maximum amount of slots in a link between all links in the network
      *
      * @return int
      */
-    public int maximumSlotsByLinks(){
-    	int max = 0;
-    	for (int l = 0; l < linkList.size(); l++) {
-    		for (int c = 0; c < linkList.get(l).getNumberOfCores(); c++) {
-	    		int num = linkList.get(l).getCore(c).getNumOfSlots();
-	    		if(num > max){
-	    			max = num;
-	    		}
-    		}
-    	}
-    	return max;
-    }
+	public int maximumSlotsByLinks(){
+		int max = 0;
 
-    /**
+		for (int l = 0; l < linkList.size(); l++) {
+			for (int c = 0; c < linkList.get(l).getNumberOfCores(); c++) {
+				int num = linkList.get(l).getCore(c).getNumOfSlots();
+
+				if(num > max){
+					max = num;
+				}
+			}
+		}
+
+		return max;
+	}
+
+	/**
      * This method returns the maximum amount of cores in a link between all links in the network
      *
      * @return int
      */
-    public int maximumCoresByLinks(){
-    	int max = 0;
-    	for (int l = 0; l < linkList.size(); l++) {
-    		int num = linkList.get(l).getNumberOfCores();
-    		if(num > max){
-    			max = num;
-    		}
-    	}
-    	return max;
-    }
+	public int maximumCoresByLinks(){
+		int max = 0;
 
-    /**
+		for (int l = 0; l < linkList.size(); l++) {
+			int num = linkList.get(l).getNumberOfCores();
+
+			if(num > max){
+				max = num;
+			}
+		}
+
+		return max;
+	}
+
+	/**
      * Returns the physical layer configuration of the network
      *
      * @return PhysicalLayer
      */
-    public PhysicalLayer getPhysicalLayer(){
-    	return physicalLayer;
-    }
+	public PhysicalLayer getPhysicalLayer(){
+		return physicalLayer;
+	}
 
-    /**
+	/**
      * Returns the others configuration
      *
      * @return OthersConfig
      */
-    public OthersConfig getOthersConfig() {
-        return othersConfig;
-    }
+	public OthersConfig getOthersConfig() {
+		return othersConfig;
+	}
 
-    /**
+	/**
      * Returns the total power consumption
      *
      * @return double
      */
-    public double getTotalPowerConsumption() {
-        ensurePowerConsumption(); // Parte 54
-        return totalPowerConsumption;
-    }
+	public double getTotalPowerConsumption() {
+		return totalPowerConsumption;
+	}
 
-    /**
+	/**
      * Returns the total power consumption by transponders
      *
      * @return double
      */
-    public double getTotalPowerConsumptionTransponders() {
-        ensurePowerConsumption(); // Parte 54
-        return totalPowerConsumptionTransponders;
-    }
+	public double getTotalPowerConsumptionTransponders() {
+		return totalPowerConsumptionTransponders;
+	}
 
-    /**
+	/**
      * Returns the total power consumption by OXCs
      *
      * @return double
      */
-    public double getTotalPowerConsumptionOXCs() {
-        ensurePowerConsumption(); // Parte 54
-        return totalPowerConsumptionOXCs;
-    }
+	public double getTotalPowerConsumptionOXCs() {
+		return totalPowerConsumptionOXCs;
+	}
 
-    /**
+	/**
      * Returns the total power consumption by amplifiers
      *
      * @return double
      */
-    public double getTotalPowerConsumptionAmplifiers() {
-        ensurePowerConsumption(); // Parte 54
-        return totalPowerConsumptionAmplifiers;
-    }
+	public double getTotalPowerConsumptionAmplifiers() {
+		return totalPowerConsumptionAmplifiers;
+	}
 
-    /**
+	/**
      * Computes the total power consumption
      *
      * @param cp ControlPlane
      */
-    public void computesPowerConsmption(ControlPlane cp) {
-    	// Parte 54 (desempenho): the totals are read only by the ConsumedEnergy metric, once per request, but were
-    	// recomputed over the whole network at every allocation and release. Now this call only marks them as out of
-    	// date, and they are computed when read, from the same network state (every change of the state calls this
-    	// method before the next read). With -Dsnets.verifyPerf=true they are also computed here and compared when read.
-    	if (simulator.PerfChecks.ENABLED) {
-    		powerConsumptionCp = cp;
-    		powerConsumptionDirty = true;
-    		if (!simulator.PerfChecks.VERIFY) {
-    			return;
-    		}
-    	}
-    	computePowerConsumptionNow(cp);
-    }
+	public void computesPowerConsmption(ControlPlane cp) {
+		totalPowerConsumptionTransponders = EnergyConsumption.computeTranspondersPowerConsumption(cp);
+		totalPowerConsumptionOXCs = EnergyConsumption.computeOxcsPowerConsumption(nodeList);
+		totalPowerConsumptionAmplifiers = EnergyConsumption.computeLinksPowerConsumption(linkList, cp);
 
-    /** Parte 54: control plane of the pending computation of the totals, and whether they are out of date. */
-    private ControlPlane powerConsumptionCp;
-    private boolean powerConsumptionDirty;
+		totalPowerConsumption = totalPowerConsumptionTransponders + totalPowerConsumptionOXCs + totalPowerConsumptionAmplifiers;
 
-    /** Parte 54: computes the totals if they are out of date (see computesPowerConsmption). */
-    private void ensurePowerConsumption() {
-    	if (!powerConsumptionDirty) {
-    		return;
-    	}
-    	powerConsumptionDirty = false;
-    	if (simulator.PerfChecks.VERIFY) {
-    		final double[] eager = { totalPowerConsumptionTransponders, totalPowerConsumptionOXCs,
-    				totalPowerConsumptionAmplifiers, totalPowerConsumption, totalDataTransmitted };
-    		computePowerConsumptionNow(powerConsumptionCp);
-    		simulator.PerfChecks.same(eager[0], totalPowerConsumptionTransponders, "consumo dos transponders");
-    		simulator.PerfChecks.same(eager[1], totalPowerConsumptionOXCs, "consumo dos OXCs");
-    		simulator.PerfChecks.same(eager[2], totalPowerConsumptionAmplifiers, "consumo dos amplificadores");
-    		simulator.PerfChecks.same(eager[3], totalPowerConsumption, "consumo total");
-    		simulator.PerfChecks.same(eager[4], totalDataTransmitted, "dados transmitidos");
-    		return;
-    	}
-    	computePowerConsumptionNow(powerConsumptionCp);
-    }
+		totalDataTransmitted = cp.getDataTransmitted();
+	}
 
-    /** The original computation of the totals. */
-    private void computePowerConsumptionNow(ControlPlane cp) {
-    	totalPowerConsumptionTransponders = EnergyConsumption.computeTranspondersPowerConsumption(cp);
-    	totalPowerConsumptionOXCs = EnergyConsumption.computeOxcsPowerConsumption(nodeList);
-    	totalPowerConsumptionAmplifiers = EnergyConsumption.computeLinksPowerConsumption(linkList, cp);
-
-    	totalPowerConsumption = totalPowerConsumptionTransponders + totalPowerConsumptionOXCs + totalPowerConsumptionAmplifiers;
-
-    	totalDataTransmitted = cp.getDataTransmitted();
-    }
-
-    /**
+	/**
      * Returns the total data transmitted
      *
      * @return double
      */
-    public double getTotalDataTransmitted() {
-    	ensurePowerConsumption(); // Parte 54
-    	return totalDataTransmitted;
-    }
+	public double getTotalDataTransmitted() {
+		return totalDataTransmitted;
+	}
 
-    /**
+	/**
      * Returns the avaliableModulations
      *
      * @return List<Modulation> avaliableModulations
@@ -424,8 +395,8 @@ public class Mesh implements Serializable {
 	 *
 	 * @return util
 	 */
-    public Util getUtil() {
-        return util;
-    }
+	public Util getUtil() {
+		return util;
+	}
 
 }

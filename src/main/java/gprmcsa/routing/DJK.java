@@ -23,121 +23,124 @@ import simulationControl.Util;
  */
 public class DJK implements RoutingAlgorithmInterface {
 
-    private static final String DIV = "-";
+	private static final String DIV = "-";
 
-    private HashMap<String, Route> routesForAllPairs;
+	private HashMap<String, Route> routesForAllPairs;
 
-    private Util util;
+	private Util util;
 
-    /**
+	/**
      * Finds the route.
      * @param circuit the circuit.
      * @param mesh the mesh.
      * @return true if the condition is met; false otherwise.
      */
-    @Override
-    public boolean findRoute(Circuit circuit, Mesh mesh) {
-        if (routesForAllPairs == null) {
-        	this.util = mesh.getUtil();
-        	computeAllRoutes(mesh);
-        	salveRoutesByPar(mesh.getNodeList());
-        }
+	@Override
+	public boolean findRoute(Circuit circuit, Mesh mesh) {
+		if (routesForAllPairs == null) {
+			this.util = mesh.getUtil();
+			computeAllRoutes(mesh);
+			salveRoutesByPar(mesh.getNodeList());
+		}
 
-        Node source = circuit.getSource();
-        Node destination = circuit.getDestination();
+		Node source = circuit.getSource();
+		Node destination = circuit.getDestination();
 
-        Route route = routesForAllPairs.get(source.getName() + DIV + destination.getName());
+		Route route = routesForAllPairs.get(source.getName() + DIV + destination.getName());
 
-        if (route != null) {
-            circuit.setRoute(route);
-            return true;
-        }
+		if (route != null) {
+			circuit.setRoute(route);
 
-        return false;
-    }
+			return true;
+		}
 
-    /**
+		return false;
+	}
+
+	/**
      * Computes the smallest paths for each pair
      *
      * @param mesh Mesh
      */
-    private void computeAllRoutes(Mesh mesh) {
-        routesForAllPairs = new HashMap<String, Route>();
-        for (Node n1 : mesh.getNodeList()) {
-            shortestPaths(n1, mesh);
-        }
-    }
+	private void computeAllRoutes(Mesh mesh) {
+		routesForAllPairs = new HashMap<String, Route>();
 
-    /**
+		for (Node n1 : mesh.getNodeList()) {
+			shortestPaths(n1, mesh);
+		}
+	}
+
+	/**
      * Calculates the smallest route between a source node and all other nodes in the network
      * Dijkstra's algorithm
      *
      * @param source Node
      * @param mesh  Mesh
      */
-    private void shortestPaths(Node source, Mesh mesh) {
-        HashMap<Node, Double> undefined = new HashMap<>(); //Current distances from the nodes to the origin
-        HashMap<Node, Vector<Node>> routes = new HashMap<>(); //Current routes from source to each node
+	private void shortestPaths(Node source, Mesh mesh) {
+		HashMap<Node, Double> undefined = new HashMap<>(); //Current distances from the nodes to the origin
+		HashMap<Node, Vector<Node>> routes = new HashMap<>(); //Current routes from source to each node
 
-        for (Node n : mesh.getNodeList()) { //Signaling infinite distance to all nodes in the network
-            undefined.put(n, Double.POSITIVE_INFINITY);
-        }
+		for (Node n : mesh.getNodeList()) { //Signaling infinite distance to all nodes in the network
+			undefined.put(n, Double.POSITIVE_INFINITY);
+		}
 
-        undefined.put(source, 0.0); //Distance 0 from the source node to itself
-        Node nAux1;
-        Vector<Node> rAux;
+		undefined.put(source, 0.0); //Distance 0 from the source node to itself
+		Node nAux1;
+		Vector<Node> rAux;
 
-        nAux1 = source;
-        rAux = new Vector<>();
-        rAux.add(nAux1);
-        routes.put(nAux1, rAux);
+		nAux1 = source;
+		rAux = new Vector<>();
+		rAux.add(nAux1);
+		routes.put(nAux1, rAux);
 
-        while (!undefined.isEmpty()) {
-            nAux1 = minDistAt(undefined);
+		while (!undefined.isEmpty()) {
+			nAux1 = minDistAt(undefined);
 
-            //Open the vertex
-            for (Node n : mesh.getAdjacentsNodes(nAux1)) {
-                if (!undefined.containsKey(n)) continue;
+			//Open the vertex
+			for (Node n : mesh.getAdjacentsNodes(nAux1)) {
+				if (!undefined.containsKey(n)) continue;
 
-                rAux = (Vector<Node>) routes.get(nAux1).clone();
-                rAux.add(n);
+				rAux = (Vector<Node>) routes.get(nAux1).clone();
+				rAux.add(n);
 
-                //Check if it is necessary to update the route
-                if (undefined.get(n) == null || undefined.get(n) > undefined.get(nAux1) + mesh.getLink(nAux1.getName(), n.getName()).getDistance()) {
-                    undefined.put(n, undefined.get(nAux1) + mesh.getLink(nAux1.getName(), n.getName()).getDistance());
-                    routes.put(n, rAux);
-                }
-            }
-            Double removed = undefined.remove(nAux1); //Closing the vertex
+				//Check if it is necessary to update the route
+				if (undefined.get(n) == null || undefined.get(n) > undefined.get(nAux1) + mesh.getLink(nAux1.getName(), n.getName()).getDistance()) {
+					undefined.put(n, undefined.get(nAux1) + mesh.getLink(nAux1.getName(), n.getName()).getDistance());
+					routes.put(n, rAux);
+				}
+			}
 
-            routesForAllPairs.put(source.getName() + DIV + nAux1.getName(), new Route(routes.get(nAux1)));
+			Double removed = undefined.remove(nAux1); //Closing the vertex
 
-            //System.out.println("closed: " + nAux1.getName() + "    size: " + undefined.keySet().size() + "   removed: " + removed);
-        }
-    }
+			routesForAllPairs.put(source.getName() + DIV + nAux1.getName(), new Route(routes.get(nAux1)));
 
-    /**
+			//System.out.println("closed: " + nAux1.getName() + "    size: " + undefined.keySet().size() + "   removed: " + removed);
+		}
+	}
+
+	/**
      * Selects the node with the lowest current distance
      *
      * @param undefined HashMap<Node, Double>
      * @return Node
      */
-    private Node minDistAt(HashMap<Node, Double> undefined) {
+	private Node minDistAt(HashMap<Node, Double> undefined) {
 
-        Iterator<Node> it = undefined.keySet().iterator();
+		Iterator<Node> it = undefined.keySet().iterator();
 
-        Node res = it.next();
-        Node aux;
-        while (it.hasNext()) {
-            aux = it.next();
+		Node res = it.next();
+		Node aux;
+		while (it.hasNext()) {
+			aux = it.next();
 
-            if (undefined.get(res) > undefined.get(aux)) res = aux;
-        }
+			if (undefined.get(res) > undefined.get(aux)) res = aux;
+		}
 
-        return res;
-    }
+		return res;
+	}
 
-    /**
+	/**
 	 * Returns the route list for all pairs
 	 *
 	 * @return Vector<Route>
@@ -146,42 +149,45 @@ public class DJK implements RoutingAlgorithmInterface {
 		return routesForAllPairs;
 	}
 
-    /**
+	/**
      * This method saves in files the routes for all the pairs.
      *
      * @param nodeList Vector<Node>
      */
-    private void salveRoutesByPar(Vector<Node> nodeList) {
-    	List<String> routesList = new ArrayList<String>();
+	private void salveRoutesByPar(Vector<Node> nodeList) {
+		List<String> routesList = new ArrayList<String>();
 
-    	int numNodes = nodeList.size();
-        for(int i = 1; i <= numNodes; i++){
-    	    for(int j = 1; j <= numNodes; j++){
+		int numNodes = nodeList.size();
 
-    		    if(i != j){
-	      		    String pair = i + DIV + j;
+		for(int i = 1; i <= numNodes; i++){
+			for(int j = 1; j <= numNodes; j++){
 
-		        	Route rota = routesForAllPairs.get(pair);
-		        	StringBuilder sb = new StringBuilder();
-		        	for(int n = 0; n < rota.getNodeList().size(); n++){
-		        		sb.append(rota.getNodeList().get(n).getName());
-		        		if(n < rota.getNodeList().size() - 1){
-		        			sb.append("-");
-		        		}
-		        	}
+				if(i != j){
+					String pair = i + DIV + j;
 
-		        	routesList.add(sb.toString());
-    		    }
-    	    }
-        }
+					Route rota = routesForAllPairs.get(pair);
+					StringBuilder sb = new StringBuilder();
 
-        Gson gson = new GsonBuilder().create();
-        String json = gson.toJson(routesList);
+					for(int n = 0; n < rota.getNodeList().size(); n++){
+						sb.append(rota.getNodeList().get(n).getName());
 
-        try {
-        	String separator = System.getProperty("file.separator");
+						if(n < rota.getNodeList().size() - 1){
+							sb.append("-");
+						}
+					}
 
-        	FileWriter fw = new FileWriter(util.projectPath + separator + "routesByPar.txt");
+					routesList.add(sb.toString());
+				}
+			}
+		}
+
+		Gson gson = new GsonBuilder().create();
+		String json = gson.toJson(routesList);
+
+		try {
+			String separator = System.getProperty("file.separator");
+
+			FileWriter fw = new FileWriter(util.projectPath + separator + "routesByPar.txt");
 			BufferedWriter out = new BufferedWriter(fw);
 
 			out.append(json);
@@ -189,9 +195,9 @@ public class DJK implements RoutingAlgorithmInterface {
 			out.close();
 			fw.close();
 
-        } catch (Exception ex) {
-        	ex.printStackTrace();
-        }
-    }
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+	}
 
 }

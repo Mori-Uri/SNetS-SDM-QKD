@@ -16,103 +16,108 @@ import qkd.network.QKDRoutePlan;
  */
 public final class QKDRoutePhysicalResult implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private final QKDRoutePlan routePlan;
-    private final List<QKDSpanPhysicalResult> spanResults;
-    private final boolean viable;
-    private final double minimumSecretKeyRateBps;
-    private final double maximumQber;
-    private final int bottleneckSpanIndex;
+	private final QKDRoutePlan routePlan;
+	private final List<QKDSpanPhysicalResult> spanResults;
+	private final boolean viable;
+	private final double minimumSecretKeyRateBps;
+	private final double maximumQber;
+	private final int bottleneckSpanIndex;
 
-    public QKDRoutePhysicalResult(
-            QKDRoutePlan routePlan,
-            List<QKDSpanPhysicalResult> spanResults) {
+	public QKDRoutePhysicalResult(
+			QKDRoutePlan routePlan,
+			List<QKDSpanPhysicalResult> spanResults) {
 
-        if (routePlan == null) {
-            throw new IllegalArgumentException("routePlan cannot be null");
-        }
-        if (spanResults == null || spanResults.isEmpty()) {
-            throw new IllegalArgumentException("spanResults cannot be null/empty");
-        }
-        if (spanResults.size() != routePlan.getTotalSpanCount()) {
-            throw new IllegalArgumentException(
-                    "spanResults size differs from QKD route span count");
-        }
+		if (routePlan == null) {
+			throw new IllegalArgumentException("routePlan cannot be null");
+		}
 
-        this.routePlan = routePlan;
-        this.spanResults = Collections.unmodifiableList(
-                new ArrayList<QKDSpanPhysicalResult>(spanResults));
+		if (spanResults == null || spanResults.isEmpty()) {
+			throw new IllegalArgumentException("spanResults cannot be null/empty");
+		}
 
-        boolean allViable = true;
-        double minSkr = Double.POSITIVE_INFINITY;
-        double maxQberSeen = 0.0;
-        int bottleneck = -1;
+		if (spanResults.size() != routePlan.getTotalSpanCount()) {
+			throw new IllegalArgumentException(
+					"spanResults size differs from QKD route span count");
+		}
 
-        for (int i = 0; i < spanResults.size(); i++) {
-            QKDSpanPhysicalResult result = spanResults.get(i);
-            if (result == null) {
-                throw new IllegalArgumentException(
-                        "spanResults cannot contain null");
-            }
-            allViable &= result.isViable();
+		this.routePlan = routePlan;
+		this.spanResults = Collections.unmodifiableList(
+				new ArrayList<QKDSpanPhysicalResult>(spanResults));
 
-            if (result.getSecretKeyRateBps() < minSkr) {
-                minSkr = result.getSecretKeyRateBps();
-                bottleneck = i;
-            }
-            if (result.getQber() > maxQberSeen) {
-                maxQberSeen = result.getQber();
-            }
-        }
+		boolean allViable = true;
+		double minSkr = Double.POSITIVE_INFINITY;
+		double maxQberSeen = 0.0;
+		int bottleneck = -1;
 
-        this.viable = allViable;
-        this.minimumSecretKeyRateBps = minSkr;
-        this.maximumQber = maxQberSeen;
-        this.bottleneckSpanIndex = bottleneck;
-    }
+		for (int i = 0; i < spanResults.size(); i++) {
+			QKDSpanPhysicalResult result = spanResults.get(i);
 
-    public QKDRoutePlan getRoutePlan() {
-        return routePlan;
-    }
+			if (result == null) {
+				throw new IllegalArgumentException(
+						"spanResults cannot contain null");
+			}
 
-    public List<QKDSpanPhysicalResult> getSpanResults() {
-        return spanResults;
-    }
+			allViable &= result.isViable();
 
-    public boolean isViable() {
-        return viable;
-    }
+			if (result.getSecretKeyRateBps() < minSkr) {
+				minSkr = result.getSecretKeyRateBps();
+				bottleneck = i;
+			}
 
-    public double getMinimumSecretKeyRateBps() {
-        return minimumSecretKeyRateBps;
-    }
+			if (result.getQber() > maxQberSeen) {
+				maxQberSeen = result.getQber();
+			}
+		}
 
-    public double getMinimumSecretKeyRateMbps() {
-        return minimumSecretKeyRateBps / 1e6;
-    }
+		this.viable = allViable;
+		this.minimumSecretKeyRateBps = minSkr;
+		this.maximumQber = maxQberSeen;
+		this.bottleneckSpanIndex = bottleneck;
+	}
 
-    public double getMaximumQber() {
-        return maximumQber;
-    }
+	public QKDRoutePlan getRoutePlan() {
+		return routePlan;
+	}
 
-    public int getBottleneckSpanIndex() {
-        return bottleneckSpanIndex;
-    }
+	public List<QKDSpanPhysicalResult> getSpanResults() {
+		return spanResults;
+	}
 
-    public QKDSpanPhysicalResult getBottleneckSpan() {
-        return spanResults.get(bottleneckSpanIndex);
-    }
+	public boolean isViable() {
+		return viable;
+	}
 
-    @Override
-    public String toString() {
-        return "QKDRoutePhysicalResult{" +
-                routePlan.getSource() + "->" + routePlan.getDestination() +
-                ", spans=" + spanResults.size() +
-                ", minSKR_Mbps=" + getMinimumSecretKeyRateMbps() +
-                ", maxQBER=" + maximumQber +
-                ", bottleneckSpanIndex=" + bottleneckSpanIndex +
-                ", viable=" + viable +
-                '}';
-    }
+	public double getMinimumSecretKeyRateBps() {
+		return minimumSecretKeyRateBps;
+	}
+
+	public double getMinimumSecretKeyRateMbps() {
+		return minimumSecretKeyRateBps / 1e6;
+	}
+
+	public double getMaximumQber() {
+		return maximumQber;
+	}
+
+	public int getBottleneckSpanIndex() {
+		return bottleneckSpanIndex;
+	}
+
+	public QKDSpanPhysicalResult getBottleneckSpan() {
+		return spanResults.get(bottleneckSpanIndex);
+	}
+
+	@Override
+	public String toString() {
+		return "QKDRoutePhysicalResult{" +
+				routePlan.getSource() + "->" + routePlan.getDestination() +
+				", spans=" + spanResults.size() +
+				", minSKR_Mbps=" + getMinimumSecretKeyRateMbps() +
+				", maxQBER=" + maximumQber +
+				", bottleneckSpanIndex=" + bottleneckSpanIndex +
+				", viable=" + viable +
+				'}';
+	}
 }

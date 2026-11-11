@@ -10,30 +10,31 @@ import java.io.Serializable;
 public class Regenerators implements Serializable {
 
 	private int regenUtilization;
-    private int numRegenerators;
+	private int numRegenerators;
 
-    /**
+	/**
      * Creates a new instance of Regenerators.
      * @param numberOfRegenerators the numberOfRegenerators.
      */
-    public Regenerators(int numberOfRegenerators){
-    	this.regenUtilization = 0;
-    	this.numRegenerators = numberOfRegenerators;
-    }
+	public Regenerators(int numberOfRegenerators){
+		this.regenUtilization = 0;
+		this.numRegenerators = numberOfRegenerators;
+	}
 
-    /**
+	/**
      * Returns the allocates regenerators.
      * @param circuit the circuit.
      * @return true if the condition is met; false otherwise.
      */
-    public boolean allocatesRegenerators(Circuit circuit){
-    	int numberOfRegenerators = getAmountOfRequiredRegenerators(circuit);
+	public boolean allocatesRegenerators(Circuit circuit){
+		int numberOfRegenerators = getAmountOfRequiredRegenerators(circuit);
 
-    	if(quantRegeneratorsFree() >= numberOfRegenerators){
-    		regenUtilization += numberOfRegenerators;
+		if(quantRegeneratorsFree() >= numberOfRegenerators){
+			regenUtilization += numberOfRegenerators;
 
-    		return true;
-    	}
+			return true;
+		}
+
 		return false;
 	}
 
@@ -50,6 +51,7 @@ public class Regenerators implements Serializable {
 
 			return true;
 		}
+
 		return false;
 	}
 
@@ -97,11 +99,12 @@ public class Regenerators implements Serializable {
 	 * @return boolean
 	 */
 	public boolean canRegenerate(int numberOfRegenerators) {
-        if (quantRegeneratorsFree() >= numberOfRegenerators) {
-            return true;
-        }
-        return false;
-    }
+		if (quantRegeneratorsFree() >= numberOfRegenerators) {
+			return true;
+		}
+
+		return false;
+	}
 
 	/**
 	 * Returns the amount of regenerators required by the circuit
@@ -112,6 +115,7 @@ public class Regenerators implements Serializable {
 		double BR = 100.0; //Gbps
 		double Bn = circuit.getRequiredBitRate() / 1000000000.0;
 		int quantRegeneradoresRequeridos = PhysicalLayer.roundUp(Bn / BR);
+
 		return quantRegeneradoresRequeridos;
 	}
 }

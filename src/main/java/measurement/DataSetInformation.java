@@ -18,28 +18,28 @@ import util.tools.machineLearning.collectingData.LineDataManager;
  */
 public class DataSetInformation extends Measurement {
 
-    public final static String SEP = "-";
+	public final static String SEP = "-";
 
-    private List<DataSetInterface> dataSetList;
-    private Util util;
+	private List<DataSetInterface> dataSetList;
+	private Util util;
 
-    private int differentQuantity;
-    private LineDataManager lineDataManager;
+	private int differentQuantity;
+	private LineDataManager lineDataManager;
 
-    private int identifyResultsFile;
+	private int identifyResultsFile;
 
-    /**
+	/**
      * Creates a new instance of BlockingProbability
      *
      * @param loadPoint int
      * @param rep int
      * @param util Util
      */
-    public DataSetInformation(int loadPoint, int rep, Util util) {
-        super(loadPoint, rep);
+	public DataSetInformation(int loadPoint, int rep, Util util) {
+		super(loadPoint, rep);
 
-        this.util = util;
-        this.dataSetList = new ArrayList<>();
+		this.util = util;
+		this.dataSetList = new ArrayList<>();
 
 		this.resultManager = new DataSetInfoResultManager();
 
@@ -47,19 +47,19 @@ public class DataSetInformation extends Measurement {
 		this.lineDataManager = new LineDataManager();
 
 		this.identifyResultsFile = 0;
-    }
+	}
 
-    /**
+	/**
      * Adds a new observation of DataSet
      *
      * @param cp ControlPlane
      * @param success boolean
      * @param request RequestForConnection
      */
-    public void addNewObservation(ControlPlane cp, boolean success, RequestForConnection request) {
+	public void addNewObservation(ControlPlane cp, boolean success, RequestForConnection request) {
 
-    	//Information about the circuits that attend the request
-    	for (Circuit c: request.getCircuits()) {
+		//Information about the circuits that attend the request
+		for (Circuit c: request.getCircuits()) {
 
 //    		if (cp.getIntegrated() instanceof SAR_and_BF5) {
 //    			identifyResultsFile = 1;
@@ -68,43 +68,45 @@ public class DataSetInformation extends Measurement {
 //				lineDataManager.toRecord(((SAR_and_BF5)cp.getIntegrated()).getLineDataList(), cp, getLoadPoint(), getReplication());
 //
 //    		} else {
-    			DataSetInterface newDataSetInfo = DataSetManager.createNewDatasetStructure(cp, c);
-        		if (newDataSetInfo != null) {
-        			this.dataSetList.add(newDataSetInfo);
-        		}
+				DataSetInterface newDataSetInfo = DataSetManager.createNewDatasetStructure(cp, c);
+
+				if (newDataSetInfo != null) {
+					this.dataSetList.add(newDataSetInfo);
+				}
+
 //    		}
 
-    	}
-    }
+		}
+	}
 
-    /**
+	/**
      * Returns the file name.
      * @return the file name.
      */
-    @Override
-    public String getFileName() {
-        return SimulationRequest.Result.FILE_DATASET_INFORMATION;
-    }
+	@Override
+	public String getFileName() {
+		return SimulationRequest.Result.FILE_DATASET_INFORMATION;
+	}
 
-    /**
+	/**
      * Returns the DataSet List
      *
      * @return List<DataSetInterface>
      */
-    public List<DataSetInterface> getDataSetList() {
+	public List<DataSetInterface> getDataSetList() {
 		return dataSetList;
 	}
 
-    /**
+	/**
      * Returns the util
      *
      * @return util
      */
-    public Util getUtil() {
-        return util;
-    }
+	public Util getUtil() {
+		return util;
+	}
 
-    /**
+	/**
      * Returns the differentQuantity
      *
      * @return differentQuantity
@@ -121,6 +123,5 @@ public class DataSetInformation extends Measurement {
 	public int getIdentifyResultsFile() {
 		return identifyResultsFile;
 	}
-
 
 }

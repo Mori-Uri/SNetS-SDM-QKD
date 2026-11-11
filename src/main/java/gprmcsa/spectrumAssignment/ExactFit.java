@@ -6,7 +6,6 @@ import network.Circuit;
 import network.ControlPlane;
 import util.IntersectionFreeSpectrum;
 
-
 /**
  * This class represents the spectrum allocation technique called Exact Fit.
  * This technique attempts to allocate a range of spectrum with exactly the same size as the number of slots required by the new request.
@@ -20,7 +19,7 @@ import util.IntersectionFreeSpectrum;
 
 public class ExactFit implements SpectrumAssignmentAlgorithmInterface {
 
-    /**
+	/**
      * Returns the assign spectrum.
      * @param numberOfSlots the numberOfSlots.
      * @param circuit the circuit.
@@ -28,20 +27,20 @@ public class ExactFit implements SpectrumAssignmentAlgorithmInterface {
      * @param indexCore the indexCore.
      * @return true if the condition is met; false otherwise.
      */
-    @Override
-    public boolean assignSpectrum(int numberOfSlots, Circuit circuit, ControlPlane cp, int indexCore) {
-    	List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), indexCore);
+	@Override
+	public boolean assignSpectrum(int numberOfSlots, Circuit circuit, ControlPlane cp, int indexCore) {
+		List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), indexCore);
 
-        int chosen[] = policy(numberOfSlots, composition, circuit, cp);
-        circuit.setSpectrumAssigned(chosen);
+		int chosen[] = policy(numberOfSlots, composition, circuit, cp);
+		circuit.setSpectrumAssigned(chosen);
 
-        if (chosen == null)
-        	return false;
+		if (chosen == null)
+			return false;
 
-        return true;
-    }
+		return true;
+	}
 
-    /**
+	/**
      * Returns the policy.
      * @param numberOfSlots the numberOfSlots.
      * @param freeSpectrumBands the freeSpectrumBands.
@@ -49,34 +48,36 @@ public class ExactFit implements SpectrumAssignmentAlgorithmInterface {
      * @param cp the cp.
      * @return the result of the operation.
      */
-    @Override
-    public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp){
-        int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
+	@Override
+	public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp){
+		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
 
-        for (int[] band : freeSpectrumBands) {
-        	int sizeBand = band[1] - band[0] + 1;
-            if (sizeBand == numberOfSlots) {
-                chosen = band.clone();
-                chosen[1] = chosen[0] + numberOfSlots - 1; //It is not necessary to allocate the entire band, just the amount of slots required
-                break;
-            }
-        }
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-        if (chosen == null) { // did not find any contiguous tracks and is still available
-            // now just look for the free range and apply first fit policy
+		for (int[] band : freeSpectrumBands) {
+			int sizeBand = band[1] - band[0] + 1;
 
-	        for (int[] band : freeSpectrumBands) {
-	            if (band[1] - band[0] + 1 >= numberOfSlots) {
-	                chosen = band.clone();
-	                chosen[1] = chosen[0] + numberOfSlots - 1; //It is not necessary to allocate the entire band, just the amount of slots required
-	                break;
-	            }
-	        }
-        }
+			if (sizeBand == numberOfSlots) {
+				chosen = band.clone();
+				chosen[1] = chosen[0] + numberOfSlots - 1; //It is not necessary to allocate the entire band, just the amount of slots required
+				break;
+			}
+		}
 
-        return chosen;
-    }
+		if (chosen == null) { // did not find any contiguous tracks and is still available
+			// now just look for the free range and apply first fit policy
+
+			for (int[] band : freeSpectrumBands) {
+				if (band[1] - band[0] + 1 >= numberOfSlots) {
+					chosen = band.clone();
+					chosen[1] = chosen[0] + numberOfSlots - 1; //It is not necessary to allocate the entire band, just the amount of slots required
+					break;
+				}
+			}
+		}
+
+		return chosen;
+	}
 
 }

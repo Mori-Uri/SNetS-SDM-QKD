@@ -14,6 +14,7 @@ import util.IntersectionFreeSpectrum;
 // Adaptao da estratgia XT avoid de LIU 2020.
 // Paper: Routing Core and Spectrum Allocation Algorithm for Inter-Core Crosstalk and Energy Efficiency in Space Division Multiplexing Elastic Optical Networks
 // A IMPLEMENTAO A SEGUIR  VLIDA APENAS PARA UMA FIBRA DE 7 NCLEOS E 320 SLOTS EM CADA NCLEO.
+
 /**
  * Represents the CorePrioritizationCrosstalkAvoidanceStrategy component.
  */
@@ -81,29 +82,28 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 		int chosen[] = null;
 		//int contadorF = numberOfSlots;
 
-    	List<int[]> compositionantiga = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), chosenCore);
+		List<int[]> compositionantiga = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), chosenCore);
 
-    	if(g1.contains(chosenCore)) {
-    		chosen = alocacaoGrupo1(numberOfSlots, compositionantiga, circuit, cp);
-    	}
+		if(g1.contains(chosenCore)) {
+			chosen = alocacaoGrupo1(numberOfSlots, compositionantiga, circuit, cp);
+		}
 
-    	if(g2.contains(chosenCore)) {
-    		chosen = alocacaoGrupo2(numberOfSlots, compositionantiga, circuit, cp);
-    	}
+		if(g2.contains(chosenCore)) {
+			chosen = alocacaoGrupo2(numberOfSlots, compositionantiga, circuit, cp);
+		}
 
-    	if(g3.contains(chosenCore)) {
-    		chosen = alocacaoGrupo3(numberOfSlots, compositionantiga, circuit, cp);
-    	}
+		if(g3.contains(chosenCore)) {
+			chosen = alocacaoGrupo3(numberOfSlots, compositionantiga, circuit, cp);
+		}
 
-    	circuit.setSpectrumAssigned(chosen);
-        circuit.setIndexCore(chosenCore);
+		circuit.setSpectrumAssigned(chosen);
+		circuit.setIndexCore(chosenCore);
 
+		if (chosen == null) {
+			return false;
+		}
 
-        if (chosen == null) {
-        	return false;
-        }
-
-        return true;
+		return true;
 	}
 
 	/**
@@ -114,6 +114,7 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 	public int coreAssignment() {
 		Random generator = new Random();
 		int a = generator.nextInt(this.c);
+
 		return a;
 	}
 
@@ -146,7 +147,6 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 			link.updatePesosOfCores(coreEscolhido);
 		}
 
-
 		// reset the weights
 		for(Link link : circuit.getRoute().getLinkList()) {
 			boolean flag = true;
@@ -175,6 +175,7 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 	}
 
 	//Firt fit
+
 	/**
 	 * Returns the policy.
 	 * @param numberOfSlots the numberOfSlots.
@@ -185,19 +186,20 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 	 */
 	public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-        for (int[] band : freeSpectrumBands) {
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-            if (band[1] - band[0] + 1 >= numberOfSlots) {
-                chosen = band.clone();
-                chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
-                break;
-            }
-        }
+		for (int[] band : freeSpectrumBands) {
 
-        return chosen;
+			if (band[1] - band[0] + 1 >= numberOfSlots) {
+				chosen = band.clone();
+				chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
+				break;
+			}
+		}
+
+		return chosen;
 	}
 
 	/**
@@ -210,25 +212,29 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 	 */
 	public int[] alocacaoGrupo1(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-    	//Priority group
-    	List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition1, circuit, cp);
-        if (chosen!=null){return chosen;}
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-        //Priority group 2
-        List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition2, circuit, cp);
-        if (chosen!=null){return chosen;}
+		//Priority group
+		List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition1, circuit, cp);
 
-        //Lowest-priority group
-        List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition3, circuit, cp);
-        if (chosen!=null){return chosen;}
+		if (chosen!=null){return chosen;}
 
-        return chosen;
+		//Priority group 2
+		List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition2, circuit, cp);
+
+		if (chosen!=null){return chosen;}
+
+		//Lowest-priority group
+		List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition3, circuit, cp);
+
+		if (chosen!=null){return chosen;}
+
+		return chosen;
 	}
 
 	/**
@@ -241,25 +247,29 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 	 */
 	public int[] alocacaoGrupo2(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-    	//Priority group
-    	List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition2, circuit, cp);
-        if (chosen!=null){return chosen;}
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-        //Priority group 2
-        List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition3, circuit, cp);
-        if (chosen!=null){return chosen;}
+		//Priority group
+		List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition2, circuit, cp);
 
-        //Lowest-priority group
-        List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition1, circuit, cp);
-        if (chosen!=null){return chosen;}
+		if (chosen!=null){return chosen;}
 
-        return chosen;
+		//Priority group 2
+		List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition3, circuit, cp);
+
+		if (chosen!=null){return chosen;}
+
+		//Lowest-priority group
+		List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition1, circuit, cp);
+
+		if (chosen!=null){return chosen;}
+
+		return chosen;
 	}
 
 	/**
@@ -272,25 +282,29 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 	 */
 	public int[] alocacaoGrupo3(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-    	//Priority group
-        List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition3, circuit, cp);
-        if (chosen!=null){return chosen;}
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-        //Priority group 2
-    	List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition1, circuit, cp);
-        if (chosen!=null){return chosen;}
+		//Priority group
+		List<int[]> composition3 = novaComposicao3(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition3, circuit, cp);
 
-        //Lowest-priority group
-        List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
-    	chosen = policy(numberOfSlots, composition2, circuit, cp);
-        if (chosen!=null){return chosen;}
+		if (chosen!=null){return chosen;}
 
-        return chosen;
+		//Priority group 2
+		List<int[]> composition1 = novaComposicao1(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition1, circuit, cp);
+
+		if (chosen!=null){return chosen;}
+
+		//Lowest-priority group
+		List<int[]> composition2 = novaComposicao2(freeSpectrumBands, circuit, cp);
+		chosen = policy(numberOfSlots, composition2, circuit, cp);
+
+		if (chosen!=null){return chosen;}
+
+		return chosen;
 	}
 
 	/**
@@ -307,7 +321,7 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 			// Est completamente dentro do intervalo
 			if ((band[1] >= this.eg1[0]) && (band[1] <= this.eg1[1]) && (band[0] >= this.eg1[0]) && (band[0] <= this.eg1[1])) {
 				novacomposition.add(band.clone());
-            }
+			}
 
 			// Est parcialmente no limite inferior
 			if ((band[1] >= this.eg1[0]) && (band[1] <= this.eg1[1]) && (band[0] < this.eg1[0]) && (band[0] < this.eg1[1])) {
@@ -315,7 +329,7 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 				novo[0] = this.eg1[0];
 				novo[1] = band[1];
 				novacomposition.add(novo);
-            }
+			}
 
 			// Est parcialmente no limite supeior
 			if ((band[1] > this.eg1[1]) && (band[1] > this.eg1[0]) && (band[0] <= this.eg1[1]) && (band[0] > this.eg1[0])) {
@@ -323,7 +337,7 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 				novo[0] = band[0];
 				novo[1] = this.eg1[1];
 				novacomposition.add(novo);
-            }
+			}
 
 			// Engloba os limites
 			if ((band[1] > this.eg1[1]) && (band[1] > this.eg1[0]) && (band[0] < this.eg1[1]) && (band[0] < this.eg1[0])) {
@@ -334,6 +348,7 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 			}
 
 		}
+
 		return novacomposition;
 	}
 
@@ -351,7 +366,7 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 			// Est completamente dentro do intervalo
 			if ((band[1] >= this.eg2[0]) && (band[1] <= this.eg2[1]) && (band[0] >= this.eg2[0]) && (band[0] <= this.eg2[1])) {
 				novacomposition.add(band.clone());
-            }
+			}
 
 			// Est parcialmente no limite inferior
 			if ((band[1] >= this.eg2[0]) && (band[1] <= this.eg2[1]) && (band[0] < this.eg2[0]) && (band[0] < this.eg2[1])) {
@@ -359,7 +374,7 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 				novo[0] = this.eg2[0];
 				novo[1] = band[1];
 				novacomposition.add(novo);
-            }
+			}
 
 			// Est parcialmente no limite supeior
 			if ((band[1] > this.eg2[1]) && (band[1] > this.eg2[0]) && (band[0] <= this.eg2[1]) && (band[0] > this.eg2[0])) {
@@ -367,7 +382,7 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 				novo[0] = band[0];
 				novo[1] = this.eg2[1];
 				novacomposition.add(novo);
-            }
+			}
 
 			// Engloba os limites
 			if ((band[1] > this.eg2[1]) && (band[1] > this.eg2[0]) && (band[0] < this.eg2[1]) && (band[0] < this.eg2[0])) {
@@ -395,7 +410,7 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 			// Est completamente dentro do intervalo
 			if ((band[1] >= this.eg3[0]) && (band[1] <= this.eg3[1]) && (band[0] >= this.eg3[0]) && (band[0] <= this.eg3[1])) {
 				novacomposition.add(band.clone());
-            }
+			}
 
 			// Est parcialmente no limite inferior
 			if ((band[1] >= this.eg3[0]) && (band[1] <= this.eg3[1]) && (band[0] < this.eg3[0]) && (band[0] < this.eg3[1])) {
@@ -403,7 +418,7 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 				novo[0] = this.eg3[0];
 				novo[1] = band[1];
 				novacomposition.add(novo);
-            }
+			}
 
 			// Est parcialmente no limite supeior
 			if ((band[1] > this.eg3[1]) && (band[1] > this.eg3[0]) && (band[0] <= this.eg3[1]) && (band[0] > this.eg3[0])) {
@@ -411,7 +426,7 @@ public class CorePrioritizationCrosstalkAvoidanceStrategy implements CoreAndSpec
 				novo[0] = band[0];
 				novo[1] = this.eg3[1];
 				novacomposition.add(novo);
-            }
+			}
 
 			// Engloba os limites
 			if ((band[1] > this.eg3[1]) && (band[1] > this.eg3[0]) && (band[0] < this.eg3[1]) && (band[0] < this.eg3[0])) {

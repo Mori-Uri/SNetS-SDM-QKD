@@ -18,31 +18,31 @@ import util.IntersectionFreeSpectrum;
 
 /**
  * Algorithm created to apply sequentially the SCSP, modulation, core and spectrum allocation algorithms.
- * 
+ *
  */
 public class SCSP_MCS_v2 implements IntegratedRMLSAAlgorithmInterface {
 
 	private RoutingAlgorithmInterface routing;
-	
+
 	private double alpha1 = 0.5; //Applied to XT
-    private double alpha2 = 0.5; //Applied to Utilization
-    
-    private double maxXT = Crosstalk.lowestXT; //Minimum XT value
-    
+	private double alpha2 = 0.5; //Applied to Utilization
+
+	private double maxXT = Crosstalk.lowestXT; //Minimum XT value
+
 	@Override
 	public boolean rsa(Circuit circuit, ControlPlane cp) {
 		if (routing == null) {
 			routing = new SCSP();
-			
+
 			Map<String, String> uv = cp.getMesh().getOthersConfig().getVariables();
 
-        	if(uv.get("alpha1") != null) {
-        		alpha1 = Double.parseDouble((String)uv.get("alpha1"));
-        	}
-        	
-        	if(uv.get("alpha2") != null) {
-        		alpha2 = Double.parseDouble((String)uv.get("alpha2"));
-        	}
+			if(uv.get("alpha1") != null) {
+				alpha1 = Double.parseDouble((String)uv.get("alpha1"));
+			}
+
+			if(uv.get("alpha2") != null) {
+				alpha2 = Double.parseDouble((String)uv.get("alpha2"));
+			}
 		}
 
 		// All available modulations
@@ -67,7 +67,7 @@ public class SCSP_MCS_v2 implements IntegratedRMLSAAlgorithmInterface {
 		int checkBand2[] = null;
 
 		Route checkRoute3 = null;
-		
+
 		double minRouteCost = Double.POSITIVE_INFINITY;
 
 		// Begins with the most spectrally efficient modulation format
@@ -77,7 +77,7 @@ public class SCSP_MCS_v2 implements IntegratedRMLSAAlgorithmInterface {
 
 			// Number of slots required using the selected modulation
 			int requiredSlotsNumber = mod.requiredSlots(circuit.getRequiredBitRate());
-			
+
 			// It goes through the cores starting from the highest index to the lowest index
 			for (int core = numberOfCores-1; core >= 0; core--) {
 				circuit.setIndexCore(core);
@@ -112,24 +112,26 @@ public class SCSP_MCS_v2 implements IntegratedRMLSAAlgorithmInterface {
 							// Checks the QoT and XT for others circuits
 							boolean QoTO = cp.isAdmissibleOSNRInOther(circuit);
 							boolean XTO = cp.isAdmissibleCrosstalkInOther(circuit);
-							
+
 							if(circuit.getXt() > maxXT) {
-    							maxXT = circuit.getXt();
-    						}
+								maxXT = circuit.getXt();
+							}
 
 							if (QoTO && XTO) { //Acceptable QoTO and XTO ?
-								
+
 								double cost = calculateCost(circuit, route, mod, core, band);
-    		                	if (cost < minRouteCost) { // Select the route with the lowest cost
-    		                		minRouteCost = cost;
-    		                		
-    		                		chosenRoute = route;
-        			                chosenMod = mod;
-        			                chosenCore = core;
-        			                chosenBand = band;
-    		                	}
+
+								if (cost < minRouteCost) { // Select the route with the lowest cost
+									minRouteCost = cost;
+
+									chosenRoute = route;
+									chosenMod = mod;
+									chosenCore = core;
+									chosenBand = band;
+								}
 							}
 						}
+
 					} //band
 				} //route
 			} //core
@@ -158,9 +160,11 @@ public class SCSP_MCS_v2 implements IntegratedRMLSAAlgorithmInterface {
 				}else{
 					checkRoute = routing.getRoutesForAllPairs().get(circuit.getSource().getName() + SCSP.DIV + circuit.getDestination().getName());
 				}
+
 				checkMod = avaliableModulations.get(0);
 				checkCore = new Random().nextInt(cp.getMesh().getLinkList().get(0).getNumberOfCores());
 			}
+
 			circuit.setRoute(checkRoute);
 			circuit.setModulation(checkMod);
 			circuit.setIndexCore(checkCore);
@@ -169,10 +173,10 @@ public class SCSP_MCS_v2 implements IntegratedRMLSAAlgorithmInterface {
 			return false;
 		}
 	}
-	
+
 	/**
 	 * Returns the cost of the solution
-	 * 
+	 *
 	 * @param circuit Circuit
 	 * @param route Route
 	 * @param mod Modulation
@@ -182,24 +186,26 @@ public class SCSP_MCS_v2 implements IntegratedRMLSAAlgorithmInterface {
 	 */
 	private double calculateCost(Circuit circuit, Route route, Modulation mod, int core, int sa[]) {
 		double cost = 0.0;
-		
+
 		double xt = circuit.getXt();
 		xt = PhysicalLayer.ratioOfDB(xt) / PhysicalLayer.ratioOfDB(maxXT); //Normalized
-		
+
 		double ut = 0.0;
+
 		for (Link link : route.getLinkList()) {
 			ut += link.getCore(core).getUtilization();
 		}
+
 		ut = ut / route.getLinkList().size();
-		
+
 		cost = (alpha1 * xt) + (alpha2 * ut);
-		
+
 		return cost;
 	}
 
 	/**
 	 * Performs spectrum allocation strategy selection
-	 * 
+	 *
 	 * @param slotsNumber int
 	 * @param circuit Circuit
 	 * @param cp ControlPlane
@@ -227,7 +233,7 @@ public class SCSP_MCS_v2 implements IntegratedRMLSAAlgorithmInterface {
 	/**
 	 * Apply the mediumFit strategy
 	 * policy for central core
-	 * 
+	 *
 	 * @param numberOfslots int
 	 * @param freeSpectrumBands List<int[]>
 	 * @param circuit Circuit
@@ -236,6 +242,7 @@ public class SCSP_MCS_v2 implements IntegratedRMLSAAlgorithmInterface {
 	 */
 	private int[] mediumFit(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
+
 		if(numberOfSlots> maxAmplitude) return null;
 		int chosen[] = null;
 
@@ -247,7 +254,7 @@ public class SCSP_MCS_v2 implements IntegratedRMLSAAlgorithmInterface {
 					chosen = band.clone();
 					chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
 					break;
-				}       		
+				}
 			}
 		}
 
@@ -271,7 +278,7 @@ public class SCSP_MCS_v2 implements IntegratedRMLSAAlgorithmInterface {
 	/**
 	 * Apply the lastFit strategy
 	 * policy for even core (pares)
-	 * 
+	 *
 	 * @param numberOfslots int
 	 * @param freeSpectrumBands List<int[]>
 	 * @param circuit Circuit
@@ -280,6 +287,7 @@ public class SCSP_MCS_v2 implements IntegratedRMLSAAlgorithmInterface {
 	 */
 	private int[] lastFit(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
+
 		if(numberOfSlots>maxAmplitude) return null;
 		int chosen[] = null;
 		int band[] = null;
@@ -300,7 +308,7 @@ public class SCSP_MCS_v2 implements IntegratedRMLSAAlgorithmInterface {
 	/**
 	 * Apply the firstFit strategy
 	 * policy for odd core (impares)
-	 * 
+	 *
 	 * @param numberOfslots int
 	 * @param freeSpectrumBands List<int[]>
 	 * @param circuit Circuit
@@ -309,6 +317,7 @@ public class SCSP_MCS_v2 implements IntegratedRMLSAAlgorithmInterface {
 	 */
 	private int[] firstFit(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
+
 		if(numberOfSlots> maxAmplitude) return null;
 		int chosen[] = null;
 
@@ -326,11 +335,11 @@ public class SCSP_MCS_v2 implements IntegratedRMLSAAlgorithmInterface {
 
 	/**
 	 * Returns the routing algorithm
-	 * 
+	 *
 	 * @return KRoutingAlgorithmInterface
 	 */
 	public KRoutingAlgorithmInterface getRoutingAlgorithm(){
 		return null;
 	}
-	
+
 }

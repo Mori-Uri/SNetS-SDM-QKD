@@ -24,34 +24,36 @@ import request.RequestForConnection;
 @SuppressWarnings("serial")
 public class ObservedClassicalControlPlane extends ControlPlane {
 
-    private final BlockingDetailRecorder blockingDetails;
+	private final BlockingDetailRecorder blockingDetails;
 
-    public ObservedClassicalControlPlane(Mesh mesh, int rmlsaType,
-            TrafficGroomingAlgorithmInterface trafficGroomingAlgorithm,
-            IntegratedRMLSAAlgorithmInterface integratedRMLSAAlgorithm,
-            RoutingAlgorithmInterface routingAlgorithm,
-            KRoutingAlgorithmInterface kRoutingAlgorithm,
-            SpectrumAssignmentAlgorithmInterface spectrumAssignmentAlgorithm,
-            ModulationSelectionAlgorithmInterface modulationSelection,
-            CoreAndSpectrumAssignmentAlgorithmInterface coreAndSpectrumAssignment,
-            ReallocationAlgorithmInterface reallocation,
-            PowerAssignmentAlgorithmInterface powerAssignment,
-            double warmupArrivals) {
-        super(mesh, rmlsaType, trafficGroomingAlgorithm, integratedRMLSAAlgorithm, routingAlgorithm,
-                kRoutingAlgorithm, spectrumAssignmentAlgorithm, modulationSelection, coreAndSpectrumAssignment,
-                reallocation, powerAssignment);
-        this.blockingDetails = new BlockingDetailRecorder(warmupArrivals, this);
-    }
+	public ObservedClassicalControlPlane(Mesh mesh, int rmlsaType,
+			TrafficGroomingAlgorithmInterface trafficGroomingAlgorithm,
+			IntegratedRMLSAAlgorithmInterface integratedRMLSAAlgorithm,
+			RoutingAlgorithmInterface routingAlgorithm,
+			KRoutingAlgorithmInterface kRoutingAlgorithm,
+			SpectrumAssignmentAlgorithmInterface spectrumAssignmentAlgorithm,
+			ModulationSelectionAlgorithmInterface modulationSelection,
+			CoreAndSpectrumAssignmentAlgorithmInterface coreAndSpectrumAssignment,
+			ReallocationAlgorithmInterface reallocation,
+			PowerAssignmentAlgorithmInterface powerAssignment,
+			double warmupArrivals) {
+		super(mesh, rmlsaType, trafficGroomingAlgorithm, integratedRMLSAAlgorithm, routingAlgorithm,
+				kRoutingAlgorithm, spectrumAssignmentAlgorithm, modulationSelection, coreAndSpectrumAssignment,
+				reallocation, powerAssignment);
+		this.blockingDetails = new BlockingDetailRecorder(warmupArrivals, this);
+	}
 
-    @Override
-    public boolean handleRequisition(RequestForConnection request) throws Exception {
-        if (request != null) blockingDetails.arrival();
-        boolean ok = super.handleRequisition(request);
-        if (request != null) blockingDetails.observe(this, request, ok, null);
-        return ok;
-    }
+	@Override
+	public boolean handleRequisition(RequestForConnection request) throws Exception {
+		if (request != null) blockingDetails.arrival();
+		boolean ok = super.handleRequisition(request);
 
-    public BlockingDetailRecorder.Snapshot snapshotBlockingDetails() {
-        return blockingDetails.snapshot();
-    }
+		if (request != null) blockingDetails.observe(this, request, ok, null);
+
+		return ok;
+	}
+
+	public BlockingDetailRecorder.Snapshot snapshotBlockingDetails() {
+		return blockingDetails.snapshot();
+	}
 }

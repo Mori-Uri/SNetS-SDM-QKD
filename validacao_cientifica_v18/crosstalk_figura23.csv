@@ -1,0 +1,3 @@
+test,overlap,interferer_slots,iso,h_per_m,length_km,source_power_w,xt_power_w,xt_linear,xt_db
+fig23_guard_excluded,2,5,0.4,4.1339396444811906e-12,100,0.001,1.6535758577924765e-10,1.6535758577924765e-07,-67.81575877033917
+using_raw_allocated_bands_not_equivalent,3,6,0.5,4.1339396444811906e-12,100,0.001,2.0669698222405955e-10,2.0669698222405954e-07,-66.84665864025861

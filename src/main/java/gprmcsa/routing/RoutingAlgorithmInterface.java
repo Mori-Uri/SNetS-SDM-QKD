@@ -7,7 +7,6 @@ import network.Mesh;
 
 import java.io.Serializable;
 
-
 /**
  * This interface represents a routing algorithm.
  *

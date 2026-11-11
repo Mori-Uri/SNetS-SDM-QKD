@@ -37,6 +37,7 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 				reps.put(tru.getReplication(), (TransmittersReceiversRegeneratorsUtilization)tru);
 			}
 		}
+
 		loadPoints = new ArrayList<>(trus.keySet());
 		replications = new ArrayList<>(trus.values().iterator().next().keySet());
 	}
@@ -55,6 +56,7 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 		for (Integer rep : replications) { // Checks how many replications have been made and creates the header of each column
 			res.append(sep + "rep" + rep);
 		}
+
 		res.append("\n");
 
 		res.append(resultTxUtilizationGeneral());
@@ -88,13 +90,17 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 	 */
 	private String resultTxUtilizationGeneral(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			String aux = "Tx Utilization" + sep + loadPoint + sep + "all" + sep + " "; // "all"+sep+" ";
+
 			for (Integer replic : replications) {
 					aux = aux + sep + trus.get(loadPoint).get(replic).getAvgTxUtilizationGen();
 			}
+
 			res.append(aux + "\n");
 		}
+
 		return res.toString();
 	}
 
@@ -105,13 +111,17 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 	 */
 	private String resultRxUtilizationGeneral(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			String aux = "Rx Utilization" + sep + loadPoint + sep + "all" + sep + " "; // "all"+sep+" ";
+
 			for (Integer replic : replications) {
 					aux = aux + sep + trus.get(loadPoint).get(replic).getAvgRxUtilizationGen();
 			}
+
 			res.append(aux + "\n");
 		}
+
 		return res.toString();
 	}
 
@@ -122,13 +132,17 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 	 */
 	private String resultRegenUtilizationGeneral(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			String aux = "Regenerators Utilization" + sep + loadPoint + sep + "all" + sep + " "; // "all"+sep+" ";
+
 			for (Integer replic : replications) {
 					aux = aux + sep + trus.get(loadPoint).get(replic).getAvgRegenUtilizationGen();
 			}
+
 			res.append(aux + "\n");
 		}
+
 		return res.toString();
 	}
 
@@ -139,6 +153,7 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 	 */
 	private String resultTxUtilizationPerNode(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 
 			String aux = "Tx Utilization Per Node" + sep + loadPoint + sep; // "all"+sep+" ";
@@ -149,9 +164,11 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 				for (Integer replic : replications) {
 					aux2 = aux2 + sep + trus.get(loadPoint).get(replic).getAvgTxUtilizationPerNode(node);
 				}
+
 				res.append(aux2 + "\n");
 			}
 		}
+
 		return res.toString();
 	}
 
@@ -162,6 +179,7 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 	 */
 	private String resultRxUtilizationPerNode(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 
 			String aux = "Rx Utilization Per Node"+sep + loadPoint + sep; // "all"+sep+" ";
@@ -172,9 +190,11 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 				for (Integer replic : replications) {
 					aux2 = aux2 + sep + trus.get(loadPoint).get(replic).getAvgRxUtilizationPerNode(node);
 				}
+
 				res.append(aux2 + "\n");
 			}
 		}
+
 		return res.toString();
 	}
 
@@ -185,6 +205,7 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 	 */
 	private String resultRegenUtilizationPerNode(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 
 			String aux = "Regenerators Utilization Per Node"+sep + loadPoint + sep; // "all"+sep+" ";
@@ -195,9 +216,11 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 				for (Integer replic : replications) {
 					aux2 = aux2 + sep + trus.get(loadPoint).get(replic).getAvgRegenUtilizationPerNode(node);
 				}
+
 				res.append(aux2 + "\n");
 			}
 		}
+
 		return res.toString();
 	}
 
@@ -208,6 +231,7 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 	 */
 	private String resultMaxTxUtilizationPerNode(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 
 			String aux = "Max Tx Utilization Per Node" + sep + loadPoint + sep; // "all"+sep+" ";
@@ -218,9 +242,11 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 				for (Integer replic : replications) {
 					aux2 = aux2 + sep + trus.get(loadPoint).get(replic).getMaxTxUtilizationPerNode(node);
 				}
+
 				res.append(aux2 + "\n");
 			}
 		}
+
 		return res.toString();
 	}
 
@@ -229,8 +255,9 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 	 *
 	 * @return String
 	 */
-    private String resultMaxRxUtilizationPerNode(){
+	private String resultMaxRxUtilizationPerNode(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 
 			String aux = "Max Rx Utilization Per Node" + sep + loadPoint + sep; // "all"+sep+" ";
@@ -241,19 +268,22 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 				for (Integer replic : replications) {
 					aux2 = aux2 + sep + trus.get(loadPoint).get(replic).getMaxRxUtilizationPerNode(node);
 				}
+
 				res.append(aux2 + "\n");
 			}
 		}
+
 		return res.toString();
 	}
 
-    /**
+	/**
 	 * Returns the maximum regenerators utilization per node
 	 *
 	 * @return String
 	 */
-    private String resultMaxRegenUtilizationPerNode(){
+	private String resultMaxRegenUtilizationPerNode(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 
 			String aux = "Max Regenerators Utilization Per Node" + sep + loadPoint + sep; // "all"+sep+" ";
@@ -264,9 +294,11 @@ public class TransmittersReceiversRegeneratorsUtilizationResultManager implement
 				for (Integer replic : replications) {
 					aux2 = aux2 + sep + trus.get(loadPoint).get(replic).getMaxRegenUtilizationPerNode(node);
 				}
+
 				res.append(aux2 + "\n");
 			}
 		}
+
 		return res.toString();
 	}
 

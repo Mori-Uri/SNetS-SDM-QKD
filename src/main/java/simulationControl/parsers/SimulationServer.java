@@ -8,38 +8,38 @@ import java.util.List;
  */
 public class SimulationServer {
 
-    private boolean online = false;
-    private List<SimulationRequest> simulationQueue = new ArrayList<>();
+	private boolean online = false;
+	private List<SimulationRequest> simulationQueue = new ArrayList<>();
 
-    /**
+	/**
      * Checks whether online.
      * @return true if the condition is met; false otherwise.
      */
-    public boolean isOnline() {
-        return online;
-    }
+	public boolean isOnline() {
+		return online;
+	}
 
-    /**
+	/**
      * Sets the online.
      * @param online the online.
      */
-    public void setOnline(boolean online) {
-        this.online = online;
-    }
+	public void setOnline(boolean online) {
+		this.online = online;
+	}
 
-    /**
+	/**
      * Returns the simulation queue.
      * @return the simulation queue.
      */
-    public List<SimulationRequest> getSimulationQueue() {
-        return simulationQueue;
-    }
+	public List<SimulationRequest> getSimulationQueue() {
+		return simulationQueue;
+	}
 
-    /**
+	/**
      * Sets the simulation queue.
      * @param simulationQueue the simulationQueue.
      */
-    public void setSimulationQueue(List<SimulationRequest> simulationQueue) {
-        this.simulationQueue = simulationQueue;
-    }
+	public void setSimulationQueue(List<SimulationRequest> simulationQueue) {
+		this.simulationQueue = simulationQueue;
+	}
 }

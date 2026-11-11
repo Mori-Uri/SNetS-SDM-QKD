@@ -96,24 +96,24 @@ public class CorePrioritizationRandomFit implements CoreAndSpectrumAssignmentAlg
 		}
 
 		int chosenCore = coreAssignment(circuit);
-    	List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), chosenCore);
+		List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), chosenCore);
 
-        int chosen[] = policy(numberOfSlots, composition, circuit, cp);
-        circuit.setSpectrumAssigned(chosen);
-        circuit.setIndexCore(chosenCore);
+		int chosen[] = policy(numberOfSlots, composition, circuit, cp);
+		circuit.setSpectrumAssigned(chosen);
+		circuit.setIndexCore(chosenCore);
 
-        //Crosstalk crosstalk = cp.getMesh().getPhysicalLayer().getCrosstalk();
-       // System.out.println(crosstalk.isAdmissibleInOthers(circuit));
+		//Crosstalk crosstalk = cp.getMesh().getPhysicalLayer().getCrosstalk();
+	   // System.out.println(crosstalk.isAdmissibleInOthers(circuit));
 //
-      // System.out.println("\n\nCorePrioritization RF");
-       //System.out.println("preciso de "+numberOfSlots+" slots");
-       //System.out.println("Selected core: "+chosenCore);
-       //System.out.println("Slot range: "+chosen[0]+"-"+chosen[1]);
+	  // System.out.println("\n\nCorePrioritization RF");
+	   //System.out.println("preciso de "+numberOfSlots+" slots");
+	   //System.out.println("Selected core: "+chosenCore);
+	   //System.out.println("Slot range: "+chosen[0]+"-"+chosen[1]);
 
-        if (chosen == null)
-        	return false;
+		if (chosen == null)
+			return false;
 
-        return true;
+		return true;
 	}
 
 	/**
@@ -126,12 +126,14 @@ public class CorePrioritizationRandomFit implements CoreAndSpectrumAssignmentAlg
 		escolha = contador;
 
 		if (contador == numberOfCores -1) {
-    		contador = 0;
-    		return coreOfTheTime[escolha];
-    	}else {
-    		contador++;
-    		return coreOfTheTime[escolha];
-    	}
+			contador = 0;
+
+			return coreOfTheTime[escolha];
+		}else {
+			contador++;
+
+			return coreOfTheTime[escolha];
+		}
 	}
 
 	/**
@@ -201,8 +203,9 @@ public class CorePrioritizationRandomFit implements CoreAndSpectrumAssignmentAlg
 	@Override
 	public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
+
 		if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
+		int chosen[] = null;
 		ArrayList<int[]> bandList = new ArrayList<int[]>();
 
 		for (int[] band : freeSpectrumBands) { //checks and guard the free bands that can establish the requisition

@@ -12,105 +12,111 @@ import java.util.List;
  */
 public class TrafficConfig {
 
-    private List<RequestGeneratorConfig> requestGenerators;
+	private List<RequestGeneratorConfig> requestGenerators;
 
-    public TrafficConfig() {
-        requestGenerators = new ArrayList<RequestGeneratorConfig>();
-    }
+	public TrafficConfig() {
+		requestGenerators = new ArrayList<RequestGeneratorConfig>();
+	}
 
-    public List<RequestGeneratorConfig> getRequestGenerators() {
-        return requestGenerators;
-    }
+	public List<RequestGeneratorConfig> getRequestGenerators() {
+		return requestGenerators;
+	}
 
-    public void setRequestGenerators(List<RequestGeneratorConfig> requestGenerators) {
-        this.requestGenerators = requestGenerators;
-    }
+	public void setRequestGenerators(List<RequestGeneratorConfig> requestGenerators) {
+		this.requestGenerators = requestGenerators;
+	}
 
-    public static class RequestGeneratorConfig {
-        private String source;
-        private String destination;
-        private double bitRate;
-        private double arrivalRate;
-        private double holdRate;
-        private double arrivalRateIncrease;
-        /**
+	public static class RequestGeneratorConfig {
+		private String source;
+		private String destination;
+		private double bitRate;
+		private double arrivalRate;
+		private double holdRate;
+		private double arrivalRateIncrease;
+
+		/**
          * Part 23 (QKD addon, optional): fraction of the requests of this
          * generator that are QKD-protected. Absent = the global
          * simulation.qkdProtectedRequestProbability. Ignored without QKD.
          */
-        private Double qkdProtectedProbability;
-        /**
+		private Double qkdProtectedProbability;
+		/** Fraction of arrivals requiring QKD only, without a data-channel lightpath. */
+		private Double qkdOnlyProbability;
+
+		/**
          * Part 23 (QKD addon, optional): key-material demand of the protected
          * requests of this generator, in Mbit/s. Absent = drawn from
          * simulation.qkdKeyDemand.
          */
-        private Double keyRateMbps;
+		private Double keyRateMbps;
 
-        public Double getQkdProtectedProbability() { return qkdProtectedProbability; }
+		public Double getQkdOnlyProbability() { return qkdOnlyProbability; }
+		public void setQkdOnlyProbability(Double value) { qkdOnlyProbability = value; }
+		public Double getQkdProtectedProbability() { return qkdProtectedProbability; }
 
-        public void setQkdProtectedProbability(Double v) { this.qkdProtectedProbability = v; }
+		public void setQkdProtectedProbability(Double v) { this.qkdProtectedProbability = v; }
 
-        public Double getKeyRateMbps() { return keyRateMbps; }
+		public Double getKeyRateMbps() { return keyRateMbps; }
 
-        public void setKeyRateMbps(Double v) { this.keyRateMbps = v; }
+		public void setKeyRateMbps(Double v) { this.keyRateMbps = v; }
 
-        public RequestGeneratorConfig(String source, String destination,
-                double bitRate, double arrivalRate, double holdRate,
-                double arrivalRateIncrease) {
-            this.source = source;
-            this.destination = destination;
-            this.bitRate = bitRate;
-            this.arrivalRate = arrivalRate;
-            this.holdRate = holdRate;
-            this.arrivalRateIncrease = arrivalRateIncrease;
-        }
+		public RequestGeneratorConfig(String source, String destination,
+				double bitRate, double arrivalRate, double holdRate,
+				double arrivalRateIncrease) {
+			this.source = source;
+			this.destination = destination;
+			this.bitRate = bitRate;
+			this.arrivalRate = arrivalRate;
+			this.holdRate = holdRate;
+			this.arrivalRateIncrease = arrivalRateIncrease;
+		}
 
-        public String getSource() {
-            return source;
-        }
+		public String getSource() {
+			return source;
+		}
 
-        public void setSource(String source) {
-            this.source = source;
-        }
+		public void setSource(String source) {
+			this.source = source;
+		}
 
-        public String getDestination() {
-            return destination;
-        }
+		public String getDestination() {
+			return destination;
+		}
 
-        public void setDestination(String destination) {
-            this.destination = destination;
-        }
+		public void setDestination(String destination) {
+			this.destination = destination;
+		}
 
-        public double getBitRate() {
-            return bitRate;
-        }
+		public double getBitRate() {
+			return bitRate;
+		}
 
-        public void setBitRate(double bitRate) {
-            this.bitRate = bitRate;
-        }
+		public void setBitRate(double bitRate) {
+			this.bitRate = bitRate;
+		}
 
-        public double getArrivalRate() {
-            return arrivalRate;
-        }
+		public double getArrivalRate() {
+			return arrivalRate;
+		}
 
-        public void setArrivalRate(double arrivalRate) {
-            this.arrivalRate = arrivalRate;
-        }
+		public void setArrivalRate(double arrivalRate) {
+			this.arrivalRate = arrivalRate;
+		}
 
-        public double getHoldRate() {
-            return holdRate;
-        }
+		public double getHoldRate() {
+			return holdRate;
+		}
 
-        public void setHoldRate(double holdRate) {
-            this.holdRate = holdRate;
-        }
+		public void setHoldRate(double holdRate) {
+			this.holdRate = holdRate;
+		}
 
-        public double getArrivalRateIncrease() {
-            return arrivalRateIncrease;
-        }
+		public double getArrivalRateIncrease() {
+			return arrivalRateIncrease;
+		}
 
-        public void setArrivalRateIncrease(double arrivalRateIncrease) {
-            this.arrivalRateIncrease = arrivalRateIncrease;
-        }
-    }
+		public void setArrivalRateIncrease(double arrivalRateIncrease) {
+			this.arrivalRateIncrease = arrivalRateIncrease;
+		}
+	}
 }

@@ -47,16 +47,16 @@ public class RandomCoreAssignment implements CoreAndSpectrumAssignmentAlgorithmI
 		}
 
 		int chosenCore = coreAssignment();
-    	List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), chosenCore);
+		List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), chosenCore);
 
-        int chosen[] = policy(numberOfSlots, composition, circuit, cp);
-        circuit.setSpectrumAssigned(chosen);
-        circuit.setIndexCore(chosenCore);
+		int chosen[] = policy(numberOfSlots, composition, circuit, cp);
+		circuit.setSpectrumAssigned(chosen);
+		circuit.setIndexCore(chosenCore);
 
-        if (chosen == null)
-        	return false;
+		if (chosen == null)
+			return false;
 
-        return true;
+		return true;
 	}
 
 	/**
@@ -66,6 +66,7 @@ public class RandomCoreAssignment implements CoreAndSpectrumAssignmentAlgorithmI
 	@Override
 	public int coreAssignment() {
 		int coreIndex = generator.nextInt(this.numberOfCores);
+
 		return coreIndex;
 	}
 
@@ -80,10 +81,10 @@ public class RandomCoreAssignment implements CoreAndSpectrumAssignmentAlgorithmI
 	@Override
 	public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 
-        //Applies the spectrum allocation algorithm selected in the simulation configuration file
-    	int chosen[] = spectrumAssignment.policy(numberOfSlots, freeSpectrumBands, circuit, cp);
+		//Applies the spectrum allocation algorithm selected in the simulation configuration file
+		int chosen[] = spectrumAssignment.policy(numberOfSlots, freeSpectrumBands, circuit, cp);
 
-        return chosen;
+		return chosen;
 	}
 
 }

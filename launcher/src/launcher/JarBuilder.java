@@ -12,13 +12,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import java.util.Set;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
@@ -50,6 +53,41 @@ public final class JarBuilder {
 
     static final String[] DEFAULT_EXCLUDES = {"simulationControl/Main.java"};
 
+    /** Removed by the GN-only refactor. Never re-import them from the base JAR. */
+    private static final Set<String> RETIRED_CLASSES = new HashSet<String>(Arrays.asList(
+            "network/EgnFullReference", "network/Poggiolini2017EgnReference",
+            "verification/HabibiEgnComparisonVerification",
+            "network/HabibiEgnComparisonVerification",
+            "network/AmplifierGainLaw", "network/HabibiEgnHybrid",
+            "network/LobatoSpectralOverlap", "network/PoggioliniGnIntegral",
+            "network/Poggiolini2017HybridVerification",
+            "network/TrackedRequestList"));
+
+    /** Includes inner classes of removed types and the superseded PhysicalLayer decision. */
+    static boolean isRetiredClass(String jarEntry) {
+        if (!jarEntry.endsWith(".class")) return false;
+        String name = jarEntry.substring(0, jarEntry.length() - ".class".length());
+        String top = name.split("\\$", 2)[0];
+        return RETIRED_CLASSES.contains(top)
+                || name.startsWith("network/PhysicalLayer$HabibiEgnDecision")
+                || name.startsWith("network/PhysicalLayer$HabibiEgnCacheKey")
+                || name.equals("qkd/multiband/ClassicalChannel$Direction");
+    }
+
+    private static void checkRetiredSources(File src) {
+        List<String> oldSources = new ArrayList<String>();
+        for (String name : RETIRED_CLASSES) {
+            File oldFile = new File(src, name.replace('/', File.separatorChar) + ".java");
+            if (oldFile.isFile()) oldSources.add(oldFile.toString());
+        }
+        if (!oldSources.isEmpty())
+            fail("Fontes descontinuadas ainda estao na arvore de compilacao: " + oldSources
+                    + "\nExecute scripts/remover_egn_full_reference.bat e scripts/limpar_tracked_experimental.py antes de compilar. "
+                    + "Nao substitua HabibiEgnDecision por HabibiGnDecision nos arquivos EGN antigos: "
+                    + "os seus tipos Fiber/Channel tambem foram removidos.");
+    }
+
+
     public static void main(String[] args) throws Exception {
         // the launcher reads this process as UTF-8 (accents in the messages)
         System.setOut(new java.io.PrintStream(new FileOutputStream(java.io.FileDescriptor.out), true, "UTF-8"));
@@ -57,6 +95,9 @@ public final class JarBuilder {
         File src = null, base = null, out = null, backup = null;
         String javac = null;
         boolean verify = false;
+        File verifyJar = null;
+        String verifyOnly = null;
+        long verifyTimeoutSeconds = 1800L;
         Set<String> excludes = new HashSet<String>(Arrays.asList(DEFAULT_EXCLUDES));
         for (int i = 0; i < args.length; i++) {
             String a = args[i];
@@ -67,6 +108,15 @@ public final class JarBuilder {
             else if ("--javac".equals(a)) javac = args[++i];
             else if ("--exclude".equals(a)) excludes.add(args[++i].replace('\\', '/'));
             else if ("--verify".equals(a)) verify = true;
+            else if ("--verify-jar".equals(a)) verifyJar = new File(args[++i]);
+            else if ("--verify-only".equals(a)) verifyOnly = args[++i];
+            else if ("--verify-timeout-seconds".equals(a)) verifyTimeoutSeconds = Long.parseLong(args[++i]);
+        }
+        if (verifyTimeoutSeconds < 1) fail("--verify-timeout-seconds deve ser maior que zero");
+        if (verifyJar != null) {
+            if (!verifyJar.isFile()) fail("JAR a verificar nao encontrado: " + verifyJar);
+            verify(verifyJar, verifyOnly, verifyTimeoutSeconds);
+            return;
         }
         if (src == null || base == null || out == null) {
             fail("uso: JarBuilder --src <pasta> --base <jar> --out <jar> [--backup <pasta>] [--javac <javac>] [--verify]");
@@ -74,6 +124,8 @@ public final class JarBuilder {
         if (!src.isDirectory()) fail("Pasta do código não encontrada: " + src.getAbsolutePath());
         if (!base.isFile()) fail("JAR base não encontrado: " + base.getAbsolutePath()
                 + "\nO JAR base fornece as bibliotecas (Gson, OpenCSV, Firebase) e a classe Main; use o JAR atual do simulador.");
+
+        checkRetiredSources(src);
 
         long t0 = System.currentTimeMillis();
         File work = new File(out.getAbsoluteFile().getParentFile(), ".jarbuild");
@@ -105,6 +157,7 @@ public final class JarBuilder {
         System.out.println("[3/4] Montando o JAR …");
         File tmp = new File(work, out.getName());
         int[] counts = pack(base, classes, tmp, sourceTops, sourcePkgs);
+        verifyNoRetiredClasses(tmp);
         System.out.println("      " + counts[0] + " classes novas, " + counts[1] + " arquivos do JAR base mantidos, "
                 + counts[2] + " classes antigas sem código-fonte removidas");
 
@@ -129,7 +182,7 @@ public final class JarBuilder {
         System.out.println(String.format(Locale.ROOT, "JAR gerado em %.1f s (%.1f MB).",
                 (System.currentTimeMillis() - t0) / 1000.0, out.length() / 1048576.0));
 
-        if (verify) verify(out);
+        if (verify) verify(out, verifyOnly, verifyTimeoutSeconds);
         System.out.println("Concluído.");
     }
 
@@ -255,8 +308,21 @@ public final class JarBuilder {
         return new int[] {added, kept, dropped};
     }
 
+    /** Defense in depth: reject obsolete top-level and nested bytecode after packaging. */
+    private static void verifyNoRetiredClasses(File jar) throws IOException {
+        try (ZipFile zip = new ZipFile(jar)) {
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                String name = entries.nextElement().getName();
+                if (isRetiredClass(name))
+                    throw new IOException("O JAR ainda contem bytecode antigo: " + name);
+            }
+        }
+    }
+
     /** A class of a project package whose top-level source file no longer exists. */
     static boolean isStale(String entry, Set<String> sourceTops, Set<String> sourcePkgs) {
+        if (isRetiredClass(entry)) return true;
         int slash = entry.lastIndexOf('/');
         String pkg = slash < 0 ? "" : entry.substring(0, slash);
         if (!sourcePkgs.contains(pkg)) return false;
@@ -268,38 +334,108 @@ public final class JarBuilder {
 
     // ------------------------------------------------------------------ verify
 
-    private static void verify(File jar) throws Exception {
-        List<String> names = new ArrayList<String>();
+    /**
+     * An executable verifier succeeds when its JVM finishes with exit code 0.
+     * Historically this method required the literal "ALL CHECKS PASSED" in stdout,
+     * incorrectly marking dozens of successful checks which print "PASS ..." as failed.
+     * Output text is diagnostic evidence, never the success criterion.
+     *
+     * Every class has a dedicated log, including the COMPLETE exception stack trace,
+     * and the summary records the process exit code or timeout. Tests in both
+     * qkd.verification and verification are included.
+     */
+    private static void verify(File jar, String filter, long timeoutSeconds) throws Exception {
+        final List<String> names = new ArrayList<String>();
         try (ZipFile z = new ZipFile(jar)) {
             Enumeration<? extends ZipEntry> en = z.entries();
             while (en.hasMoreElements()) {
                 String n = en.nextElement().getName();
-                if (n.startsWith("qkd/verification/") && n.endsWith("Verification.class") && !n.contains("$")) {
-                    names.add(n.substring("qkd/verification/".length(), n.length() - ".class".length()));
+                if (n.contains("$") || !n.endsWith("Verification.class")) continue;
+                if (n.startsWith("qkd/verification/") || n.startsWith("verification/")) {
+                    String clazz = n.substring(0, n.length() - ".class".length()).replace('/', '.');
+                    if (filter == null || Arrays.asList(filter.split(",")).contains(clazz)
+                            || Arrays.asList(filter.split(",")).contains(clazz.substring(clazz.lastIndexOf('.') + 1))) {
+                        names.add(clazz);
+                    }
                 }
             }
         }
         java.util.Collections.sort(names);
-        System.out.println("Verificações QKD (" + names.size() + "):");
-        String java = new File(new File(System.getProperty("java.home"), "bin"), "java").getAbsolutePath();
+        if (names.isEmpty()) fail("Nenhuma classe Verification encontrada para o filtro: " + filter);
+        File reports = new File(jar.getAbsoluteFile().getParentFile(), "verification-reports");
+        if (!reports.isDirectory() && !reports.mkdirs()) fail("Nao foi possivel criar logs: " + reports);
+        String runId = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.ROOT).format(new Date());
+        File reportDir = new File(reports, runId);
+        if (!reportDir.mkdirs()) fail("Nao foi possivel criar: " + reportDir);
+        File csv = new File(reportDir, "resumo.csv");
+        String javaName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win") ? "java.exe" : "java";
+        File javaFile = new File(new File(System.getProperty("java.home"), "bin"), javaName);
+        if (!javaFile.isFile()) fail("Executavel Java nao encontrado: " + javaFile);
+        File cwd = jar.getAbsoluteFile().getParentFile().getParentFile();
+        System.out.println("Verificacoes (" + names.size() + "), sucesso = codigo de saida 0:");
+        System.out.println("  Logs completos: " + reportDir.getAbsolutePath());
         int ok = 0;
         List<String> bad = new ArrayList<String>();
-        File cwd = jar.getAbsoluteFile().getParentFile().getParentFile(); // project root (simulations/..)
-        for (String n : names) {
-            Process p = new ProcessBuilder(java, "-cp", jar.getAbsolutePath(), "qkd.verification." + n)
-                    .directory(cwd).redirectErrorStream(true).start();
-            String outText = readAll(p.getInputStream());
-            p.waitFor();
-            boolean pass = outText.contains("ALL CHECKS PASSED");
-            if (pass) ok++; else bad.add(n);
-            System.out.println("  " + (pass ? "OK    " : "FALHA ") + n);
-            if (!pass) {
-                String[] lines = outText.split("\\r?\\n");
-                for (int i = Math.max(0, lines.length - 6); i < lines.length; i++) System.out.println("        " + lines[i]);
+        try (PrintWriter summary = new PrintWriter(csv, "UTF-8")) {
+            summary.println("classe,status,codigo_saida,duracao_ms,log");
+            for (String className : names) {
+                String simple = className.substring(className.lastIndexOf('.') + 1);
+                File log = new File(reportDir, className.replace('.', '_') + ".log");
+                long start = System.currentTimeMillis();
+                String state = "FALHA";
+                String rcText = "";
+                try {
+                    ProcessBuilder builder = new ProcessBuilder(javaFile.getAbsolutePath(), "-cp",
+                            jar.getAbsolutePath(), className);
+                    builder.directory(cwd).redirectErrorStream(true).redirectOutput(log);
+                    Process process = builder.start();
+                    boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+                    if (!finished) {
+                        process.destroyForcibly();
+                        process.waitFor();
+                        state = "TEMPO_ESGOTADO";
+                    } else {
+                        rcText = Integer.toString(process.exitValue());
+                        if (process.exitValue() == 0) state = "OK";
+                    }
+                } catch (Exception e) {
+                    try (PrintWriter w = new PrintWriter(new FileOutputStream(log, true))) {
+                        e.printStackTrace(w);
+                    }
+                }
+                long elapsed = System.currentTimeMillis() - start;
+                boolean pass = "OK".equals(state);
+                if (pass) ok++; else bad.add(className);
+                summary.println(className + "," + state + "," + rcText + "," + elapsed + "," + log.getName());
+                summary.flush();
+                System.out.println("  " + (pass ? "OK    " : state + " ") + simple
+                        + " (exit=" + (rcText.isEmpty() ? "n/a" : rcText) + ", " + elapsed + " ms)");
+                if (!pass) {
+                    for (String line : lastLines(log, 16)) System.out.println("        " + line);
+                    System.out.println("        Log completo: " + log.getAbsolutePath());
+                }
             }
         }
-        System.out.println(ok + " de " + names.size() + " verificações passaram" + (bad.isEmpty() ? "." : "; falharam: " + String.join(", ", bad)));
-        if (!bad.isEmpty()) System.exit(2);
+        System.out.println(ok + " de " + names.size() + " verificacoes passaram; "
+                + bad.size() + " realmente falharam. Relatorio: " + csv.getAbsolutePath());
+        if (!bad.isEmpty()) {
+            System.err.println("[ERRO] JAR compilado; regressao NAO aprovada. Verifique os logs completos.");
+            System.exit(2);
+        }
+    }
+
+    /** Read a log tail without loading the entire output of an expensive simulation into RAM. */
+    private static List<String> lastLines(File log, int limit) throws IOException {
+        Deque<String> tail = new ArrayDeque<String>(limit);
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                Files.newInputStream(log.toPath()), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (tail.size() == limit) tail.removeFirst();
+                tail.addLast(line);
+            }
+        }
+        return new ArrayList<String>(tail);
     }
 
     // ------------------------------------------------------------------ helpers

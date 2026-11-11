@@ -35,39 +35,40 @@ public class DJKGBSAlgorithm implements IntegratedRMLSAAlgorithmInterface {
 			routing = cp.getRouting();
 
 			// To read the value of k from the "others" file
-        	Map<String, String> uv = cp.getMesh().getOthersConfig().getVariables();
-        	if(uv.get("maximumGuardBand") != null) {
-        		maximumGuardBand = Integer.parseInt((String)uv.get("maximumGuardBand"));
-        	}
-        }
+			Map<String, String> uv = cp.getMesh().getOthersConfig().getVariables();
+
+			if(uv.get("maximumGuardBand") != null) {
+				maximumGuardBand = Integer.parseInt((String)uv.get("maximumGuardBand"));
+			}
+		}
 
 		//Select the route
-        routing.findRoute(circuit, cp.getMesh());
-        Route route = circuit.getRoute();
+		routing.findRoute(circuit, cp.getMesh());
+		Route route = circuit.getRoute();
 
-        List<Modulation> avaliableModulations = cp.getMesh().getAvaliableModulations();
+		List<Modulation> avaliableModulations = cp.getMesh().getAvaliableModulations();
 
-        // Modulation, core and band chosen
-        Modulation chosenMod = null;
-        int chosenCore = -1;
-        int chosenBand[] = null;
-        int chosenGB = -1;
+		// Modulation, core and band chosen
+		Modulation chosenMod = null;
+		int chosenCore = -1;
+		int chosenBand[] = null;
+		int chosenGB = -1;
 
-        // To avoid metrics error
-  		Modulation checkMod = null;
-  		int checkCore = -1;
-  		int checkBand[] = null;
-  		int checkGB = -1;
+		// To avoid metrics error
+		Modulation checkMod = null;
+		int checkCore = -1;
+		int checkBand[] = null;
+		int checkGB = -1;
 
-  		Modulation checkMod2 = null;
-  		int checkCore2 = -1;
-  		int checkBand2[] = null;
-  		int checkGB2 = -1;
+		Modulation checkMod2 = null;
+		int checkCore2 = -1;
+		int checkBand2[] = null;
+		int checkGB2 = -1;
 
-  		int numberOfCores = cp.getMesh().getLinkList().get(0).getNumberOfCores();
-  		double minRouteCost = Double.POSITIVE_INFINITY;
+		int numberOfCores = cp.getMesh().getLinkList().get(0).getNumberOfCores();
+		double minRouteCost = Double.POSITIVE_INFINITY;
 
-        // Begins with the most spectrally efficient modulation format
+		// Begins with the most spectrally efficient modulation format
 		for (int m = avaliableModulations.size()-1; m >= 0; m--) {
 			Modulation mod = avaliableModulations.get(m);
 			circuit.setModulation(mod);
@@ -75,91 +76,96 @@ public class DJKGBSAlgorithm implements IntegratedRMLSAAlgorithmInterface {
 			int slotsNumber = mod.requiredSlots(circuit.getRequiredBitRate()); // Slots required for establishment on the new circuit
 
 			// Possible values ​​for the guard band
-            for (int gb = 0; gb < maximumGuardBand; gb++) {
-            	circuit.setGuardBand(gb); // You have to set the guard band after you set the modulation.
+			for (int gb = 0; gb < maximumGuardBand; gb++) {
+				circuit.setGuardBand(gb); // You have to set the guard band after you set the modulation.
 
-    			// It goes through the cores starting from the highest index to the lowest index
-    			for (int core = numberOfCores-1; core >= 0; core--) {
-    				circuit.setIndexCore(core);
+				// It goes through the cores starting from the highest index to the lowest index
+				for (int core = numberOfCores-1; core >= 0; core--) {
+					circuit.setIndexCore(core);
 
-    	            int band[] = assignSpectrum(slotsNumber, circuit, cp, core);
-    	            circuit.setSpectrumAssigned(band);
+					int band[] = assignSpectrum(slotsNumber, circuit, cp, core);
+					circuit.setSpectrumAssigned(band);
 
-    	            if (band != null) {
-                		checkMod = mod;
-                		checkCore = core;
-    	            	checkBand = band;
-    	            	checkGB = gb;
+					if (band != null) {
+						checkMod = mod;
+						checkCore = core;
+						checkBand = band;
+						checkGB = gb;
 
-    	            	// Check the physical layer
-    	            	boolean QoT = cp.isAdmissibleOSNR(circuit);
-                		boolean XT = true;
-                		if (QoT) { // Only tests XT if it passes through OSNR
-                			XT = cp.isAdmissibleCrosstalk(circuit);
-                		}
+						// Check the physical layer
+						boolean QoT = cp.isAdmissibleOSNR(circuit);
+						boolean XT = true;
 
-    	    			if (QoT && XT) { // QoT and XT are acceptable
-    		    			checkMod2 = mod;
-    		    			checkCore2 = core;
-    	            		checkBand2 = band;
-    	            		checkGB2 = gb;
+						if (QoT) { // Only tests XT if it passes through OSNR
+							XT = cp.isAdmissibleCrosstalk(circuit);
+						}
 
-    	            		// Checks the QoT and XT for others circuits
-    	            		boolean QoTO = cp.isAdmissibleOSNRInOther(circuit);
-    	            		boolean XTO = true;
-    	            		if (QoTO) { // Only tests XT if it passes through OSNR
-    	            			XTO = cp.isAdmissibleCrosstalkInOther(circuit);
-    	            		}
+						if (QoT && XT) { // QoT and XT are acceptable
+							checkMod2 = mod;
+							checkCore2 = core;
+							checkBand2 = band;
+							checkGB2 = gb;
 
-    		                if (QoTO && XTO) { // QoTO and XTO are acceptable
+							// Checks the QoT and XT for others circuits
+							boolean QoTO = cp.isAdmissibleOSNRInOther(circuit);
+							boolean XTO = true;
 
-    		                	double cost = circuit.getXt();
-    		                	if (cost < minRouteCost) { // Select the route with the lowest cost
-    		                		minRouteCost = cost;
+							if (QoTO) { // Only tests XT if it passes through OSNR
+								XTO = cp.isAdmissibleCrosstalkInOther(circuit);
+							}
 
-        			                chosenMod = mod;
-        			                chosenCore = core;
-        			                chosenBand = band;
-        			                chosenGB = gb;
-    		                	}
-    		                }
-    	            	}
-    	            }//spectrum
-    			} //core
-            } //guard band
-        } //modulations
+							if (QoTO && XTO) { // QoTO and XTO are acceptable
 
-        if (chosenMod != null) { // If a modulation with acceptable QoT and QoTO was found
-            circuit.setRoute(route);
-            circuit.setModulation(chosenMod);
-            circuit.setGuardBand(chosenGB);
-            circuit.setIndexCore(chosenCore);
-            circuit.setSpectrumAssigned(chosenBand);
+								double cost = circuit.getXt();
 
-            return true;
+								if (cost < minRouteCost) { // Select the route with the lowest cost
+									minRouteCost = cost;
 
-        } else if(checkMod2 != null) {
-            circuit.setRoute(route);
-            circuit.setModulation(checkMod2);
-            circuit.setGuardBand(checkGB2);
-            circuit.setIndexCore(checkCore2);
-            circuit.setSpectrumAssigned(checkBand2);
+									chosenMod = mod;
+									chosenCore = core;
+									chosenBand = band;
+									chosenGB = gb;
+								}
+							}
+						}
 
-            return false;
+					}//spectrum
+				} //core
+			} //guard band
+		} //modulations
 
-        } else {
-        	if(checkMod == null){
+		if (chosenMod != null) { // If a modulation with acceptable QoT and QoTO was found
+			circuit.setRoute(route);
+			circuit.setModulation(chosenMod);
+			circuit.setGuardBand(chosenGB);
+			circuit.setIndexCore(chosenCore);
+			circuit.setSpectrumAssigned(chosenBand);
+
+			return true;
+
+		} else if(checkMod2 != null) {
+			circuit.setRoute(route);
+			circuit.setModulation(checkMod2);
+			circuit.setGuardBand(checkGB2);
+			circuit.setIndexCore(checkCore2);
+			circuit.setSpectrumAssigned(checkBand2);
+
+			return false;
+
+		} else {
+			if(checkMod == null){
 				checkMod = avaliableModulations.get(0);
 				checkCore = new Random().nextInt(numberOfCores);
 			}
-            circuit.setRoute(route);
-            circuit.setModulation(checkMod);
-            circuit.setGuardBand(checkGB);
-            circuit.setIndexCore(checkCore);
-            circuit.setSpectrumAssigned(checkBand);
 
-            return false;
-        }
+			circuit.setRoute(route);
+			circuit.setModulation(checkMod);
+			circuit.setGuardBand(checkGB);
+			circuit.setIndexCore(checkCore);
+			circuit.setSpectrumAssigned(checkBand);
+
+			return false;
+		}
 	}
 
 	/**
@@ -174,19 +180,19 @@ public class DJKGBSAlgorithm implements IntegratedRMLSAAlgorithmInterface {
 	private int[] assignSpectrum(int slotsNumber, Circuit circuit, ControlPlane cp, int core) {
 
 		int chosen[] = null;
-    	List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), core);
+		List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), core);
 
-    	if(core == 0) { // central core
-    		chosen = mediumFit(slotsNumber, composition, circuit, cp);
+		if(core == 0) { // central core
+			chosen = mediumFit(slotsNumber, composition, circuit, cp);
 
-    	}else if(core % 2 == 0) { //even core
-    		chosen = lastFit(slotsNumber, composition, circuit, cp);
+		}else if(core % 2 == 0) { //even core
+			chosen = lastFit(slotsNumber, composition, circuit, cp);
 
-    	}else if(core % 2 == 1) { //odd core
-    		chosen = firstFit(slotsNumber, composition, circuit, cp);
-    	}
+		}else if(core % 2 == 1) { //odd core
+			chosen = firstFit(slotsNumber, composition, circuit, cp);
+		}
 
-    	return chosen;
+		return chosen;
 	}
 
 	/**
@@ -200,36 +206,37 @@ public class DJKGBSAlgorithm implements IntegratedRMLSAAlgorithmInterface {
 	 */
 	private int[] mediumFit(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-    	int reference = circuit.getRoute().getLink(0).getCore(0).getNumOfSlots() / 2; //Center slot
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-    	for (int[] band : freeSpectrumBands) {
-        	if(chosen == null) {
-        		if (band[1] - band[0] + 1 >= numberOfSlots) {
-                    chosen = band.clone();
-                    chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
-                    break;
-                }
-        	}
-    	}
+		int reference = circuit.getRoute().getLink(0).getCore(0).getNumOfSlots() / 2; //Center slot
 
-    	if(chosen != null) {
-	    	for (int[] band : freeSpectrumBands) {
+		for (int[] band : freeSpectrumBands) {
+			if(chosen == null) {
+				if (band[1] - band[0] + 1 >= numberOfSlots) {
+					chosen = band.clone();
+					chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
+					break;
+				}
+			}
+		}
 
-	        	for(int i = band[0]; i <= band[1]; i++) {
-	        		if(Math.abs(reference-i) < Math.abs(reference-chosen[0])) {
-	        			if((band[1]-i+1) >= numberOfSlots) {
-	        				chosen[0] = i;
-	        				chosen[1] = i + numberOfSlots - 1;
-	        			}
-	        		}
-	        	}
-	    	}
-    	}
+		if(chosen != null) {
+			for (int[] band : freeSpectrumBands) {
 
-        return chosen;
+				for(int i = band[0]; i <= band[1]; i++) {
+					if(Math.abs(reference-i) < Math.abs(reference-chosen[0])) {
+						if((band[1]-i+1) >= numberOfSlots) {
+							chosen[0] = i;
+							chosen[1] = i + numberOfSlots - 1;
+						}
+					}
+				}
+			}
+		}
+
+		return chosen;
 	}
 
 	/**
@@ -243,21 +250,22 @@ public class DJKGBSAlgorithm implements IntegratedRMLSAAlgorithmInterface {
 	 */
 	private int[] lastFit(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots>maxAmplitude) return null;
-    	int chosen[] = null;
-        int band[] = null;
 
-        for (int i = freeSpectrumBands.size() - 1; i >= 0; i--) {
-            band = freeSpectrumBands.get(i);
+		if(numberOfSlots>maxAmplitude) return null;
+		int chosen[] = null;
+		int band[] = null;
 
-            if (band[1] - band[0] + 1 >= numberOfSlots) {
-                chosen = band.clone();
-                chosen[0] = chosen[1] - numberOfSlots + 1;//It is not necessary to allocate the entire band, just the amount of slots required
-                break;
-            }
-        }
+		for (int i = freeSpectrumBands.size() - 1; i >= 0; i--) {
+			band = freeSpectrumBands.get(i);
 
-        return chosen;
+			if (band[1] - band[0] + 1 >= numberOfSlots) {
+				chosen = band.clone();
+				chosen[0] = chosen[1] - numberOfSlots + 1;//It is not necessary to allocate the entire band, just the amount of slots required
+				break;
+			}
+		}
+
+		return chosen;
 	}
 
 	/**
@@ -271,19 +279,20 @@ public class DJKGBSAlgorithm implements IntegratedRMLSAAlgorithmInterface {
 	 */
 	private int[] firstFit(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-        for (int[] band : freeSpectrumBands) {
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-            if (band[1] - band[0] + 1 >= numberOfSlots) {
-                chosen = band.clone();
-                chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
-                break;
-            }
-        }
+		for (int[] band : freeSpectrumBands) {
 
-        return chosen;
+			if (band[1] - band[0] + 1 >= numberOfSlots) {
+				chosen = band.clone();
+				chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
+				break;
+			}
+		}
+
+		return chosen;
 	}
 
 	/**

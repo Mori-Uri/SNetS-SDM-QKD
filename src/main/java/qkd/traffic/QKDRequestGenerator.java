@@ -22,144 +22,165 @@ import util.RandGenerator;
  */
 public class QKDRequestGenerator extends RequestGenerator {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private final RandGenerator timingRandGenerator;
-    private final RandGenerator protectionRandGenerator;
-    private final double protectedRequestProbability;
-    private final QKDKeyDemandPolicy keyDemandPolicy;
-    private double atualTimeHours;
-    private QKDArrivalBudget arrivalBudget;
+	private final RandGenerator timingRandGenerator;
+	private final RandGenerator protectionRandGenerator;
+	private final double protectedRequestProbability;
+	private double qkdOnlyProbability;
+	private final QKDKeyDemandPolicy keyDemandPolicy;
+	private double atualTimeHours;
+	private QKDArrivalBudget arrivalBudget;
 
-    public QKDRequestGenerator(Pair pair, double bandwidth, double holdRate,
-            double arrivedRate, double incLoad, RandGenerator randGenerator,
-            double protectedRequestProbability) {
-        this(pair, bandwidth, holdRate, arrivedRate, incLoad, randGenerator,
-                protectedRequestProbability,
-                QKDKeyDemandPolicy.referenceDefault());
-    }
+	public QKDRequestGenerator(Pair pair, double bandwidth, double holdRate,
+			double arrivedRate, double incLoad, RandGenerator randGenerator,
+			double protectedRequestProbability) {
+		this(pair, bandwidth, holdRate, arrivedRate, incLoad, randGenerator,
+				protectedRequestProbability,
+				QKDKeyDemandPolicy.referenceDefault());
+	}
 
-    public QKDRequestGenerator(Pair pair, double bandwidth, double holdRate,
-            double arrivedRate, double incLoad, RandGenerator randGenerator,
-            double protectedRequestProbability,
-            QKDKeyDemandPolicy keyDemandPolicy) {
-        this(pair, bandwidth, holdRate, arrivedRate, incLoad, randGenerator,
-                randGenerator, protectedRequestProbability, keyDemandPolicy);
-    }
+	public QKDRequestGenerator(Pair pair, double bandwidth, double holdRate,
+			double arrivedRate, double incLoad, RandGenerator randGenerator,
+			double protectedRequestProbability,
+			QKDKeyDemandPolicy keyDemandPolicy) {
+		this(pair, bandwidth, holdRate, arrivedRate, incLoad, randGenerator,
+				randGenerator, protectedRequestProbability, keyDemandPolicy);
+	}
 
-    /** Production constructor with independent traffic-timing and QKD-class streams. */
-    public QKDRequestGenerator(Pair pair, double bandwidth, double holdRate,
-            double arrivedRate, double incLoad, RandGenerator timingRandGenerator,
-            RandGenerator protectionRandGenerator,
-            double protectedRequestProbability,
-            QKDKeyDemandPolicy keyDemandPolicy) {
-        super(pair, bandwidth, holdRate, arrivedRate, incLoad, timingRandGenerator);
-        if (timingRandGenerator == null || protectionRandGenerator == null) {
-            throw new IllegalArgumentException("random generators cannot be null");
-        }
-        if (keyDemandPolicy == null) {
-            throw new IllegalArgumentException("keyDemandPolicy cannot be null");
-        }
-        validateProbability(protectedRequestProbability);
-        this.timingRandGenerator = timingRandGenerator;
-        this.protectionRandGenerator = protectionRandGenerator;
-        this.protectedRequestProbability = protectedRequestProbability;
-        this.keyDemandPolicy = keyDemandPolicy;
-        this.atualTimeHours = 0.0;
-    }
+	/** Production constructor with independent traffic-timing and QKD-class streams. */
+	public QKDRequestGenerator(Pair pair, double bandwidth, double holdRate,
+			double arrivedRate, double incLoad, RandGenerator timingRandGenerator,
+			RandGenerator protectionRandGenerator,
+			double protectedRequestProbability,
+			QKDKeyDemandPolicy keyDemandPolicy) {
+		super(pair, bandwidth, holdRate, arrivedRate, incLoad, timingRandGenerator);
 
-    @Override
-    public void scheduleNextRequest(EventMachine eventMachine,
-            ArriveRequestForConexionListener listener) {
-        if (arrivalBudget != null && !arrivalBudget.tryAcquire()) {
-            return;
-        }
+		if (timingRandGenerator == null || protectionRandGenerator == null) {
+			throw new IllegalArgumentException("random generators cannot be null");
+		}
 
-        RequestForConnection request = new RequestForConnection();
+		if (keyDemandPolicy == null) {
+			throw new IllegalArgumentException("keyDemandPolicy cannot be null");
+		}
 
-        // Same stochastic timing equations used by the original SNetS generator.
-        double arriveTime = timingRandGenerator.negexp(getArrivedRate());
-        atualTimeHours += arriveTime;
-        request.setTimeOfRequestHours(atualTimeHours);
+		validateProbability(protectedRequestProbability);
+		this.timingRandGenerator = timingRandGenerator;
+		this.protectionRandGenerator = protectionRandGenerator;
+		this.protectedRequestProbability = protectedRequestProbability;
+		this.keyDemandPolicy = keyDemandPolicy;
+		this.atualTimeHours = 0.0;
+	}
 
-        double holdTime = timingRandGenerator.negexp(getHoldRate());
-        double finalizeTime = request.getTimeOfRequestHours() + holdTime;
-        request.setTimeOfFinalizeHours(finalizeTime);
+	@Override
+	public void scheduleNextRequest(EventMachine eventMachine,
+			ArriveRequestForConexionListener listener) {
+		if (arrivalBudget != null && !arrivalBudget.tryAcquire()) {
+			return;
+		}
 
-        request.setPair(getPair());
-        request.setRequiredBitRate(getBandwidth());
-        request.setRequestGenerator(this);
+		RequestForConnection request = new RequestForConnection();
 
-        RequestProtectionType protectionType = drawProtectionType();
-        request.setProtectionType(protectionType);
-        if (protectionType == RequestProtectionType.QKD_PROTECTED) {
-            request.setQkdKeyDemand(drawKeyDemand());
-        }
+		// Same stochastic timing equations used by the original SNetS generator.
+		double arriveTime = timingRandGenerator.negexp(getArrivedRate());
+		atualTimeHours += arriveTime;
+		request.setTimeOfRequestHours(atualTimeHours);
 
-        Event event = new Event(request, listener, atualTimeHours);
-        eventMachine.insert(event);
-    }
+		double holdTime = timingRandGenerator.negexp(getHoldRate());
+		double finalizeTime = request.getTimeOfRequestHours() + holdTime;
+		request.setTimeOfFinalizeHours(finalizeTime);
 
-    /**
-     * Draws only the request class. Kept public so deterministic verification
-     * can exercise the exact production logic without scheduling events.
-     */
-    /** Shares an arrival budget among the generators of one mesh (null = unlimited). */
-    public void setArrivalBudget(QKDArrivalBudget arrivalBudget) {
-        this.arrivalBudget = arrivalBudget;
-    }
+		request.setPair(getPair());
+		request.setRequiredBitRate(getBandwidth());
+		request.setRequestGenerator(this);
 
-    public RequestProtectionType drawProtectionType() {
-        return protectionRandGenerator.nextDouble() < protectedRequestProbability
-                ? RequestProtectionType.QKD_PROTECTED
-                : RequestProtectionType.CLASSICAL;
-    }
+		RequestProtectionType protectionType = drawProtectionType();
+		request.setProtectionType(protectionType);
 
-    /**
+		if (protectionType == RequestProtectionType.QKD_ONLY) request.setRequiredBitRate(0.0);
+		if (protectionType == RequestProtectionType.QKD_PROTECTED
+				|| protectionType == RequestProtectionType.QKD_ONLY) {
+			request.setQkdKeyDemand(drawKeyDemand());
+		}
+
+		Event event = new Event(request, listener, atualTimeHours);
+		eventMachine.insert(event);
+	}
+
+	/** Shares an arrival budget among the generators of one mesh (null = unlimited). */
+	public void setArrivalBudget(QKDArrivalBudget arrivalBudget) {
+		this.arrivalBudget = arrivalBudget;
+	}
+
+	/**
+	 * Draws only the request class; independent of the traffic-timing stream.
+	 * Kept public for deterministic verification without event scheduling.
+	 */
+	public RequestProtectionType drawProtectionType() {
+		double u = protectionRandGenerator.nextDouble();
+		if (u < qkdOnlyProbability) return RequestProtectionType.QKD_ONLY;
+		return u < qkdOnlyProbability + protectedRequestProbability
+				? RequestProtectionType.QKD_PROTECTED : RequestProtectionType.CLASSICAL;
+	}
+
+	/**
      * Draws the key-consumption class from the QKD-only random stream.
      */
-    public QKDKeyDemand drawKeyDemand() {
-        if (fixedKeyDemand != null) {
-            // keep the QKD random stream aligned with the policy-driven case
-            keyDemandPolicy.draw();
-            return fixedKeyDemand;
-        }
-        if (keyDemandPolicy.isByBitRate()) {
-            // Part 34: the demand follows the bit rate; the draw keeps the QKD random stream aligned
-            keyDemandPolicy.draw();
-            return keyDemandPolicy.forBitRate(getBandwidth());
-        }
-        return keyDemandPolicy.draw();
-    }
+	public QKDKeyDemand drawKeyDemand() {
+		if (fixedKeyDemand != null) {
+			// keep the QKD random stream aligned with the policy-driven case
+			keyDemandPolicy.draw();
 
-    /** Part 23: fixed key demand of this generator (traffic file keyRateMbps), or null. */
-    private QKDKeyDemand fixedKeyDemand;
+			return fixedKeyDemand;
+		}
 
-    public void setFixedKeyRateMbps(Double keyRateMbps) {
-        if (keyRateMbps == null) { fixedKeyDemand = null; return; }
-        if (!(keyRateMbps > 0.0) || Double.isInfinite(keyRateMbps))
-            throw new IllegalArgumentException("traffic keyRateMbps must be > 0");
-        int bits = keyDemandPolicy.getKeySizeBits();
-        // rate = keySizeBits / interval  =>  interval[us] = bits / (rate[Mbit/s])
-        fixedKeyDemand = new QKDKeyDemand(bits, bits / keyRateMbps.doubleValue());
-    }
+		if (keyDemandPolicy.isByBitRate()) {
+			// Part 34: the demand follows the bit rate; the draw keeps the QKD random stream aligned
+			keyDemandPolicy.draw();
 
-    public QKDKeyDemand getFixedKeyDemand() { return fixedKeyDemand; }
+			return keyDemandPolicy.forBitRate(getBandwidth());
+		}
 
-    public QKDKeyDemandPolicy getKeyDemandPolicy() {
-        return keyDemandPolicy;
-    }
+		return keyDemandPolicy.draw();
+	}
 
-    public double getProtectedRequestProbability() {
-        return protectedRequestProbability;
-    }
+	/** Part 23: fixed key demand of this generator (traffic file keyRateMbps), or null. */
+	private QKDKeyDemand fixedKeyDemand;
 
-    private static void validateProbability(double probability) {
-        if (!Double.isFinite(probability)
-                || probability < 0.0
-                || probability > 1.0) {
-            throw new IllegalArgumentException(
-                    "QKD protected-request probability must be in [0,1]");
-        }
-    }
+	public void setFixedKeyRateMbps(Double keyRateMbps) {
+		if (keyRateMbps == null) { fixedKeyDemand = null; return; }
+		if (!(keyRateMbps > 0.0) || Double.isInfinite(keyRateMbps))
+			throw new IllegalArgumentException("traffic keyRateMbps must be > 0");
+		int bits = keyDemandPolicy.getKeySizeBits();
+
+		// rate[bit/s] = keySizeBits / interval[s]  =>  interval[s] = bits / (rate[Mbit/s] * 1e6)
+		fixedKeyDemand = new QKDKeyDemand(bits, bits / (keyRateMbps.doubleValue() * 1.0e6));
+	}
+
+	public QKDKeyDemand getFixedKeyDemand() { return fixedKeyDemand; }
+
+	public QKDKeyDemandPolicy getKeyDemandPolicy() {
+		return keyDemandPolicy;
+	}
+
+	public void setQkdOnlyProbability(double probability) {
+		validateProbability(probability);
+		if (probability + protectedRequestProbability > 1.0 + 1e-12)
+			throw new IllegalArgumentException("qkdOnlyProbability + qkdProtectedProbability must be <= 1");
+		this.qkdOnlyProbability = probability;
+	}
+	public double getQkdOnlyProbability() { return qkdOnlyProbability; }
+
+	public double getProtectedRequestProbability() {
+		return protectedRequestProbability;
+	}
+
+	private static void validateProbability(double probability) {
+		if (!Double.isFinite(probability)
+				|| probability < 0.0
+				|| probability > 1.0) {
+			throw new IllegalArgumentException(
+					"QKD protected-request probability must be in [0,1]");
+		}
+	}
 }

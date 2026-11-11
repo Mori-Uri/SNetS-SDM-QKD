@@ -149,16 +149,6 @@ final class Settings {
         m.put("projectRootSetting", get("projectRoot", ""));
         m.put("simulationsDirSetting", get("simulationsDir", ""));
         m.put("javaCommandSetting", get("javaCommand", ""));
-        // Parte 59: application
-        m.put("appWindow", !"false".equalsIgnoreCase(get("appWindow", "true")));
-        m.put("closePolicy", get("closePolicy", "tray"));
-        m.put("tray", !"false".equalsIgnoreCase(get("tray", "true")));
-        m.put("updateCheck", !"false".equalsIgnoreCase(get("updateCheck", "true")));
-        m.put("updateRepo", get("updateRepo", "Mori-Uri/SNetS-SDM-QKD"));
-        m.put("updateTokenSet", !get("updateToken", "").isEmpty());
-        // Parte 60: folder of the exported images and animations
-        m.put("imagesDirSetting", get("imagesDir", ""));
-        m.put("imagesDir", get("imagesDir", "").isEmpty() ? new File(launcherDir, "figures").getAbsolutePath() : get("imagesDir", ""));
         return m;
     }
 }

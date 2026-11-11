@@ -36,6 +36,7 @@ public class MainMOABC {
 		if(functionName.equals("UF1") || functionName.equals("UF5") || functionName.equals("UF6")){ // for UF1, UF5 and UF6
 			minX[0] = 0.0;
 			maxX[0] = 1.0;
+
 			for(int i = 1; i < n; i++){
 				minX[i] = -1.0;
 				maxX[i] = 1.0;
@@ -50,6 +51,7 @@ public class MainMOABC {
 		}else if(functionName.equals("UF4")){ // for UF4
 			minX[0] = 0.0;
 			maxX[0] = 1.0;
+
 			for(int i = 1; i < n; i++){
 				minX[i] = -2.0;
 				maxX[i] = 2.0;
@@ -106,7 +108,6 @@ public class MainMOABC {
 
 		return result;
 	}
-
 
 	/**
 	 * Saves the results.
@@ -180,8 +181,6 @@ public class MainMOABC {
 //		}
 	}
 
-
-
 	/**
 	 * Returns the uf1.
 	 * @param x[] the x[].
@@ -201,6 +200,7 @@ public class MainMOABC {
 		for(j = 2; j <= n; j++) {
 			yj = x[j-1] - Math.sin(6.0 * Math.PI * x[0] + j * Math.PI / n);
 			yj = yj * yj;
+
 			if(j % 2 == 0) {
 				sum2 += yj;
 				count2++;
@@ -237,6 +237,7 @@ public class MainMOABC {
 		for(j = 2; j <= n; j++){
 			yj = x[j-1] - Math.pow(x[0], 0.5 * (1.0 + 3.0 * (j - 2.0) / (n - 2.0)));
 			pj = Math.cos(20.0 * yj * Math.PI / Math.sqrt(j + 0.0));
+
 			if (j % 2 == 0) {
 				sum2  += yj * yj;
 				prod2 *= pj;
@@ -273,6 +274,7 @@ public class MainMOABC {
 		for(j = 2; j <= n; j++) {
 			yj = x[j-1] - Math.sin(6.0 * Math.PI * x[0] + j * Math.PI / n);
 			hj = fabs(yj) / (1.0 + Math.exp(2.0 * fabs(yj)));
+
 			if (j % 2 == 0) {
 				sum2  += hj;
 				count2++;
@@ -309,6 +311,7 @@ public class MainMOABC {
 		for(j = 2; j <= n; j++) {
 			yj = x[j-1] - Math.sin(6.0 * Math.PI * x[0] + j * Math.PI / n);
 			hj = 2.0 * yj * yj - Math.cos(4.0 * Math.PI * yj) + 1.0;
+
 			if (j % 2 == 0) {
 				sum2  += hj;
 				count2++;
@@ -348,6 +351,7 @@ public class MainMOABC {
 		for(j = 2; j <= n; j++) {
 			yj = x[j-1] - Math.sin(6.0 * Math.PI * x[0] + j * Math.PI / n);
 			pj = Math.cos(20.0 * yj * Math.PI / Math.sqrt(j + 0.0));
+
 			if (j % 2 == 0) {
 				sum2  += yj * yj;
 				prod2 *= pj;
@@ -360,6 +364,7 @@ public class MainMOABC {
 		}
 
 		hj = 2.0 * (0.5 / N2 + E) * Math.sin(2.0 * N2 * Math.PI * x[0]);
+
 		if(hj < 0.0)
 			hj = 0.0;
 		f[0] = x[0]	+ hj + 2.0 * (4.0 * sum1 - 2.0 * prod1 + 2.0) / (double)count1;
@@ -377,6 +382,7 @@ public class MainMOABC {
 		if(x < 0.0){
 			return -1.0 * x;
 		}
+
 		return x;
 	}
 }

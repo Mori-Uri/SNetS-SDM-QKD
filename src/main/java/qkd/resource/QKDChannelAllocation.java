@@ -15,84 +15,88 @@ import network.Link;
  */
 public final class QKDChannelAllocation implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private final Link link;
-    private final String source;
-    private final String destination;
-    private final int quantumCoreId;
-    private final int[] spectrumBand;
-    private final int guardBand;
-    private final int coveredQkdSpans;
+	private final Link link;
+	private final String source;
+	private final String destination;
+	private final int quantumCoreId;
+	private final int[] spectrumBand;
+	private final int guardBand;
+	private final int coveredQkdSpans;
 
-    public QKDChannelAllocation(Link link, int quantumCoreId,
-            int[] spectrumBand, int guardBand, int coveredQkdSpans) {
-        if (link == null) {
-            throw new IllegalArgumentException("link cannot be null");
-        }
-        if (spectrumBand == null || spectrumBand.length != 2
-                || spectrumBand[0] > spectrumBand[1]) {
-            throw new IllegalArgumentException("invalid spectrumBand");
-        }
-        if (quantumCoreId < 0) {
-            throw new IllegalArgumentException("quantumCoreId must be >= 0");
-        }
-        if (guardBand < 0) {
-            throw new IllegalArgumentException("guardBand must be >= 0");
-        }
-        if (coveredQkdSpans <= 0) {
-            throw new IllegalArgumentException("coveredQkdSpans must be > 0");
-        }
+	public QKDChannelAllocation(Link link, int quantumCoreId,
+			int[] spectrumBand, int guardBand, int coveredQkdSpans) {
+		if (link == null) {
+			throw new IllegalArgumentException("link cannot be null");
+		}
 
-        this.link = link;
-        this.source = link.getSource().getName();
-        this.destination = link.getDestination().getName();
-        this.quantumCoreId = quantumCoreId;
-        this.spectrumBand = new int[] {spectrumBand[0], spectrumBand[1]};
-        this.guardBand = guardBand;
-        this.coveredQkdSpans = coveredQkdSpans;
-    }
+		if (spectrumBand == null || spectrumBand.length != 2
+				|| spectrumBand[0] > spectrumBand[1]) {
+			throw new IllegalArgumentException("invalid spectrumBand");
+		}
 
-    public Link getLink() {
-        return link;
-    }
+		if (quantumCoreId < 0) {
+			throw new IllegalArgumentException("quantumCoreId must be >= 0");
+		}
 
-    public String getSource() {
-        return source;
-    }
+		if (guardBand < 0) {
+			throw new IllegalArgumentException("guardBand must be >= 0");
+		}
 
-    public String getDestination() {
-        return destination;
-    }
+		if (coveredQkdSpans <= 0) {
+			throw new IllegalArgumentException("coveredQkdSpans must be > 0");
+		}
 
-    public int getQuantumCoreId() {
-        return quantumCoreId;
-    }
+		this.link = link;
+		this.source = link.getSource().getName();
+		this.destination = link.getDestination().getName();
+		this.quantumCoreId = quantumCoreId;
+		this.spectrumBand = new int[] {spectrumBand[0], spectrumBand[1]};
+		this.guardBand = guardBand;
+		this.coveredQkdSpans = coveredQkdSpans;
+	}
 
-    public int[] getSpectrumBand() {
-        return new int[] {spectrumBand[0], spectrumBand[1]};
-    }
+	public Link getLink() {
+		return link;
+	}
 
-    public int getGuardBand() {
-        return guardBand;
-    }
+	public String getSource() {
+		return source;
+	}
 
-    public int getCoveredQkdSpans() {
-        return coveredQkdSpans;
-    }
+	public String getDestination() {
+		return destination;
+	}
 
-    public int getAllocatedSlots() {
-        return spectrumBand[1] - spectrumBand[0] + 1;
-    }
+	public int getQuantumCoreId() {
+		return quantumCoreId;
+	}
 
-    @Override
-    public String toString() {
-        return "QKDChannelAllocation{" + source + "->" + destination
-                + ", core=" + quantumCoreId
-                + ", spectrum=[" + spectrumBand[0] + ',' + spectrumBand[1] + ']'
-                + ", slots=" + getAllocatedSlots()
-                + ", guardBand=" + guardBand
-                + ", coveredQkdSpans=" + coveredQkdSpans
-                + '}';
-    }
+	public int[] getSpectrumBand() {
+		return new int[] {spectrumBand[0], spectrumBand[1]};
+	}
+
+	public int getGuardBand() {
+		return guardBand;
+	}
+
+	public int getCoveredQkdSpans() {
+		return coveredQkdSpans;
+	}
+
+	public int getAllocatedSlots() {
+		return spectrumBand[1] - spectrumBand[0] + 1;
+	}
+
+	@Override
+	public String toString() {
+		return "QKDChannelAllocation{" + source + "->" + destination
+				+ ", core=" + quantumCoreId
+				+ ", spectrum=[" + spectrumBand[0] + ',' + spectrumBand[1] + ']'
+				+ ", slots=" + getAllocatedSlots()
+				+ ", guardBand=" + guardBand
+				+ ", coveredQkdSpans=" + coveredQkdSpans
+				+ '}';
+	}
 }

@@ -20,7 +20,7 @@ public interface KRoutingAlgorithmInterface extends Serializable {
      * @param mesh Mesha - network topology
      * @param k    int - number of routes to be computed for each pair(s, d)
      */
-    public void computeAllRoutes(Mesh mesh, int k);
+	public void computeAllRoutes(Mesh mesh, int k);
 
 	/**
      * Returns the k shortest paths between two nodes
@@ -29,7 +29,7 @@ public interface KRoutingAlgorithmInterface extends Serializable {
      * @param n2 Node
      * @return List<Route>
      */
-    public List<Route> getRoutes(Node n1, Node n2);
+	public List<Route> getRoutes(Node n1, Node n2);
 
 	/**
 	 * Returns the route list for all pairs

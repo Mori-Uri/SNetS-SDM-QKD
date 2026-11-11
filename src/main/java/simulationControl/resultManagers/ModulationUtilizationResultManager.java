@@ -42,6 +42,7 @@ public class ModulationUtilizationResultManager implements ResultManagerInterfac
 				}
 			}
 		}
+
 		loadPoints = new ArrayList<>(mus.keySet());
 		replications = new ArrayList<>(mus.values().iterator().next().keySet());
 	}
@@ -61,6 +62,7 @@ public class ModulationUtilizationResultManager implements ResultManagerInterfac
 		for (Integer rep : replications) { // Checks how many replications have been made and creates the header of each column
 			res.append(sep + "rep" + rep);
 		}
+
 		res.append("\n");
 
 		res.append(resultPercentageCircuitsPerModulation());
@@ -78,6 +80,7 @@ public class ModulationUtilizationResultManager implements ResultManagerInterfac
 	 */
 	private String resultPercentageCircuitsPerModulation() {
 		StringBuilder res = new StringBuilder();
+
 		for(Integer loadPoint : loadPoints){
 			String aux = "Percentage of cicuits per modulation" + sep + loadPoint;
 
@@ -87,9 +90,11 @@ public class ModulationUtilizationResultManager implements ResultManagerInterfac
 				for (Integer replic : replications) {
 					aux2 = aux2 + sep + mus.get(loadPoint).get(replic).getPercentageCircuitsPerModulation(modName);
 				}
+
 				res.append(aux2 + "\n");
 			}
 		}
+
 		return res.toString();
 	}
 
@@ -100,6 +105,7 @@ public class ModulationUtilizationResultManager implements ResultManagerInterfac
 	 */
 	private String resultPercentageCircuitsPerModuPerBw() {
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			String aux = "Percentage of cicuits per modulation and bandwidth" + sep + loadPoint;
 
@@ -112,10 +118,12 @@ public class ModulationUtilizationResultManager implements ResultManagerInterfac
 					for (Integer replic : replications) {
 						aux3 = aux3 + sep + mus.get(loadPoint).get(replic).getPercentageCircuitPerModPerBw(modName, bandwidth);
 					}
+
 					res.append(aux3 + "\n");
 				}
 			}
 		}
+
 		return res.toString();
 	}
 

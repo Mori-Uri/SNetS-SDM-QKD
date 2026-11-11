@@ -23,70 +23,70 @@ import java.io.Serializable;
  */
 public final class QKDCrosstalkContribution implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private final Integer circuitId;
-    private final int interfererCoreId;
-    private final int interfererSpectrumStart;
-    private final int interfererSpectrumEnd;
-    private final int overlapSlots;
-    private final int interfererSlots;
-    private final double overlapIndex;
-    private final double launchPowerW;
-    private final double couplingCoefficientPerM;
-    private final double linkDistanceKm;
-    private final double powerContributionW;
+	private final Integer circuitId;
+	private final int interfererCoreId;
+	private final int interfererSpectrumStart;
+	private final int interfererSpectrumEnd;
+	private final int overlapSlots;
+	private final int interfererSlots;
+	private final double overlapIndex;
+	private final double launchPowerW;
+	private final double couplingCoefficientPerM;
+	private final double linkDistanceKm;
+	private final double powerContributionW;
 
-    public QKDCrosstalkContribution(
-            Integer circuitId,
-            int interfererCoreId,
-            int interfererSpectrumStart,
-            int interfererSpectrumEnd,
-            int overlapSlots,
-            int interfererSlots,
-            double overlapIndex,
-            double launchPowerW,
-            double couplingCoefficientPerM,
-            double linkDistanceKm,
-            double powerContributionW) {
-        this.circuitId = circuitId;
-        this.interfererCoreId = interfererCoreId;
-        this.interfererSpectrumStart = interfererSpectrumStart;
-        this.interfererSpectrumEnd = interfererSpectrumEnd;
-        this.overlapSlots = overlapSlots;
-        this.interfererSlots = interfererSlots;
-        this.overlapIndex = overlapIndex;
-        this.launchPowerW = launchPowerW;
-        this.couplingCoefficientPerM = couplingCoefficientPerM;
-        this.linkDistanceKm = linkDistanceKm;
-        this.powerContributionW = powerContributionW;
-    }
+	public QKDCrosstalkContribution(
+			Integer circuitId,
+			int interfererCoreId,
+			int interfererSpectrumStart,
+			int interfererSpectrumEnd,
+			int overlapSlots,
+			int interfererSlots,
+			double overlapIndex,
+			double launchPowerW,
+			double couplingCoefficientPerM,
+			double linkDistanceKm,
+			double powerContributionW) {
+		this.circuitId = circuitId;
+		this.interfererCoreId = interfererCoreId;
+		this.interfererSpectrumStart = interfererSpectrumStart;
+		this.interfererSpectrumEnd = interfererSpectrumEnd;
+		this.overlapSlots = overlapSlots;
+		this.interfererSlots = interfererSlots;
+		this.overlapIndex = overlapIndex;
+		this.launchPowerW = launchPowerW;
+		this.couplingCoefficientPerM = couplingCoefficientPerM;
+		this.linkDistanceKm = linkDistanceKm;
+		this.powerContributionW = powerContributionW;
+	}
 
-    public Integer getCircuitId() { return circuitId; }
-    public int getInterfererCoreId() { return interfererCoreId; }
-    public int getInterfererSpectrumStart() { return interfererSpectrumStart; }
-    public int getInterfererSpectrumEnd() { return interfererSpectrumEnd; }
-    public int getOverlapSlots() { return overlapSlots; }
-    public int getInterfererSlots() { return interfererSlots; }
-    public double getOverlapIndex() { return overlapIndex; }
-    public double getLaunchPowerW() { return launchPowerW; }
-    public double getCouplingCoefficientPerM() { return couplingCoefficientPerM; }
-    public double getLinkDistanceKm() { return linkDistanceKm; }
-    public double getPowerContributionW() { return powerContributionW; }
+	public Integer getCircuitId() { return circuitId; }
+	public int getInterfererCoreId() { return interfererCoreId; }
+	public int getInterfererSpectrumStart() { return interfererSpectrumStart; }
+	public int getInterfererSpectrumEnd() { return interfererSpectrumEnd; }
+	public int getOverlapSlots() { return overlapSlots; }
+	public int getInterfererSlots() { return interfererSlots; }
+	public double getOverlapIndex() { return overlapIndex; }
+	public double getLaunchPowerW() { return launchPowerW; }
+	public double getCouplingCoefficientPerM() { return couplingCoefficientPerM; }
+	public double getLinkDistanceKm() { return linkDistanceKm; }
+	public double getPowerContributionW() { return powerContributionW; }
 
-    @Override
-    public String toString() {
-        return "QKDCrosstalkContribution{" +
-                "circuitId=" + circuitId +
-                ", core=" + interfererCoreId +
-                ", spectrum=[" + interfererSpectrumStart + ',' + interfererSpectrumEnd + ']' +
-                ", overlapSlots=" + overlapSlots +
-                ", interfererSlots=" + interfererSlots +
-                ", ISO=" + overlapIndex +
-                ", PnW=" + launchPowerW +
-                ", hPerM=" + couplingCoefficientPerM +
-                ", linkKm=" + linkDistanceKm +
-                ", contributionW=" + powerContributionW +
-                '}';
-    }
+	@Override
+	public String toString() {
+		return "QKDCrosstalkContribution{" +
+				"circuitId=" + circuitId +
+				", core=" + interfererCoreId +
+				", spectrum=[" + interfererSpectrumStart + ',' + interfererSpectrumEnd + ']' +
+				", overlapSlots=" + overlapSlots +
+				", interfererSlots=" + interfererSlots +
+				", ISO=" + overlapIndex +
+				", PnW=" + launchPowerW +
+				", hPerM=" + couplingCoefficientPerM +
+				", linkKm=" + linkDistanceKm +
+				", contributionW=" + powerContributionW +
+				'}';
+	}
 }

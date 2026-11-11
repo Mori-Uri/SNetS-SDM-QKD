@@ -1,117 +1,133 @@
 package network;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 import gprmcsa.modulation.Modulation;
+import qkd.capacity.QKDPichCircuit;
+import request.RequestForConnection;
 
 /**
- * Parte 54 (desempenho): noise terms (NLI, ASE and XT) that one link adds to the SNR of one circuit, kept in the
- * circuit and reused by {@link PhysicalLayer#computeSNRSegment}.
+ * Complete receiver-referenced QoT state per physical link. Unlike the older
+ * version-only cache, keys include the actual optical sources, their current
+ * spectra, powers and modulation, including PICh longitudinal boundaries.
+ * No candidate/test-circuit evaluations are cached.
  *
- * <p>An entry is valid only while everything that the original computation reads is the same:</p>
- * <ul>
- *   <li>the link version ({@link Link#getPhysicalVersion()}): it changes whenever a circuit enters or leaves a core
- *       of the link, a core spectrum changes, or a circuit in the network that uses the link changes its spectrum,
- *       core, modulation, power, route or requests;</li>
- *   <li>the parameters of the evaluated circuit itself: core, spectrum, modulation, launch power, bandwidth, PSD and
- *       central frequency (compared bit for bit), and the physical layer used.</li>
- * </ul>
- * <p>Terms computed with a test circuit on the link are never stored. With -Dsnets.verifyPerf=true every hit is
- * recomputed and compared bit for bit.</p>
+ * <p>Cache entries are evaluation-local, bounded, transient (not serialized),
+ * and invalidated by changes to any contributing field. No stale link result
+ * can be reused following add/release/reallocation of a PICh or DCh.</p>
  */
 final class QotLinkCache {
 
-    private QotLinkCache() {
-    }
+	private static final int MAX_ENTRIES = 2048;
+	private final Map<String, double[]> entries = new LinkedHashMap<String, double[]>(256, .75f, true) {
+		private static final long serialVersionUID = 1L;
+		@Override protected boolean removeEldestEntry(Map.Entry<String, double[]> eldest) {
+			return size() > MAX_ENTRIES;
+		}
 
-    /** One cached link of one circuit. */
-    static final class Entry {
-        Link link;
-        PhysicalLayer physicalLayer;
-        long version;
-        int core;
-        int s0;
-        int s1;
-        Modulation modulation;
-        long power;
-        long bsi;
-        long psd;
-        long fi;
-        double nli;
-        double ase;
-        double xt;
-    }
+	};
+	private long hits;
+	private long misses;
 
-    private static final int MAX = 16;
+	static boolean enabled() {
+		// Verification can be run with snets.noPerfCache=true as independent reference.
+		return !Boolean.getBoolean("snets.noPerfCache");
+	}
 
-    static Entry find(Circuit c, PhysicalLayer pl, Link link, int core, int[] sa, Modulation mod, double power,
-            double bsi, double psd, double fi) {
-        final Entry[] es = c.qotCache;
-        if (es == null) {
-            return null;
-        }
-        final long version = link.getPhysicalVersion();
-        for (int k = 0; k < es.length; k++) {
-            final Entry e = es[k];
-            if (e == null) {
-                return null;
-            }
-            if (e.link == link && e.physicalLayer == pl) {
-                if (e.version == version && e.core == core && e.s0 == sa[0] && e.s1 == sa[1] && e.modulation == mod
-                        && e.power == Double.doubleToRawLongBits(power) && e.bsi == Double.doubleToRawLongBits(bsi)
-                        && e.psd == Double.doubleToRawLongBits(psd) && e.fi == Double.doubleToRawLongBits(fi)) {
-                    return e;
-                }
-                return null;
-            }
-        }
-        return null;
-    }
+	synchronized double[] get(String key) {
+		double[] state = entries.get(key);
 
-    static void store(Circuit c, PhysicalLayer pl, Link link, long version, int core, int[] sa, Modulation mod,
-            double power, double bsi, double psd, double fi, double[] terms) {
-        Entry[] es = c.qotCache;
-        if (es == null) {
-            es = new Entry[4];
-            c.qotCache = es;
-        }
-        int slot = -1;
-        for (int k = 0; k < es.length; k++) {
-            if (es[k] == null || (es[k].link == link && es[k].physicalLayer == pl)) {
-                slot = k;
-                break;
-            }
-        }
-        if (slot < 0) {
-            if (es.length < MAX) {
-                final Entry[] bigger = new Entry[Math.min(MAX, es.length * 2)];
-                System.arraycopy(es, 0, bigger, 0, es.length);
-                slot = es.length;
-                es = bigger;
-                c.qotCache = es;
-            } else {
-                // full: drop the oldest entry (index 0) and keep the others in order
-                System.arraycopy(es, 1, es, 0, es.length - 1);
-                slot = es.length - 1;
-                es[slot] = null;
-            }
-        }
-        Entry e = es[slot];
-        if (e == null) {
-            e = new Entry();
-            es[slot] = e;
-        }
-        e.link = link;
-        e.physicalLayer = pl;
-        e.version = version;
-        e.core = core;
-        e.s0 = sa[0];
-        e.s1 = sa[1];
-        e.modulation = mod;
-        e.power = Double.doubleToRawLongBits(power);
-        e.bsi = Double.doubleToRawLongBits(bsi);
-        e.psd = Double.doubleToRawLongBits(psd);
-        e.fi = Double.doubleToRawLongBits(fi);
-        e.nli = terms[0];
-        e.ase = terms[1];
-        e.xt = terms[2];
-    }
+		if (state == null) { misses++; simulator.PerfChecks.count(simulator.PerfChecks.QOT_MISS); }
+		else { hits++; simulator.PerfChecks.count(simulator.PerfChecks.QOT_HIT); }
+
+		return state == null ? null : state.clone();
+	}
+
+	synchronized void put(String key, double[] state) {
+		entries.put(key, state.clone());
+	}
+
+	synchronized long hits() { return hits; }
+	synchronized long misses() { return misses; }
+
+	static String key(PhysicalLayer physicalLayer, Link link, Circuit victim,
+			Modulation modulation, int core, int[] spectrum,
+			double power, double bandwidth, double frequency, double[] incoming,
+			boolean selfOnly, boolean longitudinal, int gainModel) {
+
+		StringBuilder b = new StringBuilder(512);
+		b.append(System.identityHashCode(physicalLayer)).append(':')
+				.append(System.identityHashCode(link)).append(':')
+				.append(longitudinal).append(':').append(selfOnly).append(':')
+				.append(gainModel).append(':').append(core).append(':')
+				.append(System.identityHashCode(modulation)).append(':');
+		bits(b, power); bits(b, bandwidth); bits(b, frequency);
+		band(b, spectrum);
+
+		for (double value : incoming) bits(b, value);
+		// The victim may be provisional (not present in any core).
+		circuit(b, victim, link);
+
+		for (Core c : link.getCores()) {
+			b.append("core:").append(c.getId()).append(':')
+					.append(c.isDisabled()).append(':').append(c.isQkdReserved()).append(':');
+			List<Circuit> sources = new ArrayList<Circuit>(c.getCircuitList());
+			sources.addAll(c.getAuxiliaryClassicalCircuitList());
+			Collections.sort(sources, new Comparator<Circuit>() {
+				@Override public int compare(Circuit a, Circuit d) {
+					int n = Integer.compare(a.getId(), d.getId());
+
+					return n != 0 ? n : Integer.compare(System.identityHashCode(a), System.identityHashCode(d));
+				}
+
+			});
+
+			for (Circuit source : sources) circuit(b, source, link);
+		}
+
+		return b.toString();
+	}
+
+	private static void bits(StringBuilder b, double value) {
+		b.append(Long.toHexString(Double.doubleToRawLongBits(value))).append(':');
+	}
+
+	private static void band(StringBuilder b, int[] slots) {
+		if (slots == null) { b.append("null:"); return; }
+		b.append('[');
+
+		for (int value : slots) b.append(value).append(',');
+		b.append("]:");
+	}
+
+	private static void circuit(StringBuilder b, Circuit c, Link link) {
+		if (c == null) { b.append("null-circuit:"); return; }
+		b.append("c:").append(System.identityHashCode(c)).append(':')
+				.append(c.getId()).append(':').append(c.getClass().getName()).append(':')
+				.append(System.identityHashCode(c.getModulationByLink(link))).append(':');
+		bits(b, c.getLaunchPowerLinear());
+		bits(b, c.getRequiredBitRate());
+		b.append(c.getIndexCoreByLink(link)).append(':').append(c.getGuardBand()).append(':');
+		band(b, c.getSpectrumAssignedByLink(link));
+
+		if (c instanceof QKDPichCircuit) {
+			QKDPichCircuit p = (QKDPichCircuit) c;
+
+			if (p.getSpan() != null) {
+				bits(b, p.getSpan().getStartKm());
+				bits(b, p.getSpan().getEndKm());
+			}
+		}
+
+		if (c.getRequests() != null) {
+			b.append("requests:").append(c.getRequests().size()).append(':');
+
+			for (RequestForConnection req : c.getRequests()) bits(b, req.getRequiredBitRate());
+		}
+	}
 }

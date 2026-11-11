@@ -1,0 +1,27 @@
+{
+  "base": "v22",
+  "updated": "v23",
+  "origin_compared": "SNetS-SDM-QKD-v2.zip",
+  "source_modified": [
+    "src/main/java/network/ClassicalMultiBand.java",
+    "src/main/java/network/GnModelMath.java",
+    "src/main/java/network/PhysicalLayer.java",
+    "src/main/java/qkd/control/QKDProvisioningService.java",
+    "src/main/java/qkd/physical/QKDPhysicalLayer.java",
+    "src/main/java/qkd/verification/QKDCascadedOsnrVerification.java",
+    "src/main/java/qkd/verification/QKDv23LossAndBandVerification.java",
+    "src/main/java/simulationControl/parsers/PhysicalLayerConfig.java"
+  ],
+  "new_docs": [
+    "docs/ATUALIZACAO_V23_INTEGRACAO_V2_E_PERDAS.md"
+  ],
+  "removed_files": [],
+  "tests_status": "16/16 controlled Java verifiers passed",
+  "build_limit": "Incremental Java 8 with temporary external API stubs; no clean Maven build or full dynamic MF/MB/MB-SDM regression",
+  "limitations": [
+    "v2 QotLinkCache not merged because QKD/PICh invalidation is incomplete",
+    "v2 simulation checkpoint/progress not merged",
+    "v2 ISRS approximates power/ASE, not distributed ISRS-GN",
+    "v2 optional classical multiBand and shared QKD longitudinal mode intentionally mutually exclusive"
+  ]
+}

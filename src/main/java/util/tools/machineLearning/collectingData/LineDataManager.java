@@ -3,6 +3,8 @@ package util.tools.machineLearning.collectingData;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -19,7 +21,9 @@ import util.tools.machineLearning.DataSetManager;
 /**
  * Represents the LineDataManager component.
  */
-public class LineDataManager {
+public class LineDataManager implements Serializable {
+
+	private static final long serialVersionUID = 1L;
 
 	public final static char charSeparator = ',';
 	public final static String strSeparator = charSeparator + "";
@@ -27,8 +31,12 @@ public class LineDataManager {
 	private static final String FILE_NAME = "simulation_data";
 	private static final String FILE_FOLDER = "data_folder";
 
-    private final Map<String, CSVWriter> csvWriters = new HashMap<>();
+	private transient Map<String, CSVWriter> csvWriters = new HashMap<>();
 
+	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+		in.defaultReadObject();
+		csvWriters = new HashMap<>();
+	}
 
 	/**
 	 * Save data to a CSV file.
@@ -47,98 +55,107 @@ public class LineDataManager {
 
 		//To create the DataSet folder
 		File fileFolder = new File(dataFolder);
+
 		if (!fileFolder.exists()) { //Check if the folder does not exist before trying to create it
 			fileFolder.mkdirs();
 		}
 
 		// Find the last saved index (to continue where you left off).
-        int ultimaIteracao = getLastIteration(dataPath);
+		int ultimaIteracao = getLastIteration(dataPath);
 
-        try {
-        	// Get the writer corresponding to this file (or create a new one).
-            CSVWriter csvWriter = csvWriters.get(dataPath);
-            if (csvWriter == null) {
-	        	BufferedWriter writer = Files.newBufferedWriter(Paths.get(dataPath), StandardOpenOption.CREATE,  StandardOpenOption.APPEND);
-	        	csvWriter = new CSVWriter(writer, charSeparator, CSVWriter.NO_QUOTE_CHARACTER, CSVWriter.DEFAULT_ESCAPE_CHARACTER, CSVWriter.DEFAULT_LINE_END);
+		try {
+			// Get the writer corresponding to this file (or create a new one).
+			CSVWriter csvWriter = csvWriters.get(dataPath);
 
-	            // If the file is new, write the header.
-	            if (ultimaIteracao == 0) {
-	            	String header = lineDataList.get(0).getHeader();
-	            	csvWriter.writeNext(header.split(strSeparator), false);
-	            }
-	        }
+			if (csvWriter == null) {
+				BufferedWriter writer = Files.newBufferedWriter(Paths.get(dataPath), StandardOpenOption.CREATE,  StandardOpenOption.APPEND);
+				csvWriter = new CSVWriter(writer, charSeparator, CSVWriter.NO_QUOTE_CHARACTER, CSVWriter.DEFAULT_ESCAPE_CHARACTER, CSVWriter.DEFAULT_LINE_END);
 
-            // It starts with the next iteration.
-            int index = 0;
-            for (int i = ultimaIteracao; i < ultimaIteracao + lineDataList.size(); i++) {
-    			String newLine = ((i + 1) + DataSetManager.strSeparator + lineDataList.get(index).dataSetToString());
-    			String[] lineW = newLine.split(strSeparator);
-            	csvWriter.writeNext(lineW, false);
-    			index++;
-            }
+				// If the file is new, write the header.
+				if (ultimaIteracao == 0) {
+					String header = lineDataList.get(0).getHeader();
+					csvWriter.writeNext(header.split(strSeparator), false);
+				}
+			}
 
-            csvWriter.flush();
+			// It starts with the next iteration.
+			int index = 0;
 
-            lineDataList.clear(); // frees up memory used by the list.
+			for (int i = ultimaIteracao; i < ultimaIteracao + lineDataList.size(); i++) {
+				String newLine = ((i + 1) + DataSetManager.strSeparator + lineDataList.get(index).dataSetToString());
+				String[] lineW = newLine.split(strSeparator);
+				csvWriter.writeNext(lineW, false);
+				index++;
+			}
 
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+			csvWriter.flush();
+
+			lineDataList.clear(); // frees up memory used by the list.
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	/**
      * Reads the CSV file and returns the value from the last saved iteration.
      */
-    private static int getLastIteration(String fileName) {
-        File file = new File(fileName);
-        if (!file.exists()) {
-            return 0; // new file
-        }
+	private static int getLastIteration(String fileName) {
+		File file = new File(fileName);
 
-        try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
-            long length = file.length();
-            if (length == 0) return 0;
+		if (!file.exists()) {
+			return 0; // new file
+		}
 
-            long pos = length - 1;
-            StringBuilder lastLine = new StringBuilder();
+		try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+			long length = file.length();
 
-            // Read from back to front until you find the line break.
-            while (pos >= 0) {
-                raf.seek(pos);
-                char c = (char) raf.readByte();
-                if (c == '\n' && pos < length - 1) break;
-                lastLine.insert(0, c);
-                pos--;
-            }
+			if (length == 0) return 0;
 
-            // Extract the number from the first column (Interaction).
-            String[] partes = lastLine.toString().split(",");
-            if (partes.length > 0) {
-                try {
-                    return Integer.parseInt(partes[0].trim());
-                } catch (NumberFormatException e) {
-                    return 0; // if the final line is invalid
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+			long pos = length - 1;
+			StringBuilder lastLine = new StringBuilder();
 
-        return 0;
-    }
+			// Read from back to front until you find the line break.
+			while (pos >= 0) {
+				raf.seek(pos);
+				char c = (char) raf.readByte();
 
-    /**
+				if (c == '\n' && pos < length - 1) break;
+				lastLine.insert(0, c);
+				pos--;
+			}
+
+			// Extract the number from the first column (Interaction).
+			String[] partes = lastLine.toString().split(",");
+
+			if (partes.length > 0) {
+				try {
+					return Integer.parseInt(partes[0].trim());
+				} catch (NumberFormatException e) {
+					return 0; // if the final line is invalid
+				}
+			}
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		return 0;
+	}
+
+	/**
      * Calling this method at the end of the simulation will close everything correctly.
      */
-    public void closeAllWriters() {
-        for (CSVWriter writer : csvWriters.values()) {
-            try {
-                writer.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        csvWriters.clear();
-    }
+	public void closeAllWriters() {
+		for (CSVWriter writer : csvWriters.values()) {
+			try {
+				writer.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+
+		csvWriters.clear();
+	}
 
 }

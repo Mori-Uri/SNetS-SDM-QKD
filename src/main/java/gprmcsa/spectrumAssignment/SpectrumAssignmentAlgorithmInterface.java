@@ -6,7 +6,6 @@ import java.util.List;
 import network.Circuit;
 import network.ControlPlane;
 
-
 /**
  * This interface should be implemented by classes of spectrum assignment algorithms independent of the routing.
  *

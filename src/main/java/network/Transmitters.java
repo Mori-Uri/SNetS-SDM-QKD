@@ -54,6 +54,7 @@ public class Transmitters implements Serializable {
 	public boolean allocatesTransmitters() {
 		if(this.txUtilization < this.numberOfTx){
 			this.txUtilization++;
+
 			return true;
 		}else{
 			return false;

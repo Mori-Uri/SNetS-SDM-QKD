@@ -8,10 +8,10 @@ import java.rmi.RemoteException;
  */
 public interface ClientProgressCallbackInterface extends Remote {
 
-    /**
+	/**
      * Updates the progress.
      * @param progress the progress.
      */
-    public void updateProgress(double progress) throws RemoteException;
+	public void updateProgress(double progress) throws RemoteException;
 
 }

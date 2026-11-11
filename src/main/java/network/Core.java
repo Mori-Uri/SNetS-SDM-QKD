@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.TreeSet;
 
 /**
  * One spatial core of an SNetS multi-core fiber.
@@ -21,254 +20,222 @@ import java.util.TreeSet;
  */
 public class Core implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private int id;
-    private Spectrum spectrum;
-    private int peso;
-    private HashSet<Circuit> circuitList;
-    private ArrayList<Core> adjacentCores;
+	private int id;
+	private Spectrum spectrum;
+	private int peso;
+	private HashSet<Circuit> circuitList;
 
-    /** True when this physical core is dedicated to QKD. */
-    private boolean qkdReserved;
+	/** Physical auxiliary classical channels (currently PICh). They are visible to the QKD physical layer,
+     * and considered separately in XT_TOGETHER classical QoT calculations. */
+	private HashSet<Circuit> auxiliaryClassicalCircuitList;
+	private ArrayList<Core> adjacentCores;
 
-    /** Original SNetS constructor: creates a normal classical core. */
-    public Core(int id, int numOfSlots, double slotSpectrumBand) {
-        this(id, numOfSlots, slotSpectrumBand, false);
-    }
+	/** True when this physical core is dedicated to QKD. */
+	private boolean qkdReserved;
 
-    /** Constructor used by {@link Link} when building QKD-enabled networks. */
-    public Core(int id, int numOfSlots, double slotSpectrumBand,
-            boolean qkdReserved) {
-        this.id = id;
-        this.spectrum = new Spectrum(numOfSlots, slotSpectrumBand);
-        this.peso = 0;
-        this.circuitList = new HashSet<Circuit>();
-        this.adjacentCores = new ArrayList<Core>();
-        this.qkdReserved = qkdReserved;
-    }
+	/** Original SNetS constructor: creates a normal classical core. */
+	public Core(int id, int numOfSlots, double slotSpectrumBand) {
+		this(id, numOfSlots, slotSpectrumBand, false);
+	}
 
-    public ArrayList<Core> getAdjacentCores() {
-        return adjacentCores;
-    }
+	/** Constructor used by {@link Link} when building QKD-enabled networks. */
+	public Core(int id, int numOfSlots, double slotSpectrumBand,
+			boolean qkdReserved) {
+		this.id = id;
+		this.spectrum = new Spectrum(numOfSlots, slotSpectrumBand);
+		this.peso = 0;
+		this.circuitList = new HashSet<Circuit>();
+		this.auxiliaryClassicalCircuitList = new HashSet<Circuit>();
+		this.adjacentCores = new ArrayList<Core>();
+		this.qkdReserved = qkdReserved;
+	}
 
-    public void setAdjacentCores(ArrayList<Core> adjacentCores) {
-        this.adjacentCores = adjacentCores;
-    }
+	public ArrayList<Core> getAdjacentCores() {
+		return adjacentCores;
+	}
 
-    /**
+	public void setAdjacentCores(ArrayList<Core> adjacentCores) {
+		this.adjacentCores = adjacentCores;
+	}
+
+	/**
      * Classical allocation entry point.
      *
      * <p>A QKD-reserved core rejects classical allocation even if a caller
      * bypassed the normal free-band discovery stage.</p>
      */
-    public boolean useSpectrum(int[] spectrumBand, int guardBand)
-            throws Exception {
-        if (qkdReserved || disabled) {
-            return false;
-        }
-        touch(); // Parte 54
-        return spectrum.useSpectrum(spectrumBand, guardBand);
-    }
+	public boolean useSpectrum(int[] spectrumBand, int guardBand)
+			throws Exception {
+		if (qkdReserved || disabled) {
+			return false;
+		}
 
-    /** Classical release entry point retained unchanged for compatibility. */
-    public void liberateSpectrum(int[] spectrumBand, int guardBand)
-            throws Exception {
-        touch(); // Parte 54
-        spectrum.freeSpectrum(spectrumBand, guardBand);
-    }
+		return spectrum.useSpectrum(spectrumBand, guardBand);
+	}
 
-    /**
+	/** Classical release entry point retained unchanged for compatibility. */
+	public void liberateSpectrum(int[] spectrumBand, int guardBand)
+			throws Exception {
+		spectrum.freeSpectrum(spectrumBand, guardBand);
+	}
+
+	/**
      * Classical free-spectrum view. Reserved QKD cores intentionally appear
      * to have no available spectrum.
      */
-    public List<int[]> getFreeSpectrumBands(int guardBand) {
-        if (qkdReserved || disabled) {
-            return Collections.emptyList();
-        }
-        return spectrum.getFreeSpectrumBands(guardBand);
-    }
+	public List<int[]> getFreeSpectrumBands(int guardBand) {
+		if (qkdReserved || disabled) {
+			return Collections.emptyList();
+		}
 
-    /*
+		return spectrum.getFreeSpectrumBands(guardBand);
+	}
+
+	/*
      * Part 33: a core disabled in the network file (network.disabledCores) behaves like the QKD core for the
      * classical side: no free spectrum and no allocation, so every algorithm skips it. Default false.
      */
-    private boolean disabled;
+	private boolean disabled;
 
-    public boolean isDisabled() {
-        return disabled;
-    }
+	public boolean isDisabled() {
+		return disabled;
+	}
 
-    public void setDisabled(boolean disabled) {
-        this.disabled = disabled;
-    }
+	public void setDisabled(boolean disabled) {
+		this.disabled = disabled;
+	}
 
-    /** Part 33: the real free bands, whatever the flags (used by the occupancy metrics). */
-    public List<int[]> getFreeSpectrumBandsIgnoringReservation(int guardBand) {
-        return spectrum.getFreeSpectrumBands(guardBand);
-    }
+	/** Part 33: the real free bands, whatever the flags (used by the occupancy metrics). */
+	public List<int[]> getFreeSpectrumBandsIgnoringReservation(int guardBand) {
+		return spectrum.getFreeSpectrumBands(guardBand);
+	}
 
-    /**
+	/**
      * QKD-only free-spectrum view prepared for later quantum-channel stages.
      * Non-reserved cores are not exposed through this method.
      */
-    public List<int[]> getFreeSpectrumBandsForQKD(int guardBand) {
-        if (!qkdReserved) {
-            return Collections.emptyList();
-        }
-        return spectrum.getFreeSpectrumBands(guardBand);
-    }
+	public List<int[]> getFreeSpectrumBandsForQKD(int guardBand) {
+		if (!qkdReserved) {
+			return Collections.emptyList();
+		}
 
-    /**
+		return spectrum.getFreeSpectrumBands(guardBand);
+	}
+
+	/**
      * QKD-only spectrum allocation. This is deliberately separate from the
      * classical {@link #useSpectrum(int[], int)} method.
      */
-    public boolean useSpectrumForQKD(int[] spectrumBand, int guardBand)
-            throws Exception {
-        if (!qkdReserved) {
-            return false;
-        }
-        touch(); // Parte 54
-        return spectrum.useSpectrum(spectrumBand, guardBand);
-    }
+	public boolean useSpectrumForQKD(int[] spectrumBand, int guardBand)
+			throws Exception {
+		if (!qkdReserved) {
+			return false;
+		}
 
-    /** Releases spectrum previously allocated through the QKD-only API. */
-    public void liberateSpectrumForQKD(int[] spectrumBand, int guardBand)
-            throws Exception {
-        if (!qkdReserved) {
-            throw new IllegalStateException(
-                    "Core " + id + " is not reserved for QKD");
-        }
-        touch(); // Parte 54
-        spectrum.freeSpectrum(spectrumBand, guardBand);
-    }
+		return spectrum.useSpectrum(spectrumBand, guardBand);
+	}
 
-    public double getSlotSpectrumBand() {
-        return spectrum.getSlotSpectrumBand();
-    }
+	/** Releases spectrum previously allocated through the QKD-only API. */
+	public void liberateSpectrumForQKD(int[] spectrumBand, int guardBand)
+			throws Exception {
+		if (!qkdReserved) {
+			throw new IllegalStateException(
+					"Core " + id + " is not reserved for QKD");
+		}
 
-    public int getNumOfSlots() {
-        return spectrum.getNumOfSlots();
-    }
+		spectrum.freeSpectrum(spectrumBand, guardBand);
+	}
 
-    public int getUsedSlots() {
-        return spectrum.getUsedSlots();
-    }
+	public double getSlotSpectrumBand() {
+		return spectrum.getSlotSpectrumBand();
+	}
 
-    public Double getUtilization() {
-        return Double.valueOf(spectrum.utilization());
-    }
+	public int getNumOfSlots() {
+		return spectrum.getNumOfSlots();
+	}
 
-    public HashSet<Circuit> getCircuitList() {
-        return circuitList;
-    }
+	public int getUsedSlots() {
+		return spectrum.getUsedSlots();
+	}
 
-    public void setCircuitList(HashSet<Circuit> circuitList) {
-        this.circuitList = circuitList;
-        this.sortedCircuits = null; // Parte 54
-        touch();
-    }
+	public Double getUtilization() {
+		return Double.valueOf(spectrum.utilization());
+	}
 
-    public void addCircuit(Circuit circuit) {
-        if (!circuitList.contains(circuit)) {
-            circuitList.add(circuit);
-            if (sortedCircuits != null) sortedCircuits.add(circuit); // Parte 54
-            circuit.enteredCoreList(); // Parte 54
-            PhysicalStateChanges.membershipChanged();
-        }
-        touch();
-    }
+	public HashSet<Circuit> getCircuitList() {
+		return circuitList;
+	}
 
-    public void removeCircuit(Circuit circuit) {
-        if (circuitList.remove(circuit)) {
-            circuit.leftCoreList(); // Parte 54
-            PhysicalStateChanges.membershipChanged();
-        }
-        if (sortedCircuits != null) sortedCircuits.remove(circuit); // Parte 54
-        touch();
-    }
+	public void setCircuitList(HashSet<Circuit> circuitList) {
+		this.circuitList = circuitList;
+		PhysicalStateChanges.membershipChanged();
+	}
 
-    /*
-     * Parte 54 (desempenho): the QoT and crosstalk code iterates the circuits of a core in id order, and used to build
-     * a new TreeSet from the HashSet above at every evaluation. The same ordered set is now kept up to date by
-     * addCircuit/removeCircuit. Callers must only read it.
+	public void addCircuit(Circuit circuit) {
+		if (!circuitList.contains(circuit)) {
+			circuitList.add(circuit);
+			PhysicalStateChanges.membershipChanged();
+		}
+	}
+
+	public void removeCircuit(Circuit circuit) {
+		if (circuitList.remove(circuit)) PhysicalStateChanges.membershipChanged();
+	}
+
+	/**
+     * Physical auxiliary classical optical sources, currently used by the PICh.
+     * They consume spectrum in this core and are included by the QKD physical
+     * layer as Raman/NLI interferers, without changing the legacy DCh QoT
+     * calculation in this first stage.
      */
-    private transient TreeSet<Circuit> sortedCircuits;
+	public HashSet<Circuit> getAuxiliaryClassicalCircuitList() {
+		return auxiliaryClassicalCircuitList;
+	}
 
-    /**
-     * Parte 59: the last copy of sortedCircuits with a test circuit added or removed (PhysicalLayer.getCircuitList),
-     * with what it was built from. Read only, like sortedCircuits.
-     */
-    transient TreeSet<Circuit> derivedList;
-    transient TreeSet<Circuit> derivedBase;
-    transient long derivedMemberships;
-    transient int derivedBaseSize;
-    transient Circuit derivedTest;
-    transient boolean derivedAdd;
+	public void addAuxiliaryClassicalCircuit(Circuit circuit) {
+		if (circuit != null && auxiliaryClassicalCircuitList.add(circuit))
+			PhysicalStateChanges.membershipChanged();
+	}
 
-    /** Parte 54: the circuits of this core in id order (read only; the same order as new TreeSet(getCircuitList())). */
-    public TreeSet<Circuit> getSortedCircuitList() {
-        if (sortedCircuits == null || !simulator.PerfChecks.ENABLED) {
-            final TreeSet<Circuit> s = new TreeSet<Circuit>(circuitList);
-            if (!simulator.PerfChecks.ENABLED) return s;
-            sortedCircuits = s;
-        } else if (simulator.PerfChecks.VERIFY) {
-            if (!sortedCircuits.equals(new TreeSet<Circuit>(circuitList)) || sortedCircuits.size() != circuitList.size()) {
-                throw new IllegalStateException("snets.verifyPerf: lista ordenada de circuitos do nucleo difere");
-            }
-        }
-        return sortedCircuits;
-    }
+	public void removeAuxiliaryClassicalCircuit(Circuit circuit) {
+		if (auxiliaryClassicalCircuitList.remove(circuit)) PhysicalStateChanges.membershipChanged();
+	}
 
-    /*
-     * Parte 54: version of the physical state of this core (its circuits). The link that owns the core is told, so the
-     * link version changes whenever a circuit is added to or removed from any of its cores.
-     */
-    private Link owner;
+	public int getId() {
+		return id;
+	}
 
-    /** Parte 54: set by the link that creates this core. */
-    void setOwner(Link link) {
-        this.owner = link;
-    }
+	public Spectrum getSpectrum() {
+		return spectrum;
+	}
 
-    /** Parte 54: the physical state of this core changed. */
-    public void touch() {
-        if (owner != null) owner.touch();
-    }
+	public int getPeso() {
+		return peso;
+	}
 
-    public int getId() {
-        return id;
-    }
+	public void setPeso(int peso) {
+		this.peso = peso;
+	}
 
-    public Spectrum getSpectrum() {
-        return spectrum;
-    }
+	public void incrementPeso() {
+		this.peso++;
+	}
 
-    public int getPeso() {
-        return peso;
-    }
+	public void renewPeso() {
+		this.peso = 0;
+	}
 
-    public void setPeso(int peso) {
-        this.peso = peso;
-    }
+	public boolean isQkdReserved() {
+		return qkdReserved;
+	}
 
-    public void incrementPeso() {
-        this.peso++;
-    }
-
-    public void renewPeso() {
-        this.peso = 0;
-    }
-
-    public boolean isQkdReserved() {
-        return qkdReserved;
-    }
-
-    /**
+	/**
      * Intended for network construction/configuration only. Dynamic toggling
      * during a simulation is not part of the current model.
      */
-    public void setQkdReserved(boolean qkdReserved) {
-        this.qkdReserved = qkdReserved;
-    }
+	public void setQkdReserved(boolean qkdReserved) {
+		this.qkdReserved = qkdReserved;
+	}
 }

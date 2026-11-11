@@ -27,7 +27,6 @@ public class DataSetStructure implements DataSetInterface {
 
 	private List<Integer> coreUtilization = new ArrayList<>();
 
-
 	/**
 	 * Method that creates the DataSet header
 	 *
@@ -47,11 +46,11 @@ public class DataSetStructure implements DataSetInterface {
 		res.append("XT").append(DataSetManager.strSeparator);
 		res.append("OSNR").append(DataSetManager.strSeparator);
 
-    	for (int i = 0; i < coreUtilization.size(); i++) {
-    		res.append("core_utilization_").append(i).append(DataSetManager.strSeparator);
-    	}
+		for (int i = 0; i < coreUtilization.size(); i++) {
+			res.append("core_utilization_").append(i).append(DataSetManager.strSeparator);
+		}
 
-    	res.append("was_blocked").append(DataSetManager.strSeparator);
+		res.append("was_blocked").append(DataSetManager.strSeparator);
 		res.append("block_cause").append(DataSetManager.strSeparator);
 
 		return res.toString();
@@ -79,11 +78,11 @@ public class DataSetStructure implements DataSetInterface {
 		res.append(getXT()).append(DataSetManager.strSeparator);
 		res.append(getOSNR()).append(DataSetManager.strSeparator);
 
-    	for (Integer utilization : coreUtilization) {
-    		res.append(utilization).append(DataSetManager.strSeparator);
-    	}
+		for (Integer utilization : coreUtilization) {
+			res.append(utilization).append(DataSetManager.strSeparator);
+		}
 
-    	res.append(getWasBlocked()).append(DataSetManager.strSeparator);
+		res.append(getWasBlocked()).append(DataSetManager.strSeparator);
 		res.append(getBlockCause()).append(DataSetManager.strSeparator);
 
 		return res.toString();
@@ -101,29 +100,31 @@ public class DataSetStructure implements DataSetInterface {
 		setBandwidth(c.getRequiredBitRate());
 
 		setHops(c.getRoute().getHops());
-    	setLength(c.getRoute().getDistanceAllLinks());
+		setLength(c.getRoute().getDistanceAllLinks());
 
-    	setCore(c.getIndexCore());
-    	setModulation(c.getModulation().getM());
-    	setFirstSlot(c.getSpectrumAssigned()[0]);
-    	setLastSlot(c.getSpectrumAssigned()[1]);
+		setCore(c.getIndexCore());
+		setModulation(c.getModulation().getM());
+		setFirstSlot(c.getSpectrumAssigned()[0]);
+		setLastSlot(c.getSpectrumAssigned()[1]);
 
-    	setXT(c.getXt());
-    	setOSNR(c.getSNR());
-
+		setXT(c.getXt());
+		setOSNR(c.getOSNR());
 
 		List<Integer> coreUtilization = new ArrayList<>(numberOfCores);
-    	for (int i = 0; i < numberOfCores; i++) {
-    		int slotUtilizationByCore = 0;
-    		if(c.getSpectrumUtilizationAbsolut() != null) {
-    			slotUtilizationByCore = c.getSpectrumUtilizationAbsolut()[i];
-    		}
-    		coreUtilization.add(slotUtilizationByCore);
-    	}
 
-    	setCoreUtilization(coreUtilization);
+		for (int i = 0; i < numberOfCores; i++) {
+			int slotUtilizationByCore = 0;
 
-    	setWasBlocked(c.isWasBlocked());
+			if(c.getSpectrumUtilizationAbsolut() != null) {
+				slotUtilizationByCore = c.getSpectrumUtilizationAbsolut()[i];
+			}
+
+			coreUtilization.add(slotUtilizationByCore);
+		}
+
+		setCoreUtilization(coreUtilization);
+
+		setWasBlocked(c.isWasBlocked());
 		setBlockCause(c.getBlockCause());
 	}
 

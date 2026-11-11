@@ -28,12 +28,6 @@ final class Figures {
         return new File(settings.launcherDir(), "figures");
     }
 
-    /** Parte 60: folder of the exported images and animations (Configurações; default launcher/figures). */
-    File imagesDir() {
-        String d = settings.get("imagesDir", "");
-        return d.isEmpty() ? dir() : new File(d);
-    }
-
     private static String clean(String name) {
         String n = name == null ? "" : name.trim();
         if (n.toLowerCase().endsWith(".json")) {
@@ -62,29 +56,11 @@ final class Figures {
             String base = n.substring(0, n.length() - 5);
             m.put("name", base);
             m.put("mtime", f.lastModified());
-            m.put("svg", new File(imagesDir(), base + ".svg").isFile());
-            m.put("png", new File(imagesDir(), base + ".png").isFile());
+            m.put("svg", new File(dir(), base + ".svg").isFile());
+            m.put("png", new File(dir(), base + ".png").isFile());
             out.add(m);
         }
         return out;
-    }
-
-    /** Parte 55: appearance defaults of each chart type (line, bars, spectrum maps...), written by the studio. */
-    File stylesFile() {
-        return new File(settings.launcherDir(), "figure-styles.json");
-    }
-
-    String readStyles() throws IOException {
-        File f = stylesFile();
-        return f.isFile() ? new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8) : "{}";
-    }
-
-    void saveStyles(String json) throws IOException {
-        String t = json == null ? "" : json.trim();
-        if (!t.startsWith("{") || t.length() > 2_000_000) {
-            throw new IllegalArgumentException("Padrões de gráfico inválidos");
-        }
-        Files.write(stylesFile().toPath(), t.getBytes(StandardCharsets.UTF_8));
     }
 
     String read(String name) throws IOException {
@@ -117,7 +93,7 @@ final class Figures {
      */
     String uniqueName(String name, String exts) {
         String n = clean(name);
-        File d = imagesDir();
+        File d = dir();
         String[] es = exts == null || exts.trim().isEmpty() ? new String[] {"svg", "png"} : exts.toLowerCase().split("[,; ]+");
         for (int k = 0; k < 100000; k++) {
             String c = k == 0 ? n : n + "(" + k + ")";
@@ -141,7 +117,7 @@ final class Figures {
         byte[] bytes;
         if ("svg".equals(e)) {
             bytes = body.getBytes(StandardCharsets.UTF_8);
-        } else if ("png".equals(e) || "pdf".equals(e) || "gif".equals(e) || "mp4".equals(e) || "webm".equals(e)) { // Parte 59: animations
+        } else if ("png".equals(e) || "pdf".equals(e)) {
             String b = body.trim();
             int comma = b.indexOf(',');
             if (b.startsWith("data:") && comma > 0) {
@@ -151,10 +127,10 @@ final class Figures {
         } else {
             throw new IllegalArgumentException("Formato de imagem não suportado: " + ext);
         }
-        if (bytes.length > 200_000_000) { // Parte 59: animations
+        if (bytes.length > 60_000_000) {
             throw new IllegalArgumentException("Imagem grande demais");
         }
-        File d = imagesDir();
+        File d = dir();
         if (!d.isDirectory() && !d.mkdirs()) {
             throw new IOException("Não foi possível criar " + d);
         }
@@ -165,9 +141,8 @@ final class Figures {
 
     void delete(String name) throws IOException {
         String n = clean(name);
-        Files.deleteIfExists(new File(dir(), n + ".json").toPath());
-        for (String e : new String[] {".svg", ".png", ".pdf"}) {
-            Files.deleteIfExists(new File(imagesDir(), n + e).toPath());
+        for (String e : new String[] {".json", ".svg", ".png", ".pdf"}) {
+            Files.deleteIfExists(new File(dir(), n + e).toPath());
         }
     }
 }

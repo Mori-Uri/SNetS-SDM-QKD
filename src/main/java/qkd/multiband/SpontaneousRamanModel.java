@@ -22,19 +22,18 @@ import java.io.Serializable;
  *
  * <p><b>Propagation.</b> The power collected at the QCh receiver is P = P_0 * rho * d_lambda * G, where P_0 is the
  * launch power of the classical channel, d_lambda the QCh filter width in nm and G an <i>effective length</i> in km
- * that depends on the propagation direction. The methods of this class return G (all losses in neper/km):</p>
+ * for co-propagating channels. The methods of this class return G (all losses in neper/km):</p>
  * <ul>
  *   <li>forward, same core (co-propagating): G = (e^{-a_q L} - e^{-a_c L}) / (a_c - a_q) [KAWAHARA11], [ERAERDS10]
  *       eq. 2; the simpler form G = L e^{-a L} used by [MEHDI24] and [DIBAJ25] is the a_q = a_c limit;</li>
- *   <li>backward, same core (counter-propagating): G = (1 - e^{-(a_c + a_q) L}) / (a_c + a_q) [ERAERDS10] eq. 3;</li>
- *   <li>forward and backward from a <i>neighbour</i> core of a weakly coupled MCF (power coupling coefficient h in
+ *   <li>forward from a <i>neighbour</i> core of a weakly coupled MCF (power coupling coefficient h in
  *       1/km): [CAI20] eqs. 11 and 18, with both paths (crosstalk then SpRS, SpRS then crosstalk) included.</li>
  * </ul>
  *
  * <p>The object is immutable and thread-safe; the effective lengths are static and allocation-free so that they can
  * be called once per (link, active classical channel) inside the simulator.</p>
  *
- * <p>Referências: [ERAERDS10] P. Eraerds et al., "Quantum key distribution and 1 Gbps data encryption over a
+ * <p>ReferÃªncias: [ERAERDS10] P. Eraerds et al., "Quantum key distribution and 1 Gbps data encryption over a
  * single fibre", New J. Phys. 12, 063027, 2010; [KAWAHARA11] H. Kawahara et al., "Effect of spontaneous Raman
  * scattering on quantum channel wavelength-multiplexed with classical channel", Opt. Commun. 284, 691, 2011;
  * [CAI20] C. Cai, Y. Sun, Y. Ji, "Intercore spontaneous Raman scattering impact on quantum key distribution in
@@ -213,13 +212,6 @@ public final class SpontaneousRamanModel implements Serializable {
         return lengthKm * Math.exp(-alpha * lengthKm);
     }
 
-    /** Backward SpRS, same core: (1 - e^{-(a_c + a_q) L}) / (a_c + a_q). */
-    public static double backwardLengthKm(double alphaClassical, double alphaQuantum, double lengthKm) {
-        checkLength(lengthKm);
-        // expm1Over(-s, L) = (1 - e^{-sL}) / s
-        return expm1Over(-(alphaClassical + alphaQuantum), lengthKm);
-    }
-
     /**
      * Forward SpRS from a neighbour core, [CAI20] eq. 11 (both crosstalk/SpRS orderings):
      * e^{-a_q L} { [e^{(a_q - a_c) L} - 1]/(a_q - a_c) - [e^{(a_q - a_c - 2h) L} - 1]/(a_q - a_c - 2h) }.
@@ -232,19 +224,6 @@ public final class SpontaneousRamanModel implements Serializable {
         final double d = alphaQuantum - alphaClassical;
         return Math.exp(-alphaQuantum * lengthKm)
                 * (expm1Over(d, lengthKm) - expm1Over(d - 2.0 * couplingPerKm, lengthKm));
-    }
-
-    /**
-     * Backward SpRS from a neighbour core, [CAI20] eq. 18:
-     * [e^{-(a_q + a_c + 2h) L} - 1]/(a_q + a_c + 2h) - [e^{-(a_q + a_c) L} - 1]/(a_q + a_c), sign-normalised so the
-     * result is positive.
-     */
-    public static double intercoreBackwardLengthKm(double alphaClassical, double alphaQuantum, double couplingPerKm,
-            double lengthKm) {
-        checkLength(lengthKm);
-        final double s = alphaQuantum + alphaClassical;
-        // (1 - e^{-sL})/s - (1 - e^{-(s+2h)L})/(s+2h), equal to eq. 18 written with positive terms
-        return expm1Over(-s, lengthKm) - expm1Over(-(s + 2.0 * couplingPerKm), lengthKm);
     }
 
     /**

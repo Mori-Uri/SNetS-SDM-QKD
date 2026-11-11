@@ -1,0 +1,13 @@
+src/main/java/qkd/capacity/QKDPichPool.java
+src/main/java/qkd/capacity/QKDPichCircuit.java
+src/main/java/qkd/capacity/PichClassicalCrosstalk.java
+src/main/java/network/Core.java
+src/main/java/network/PhysicalLayer.java
+src/main/java/qkd/control/QKDControlPlane.java
+src/main/java/qkd/physical/QKDOpticalBudget.java
+src/main/java/qkd/physical/QKDPhysicalParameters.java
+src/main/java/qkd/physical/QKDPhysicalLayerConfig.java
+src/main/java/qkd/physical/BB84DecoyModel.java
+src/main/java/qkd/physical/QKDPhysicalLayer.java
+src/main/java/qkd/verification/QKDStages12Verification.java
+docs/ATUALIZACAO_ETAPAS_1_2_20261103.md

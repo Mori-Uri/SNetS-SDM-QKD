@@ -6,7 +6,7 @@ package network;
  * w = E 5 Phi_j B_j / (6 alpha L_s delta_f). Both depend only on the circuit i (centre frequency, bandwidth and the
  * fibre parameters of its band) and on the circuit j (centre frequency, bandwidth and modulation). They are kept in
  * circuit i, by the id of j, together with these inputs, and reused while none of them changes. The sums of the GN
- * model keep their order, so the NLI is the same bit for bit. Not saved in save states.
+ * model keep their order, so the NLI is the same bit for bit. Not saved in save states. Activated only with -Dsnets.gnPairCache=true; disabled via -Dsnets.noPerfCache=true; verified with -Dsnets.verifyPerf=true.
  */
 final class GnPairCache {
 
@@ -25,7 +25,7 @@ final class GnPairCache {
     private int current = 1;
     private int size;
 
-    private GnPairCache() {
+    GnPairCache() {
         alloc(64);
     }
 
@@ -54,11 +54,19 @@ final class GnPairCache {
 
     /** The table of circuit i for these inputs (cleared when they differ from the ones it was built with). */
     static GnPairCache of(Circuit circuitI, double fI, double bsI, double beta, double alpha, double e, double ls) {
-        GnPairCache p = circuitI.gnPairs;
-        if (p == null) {
-            p = new GnPairCache();
-            circuitI.gnPairs = p;
+        ThreadLocal<GnPairCache> local = circuitI.gnPairs;
+        if (local == null) {
+            synchronized (circuitI) {
+                local = circuitI.gnPairs;
+                if (local == null) {
+                    local = new ThreadLocal<GnPairCache>() {
+                        @Override protected GnPairCache initialValue() { return new GnPairCache(); }
+                    };
+                    circuitI.gnPairs = local;
+                }
+            }
         }
+        GnPairCache p = local.get();
         final long a = Double.doubleToRawLongBits(fI), b = Double.doubleToRawLongBits(bsI),
                 c = Double.doubleToRawLongBits(beta), d = Double.doubleToRawLongBits(alpha),
                 f = Double.doubleToRawLongBits(e), g = Double.doubleToRawLongBits(ls);

@@ -23,129 +23,135 @@ import util.ComputesFragmentation;
  */
 public class RelativeFragmentation extends Measurement {
 
-    public final static String SEP = "-";
+	public final static String SEP = "-";
 
-    private HashMap<Integer, Double> relativeFrag;
-    private int numberObservations;
+	private HashMap<Integer, Double> relativeFrag;
+	private int numberObservations;
 
-    /**
+	/**
      * Creates a new instance of RelativeFragmentation
      *
      * @param loadPoint int
      * @param rep int
      * @param mesh Mesh
      */
-    public RelativeFragmentation(int loadPoint, int rep) {
-        super(loadPoint, rep);
+	public RelativeFragmentation(int loadPoint, int rep) {
+		super(loadPoint, rep);
 
-        relativeFrag = new HashMap<>();
-        numberObservations = 0;
+		relativeFrag = new HashMap<>();
+		numberObservations = 0;
 
 		resultManager = new RelativeFragmentationResultManager();
-    }
+	}
 
-    /**
+	/**
      * Adds a new observation of external fragmentation of the network
      *
      * @param cp ControlPlane
      * @param success boolean
      * @param request RequestForConnection
      */
-    public void addNewObservation(ControlPlane cp, boolean success, RequestForConnection request) {
+	public void addNewObservation(ControlPlane cp, boolean success, RequestForConnection request) {
 
-    	if(relativeFrag.isEmpty()) {
-	    	Set<Double> bitRateList = cp.getMesh().getUtil().bitRateList;
-	    	List<Modulation> avaliableModulations = cp.getMesh().getAvaliableModulations();
+		if(relativeFrag.isEmpty()) {
+			Set<Double> bitRateList = cp.getMesh().getUtil().bitRateList;
+			List<Modulation> avaliableModulations = cp.getMesh().getAvaliableModulations();
 
-	    	for(Double bitRate : bitRateList) {
-	    		for (int m = avaliableModulations.size()-1; m >= 0; m--) {
-	    			Modulation mod = avaliableModulations.get(m);
+			for(Double bitRate : bitRateList) {
+				for (int m = avaliableModulations.size()-1; m >= 0; m--) {
+					Modulation mod = avaliableModulations.get(m);
 
-	    			int slotsNumber = mod.requiredSlots(bitRate);
-	    			relativeFrag.put(slotsNumber, 0.0);
-	    		}
-	    	}
-    	}
+					int slotsNumber = mod.requiredSlots(bitRate);
+					relativeFrag.put(slotsNumber, 0.0);
+				}
+			}
+		}
 
-        this.observationLinks(cp.getMesh());
-        numberObservations++;
-    }
+		this.observationLinks(cp.getMesh());
+		numberObservations++;
+	}
 
-    /**
+	/**
      * Returns the file name.
      * @return the file name.
      */
-    @Override
-    public String getFileName() {
-        return SimulationRequest.Result.FILE_RELATIVE_FRAGMENTATION;
-    }
+	@Override
+	public String getFileName() {
+		return SimulationRequest.Result.FILE_RELATIVE_FRAGMENTATION;
+	}
 
-    /**
+	/**
      * Makes a observation of the average relative fragmentation on all links for each configured c value
      */
-    private void observationLinks(Mesh mesh) {
-        // Parte 45 (desempenho): the free bands of every core are read once per observation and reused for every c
-        // (before: once per c). Same values, same order of the sums: identical results.
-        final List<List<List<int[]>>> bands = new ArrayList<>();
-        for (Link link : mesh.getLinkList()) {
-            final List<List<int[]>> perCore = new ArrayList<>();
-            for (Core core : link.getCores()) {
-                perCore.add(core.getFreeSpectrumBands(0));
-            }
-            bands.add(perCore);
-        }
-        for (Integer c : relativeFrag.keySet()) {
-            this.observationAllLinks(c, mesh, bands);
-        }
-    }
+	private void observationLinks(Mesh mesh) {
+		// Parte 45 (desempenho): the free bands of every core are read once per observation and reused for every c
+		// (before: once per c). Same values, same order of the sums: identical results.
+		final List<List<List<int[]>>> bands = new ArrayList<>();
 
-    /**
+		for (Link link : mesh.getLinkList()) {
+			final List<List<int[]>> perCore = new ArrayList<>();
+
+			for (Core core : link.getCores()) {
+				perCore.add(core.getFreeSpectrumBands(0));
+			}
+
+			bands.add(perCore);
+		}
+
+		for (Integer c : relativeFrag.keySet()) {
+			this.observationAllLinks(c, mesh, bands);
+		}
+	}
+
+	/**
      * Make a note of the average relative fragmentation on all links to the value of c passed as a parameter
      *
      * @param c
      */
-    private void observationAllLinks(Integer c, Mesh mesh, List<List<List<int[]>>> bands) {
-    	ComputesFragmentation cf = new ComputesFragmentation();
-        double averageFragLink = 0.0;
+	private void observationAllLinks(Integer c, Mesh mesh, List<List<List<int[]>>> bands) {
+		ComputesFragmentation cf = new ComputesFragmentation();
+		double averageFragLink = 0.0;
 
-        int linkIndex = 0;
-        for (Link link : mesh.getLinkList()) {
-        	double fragAllCores = 0.0;
+		int linkIndex = 0;
 
-        	final List<List<int[]>> perCore = bands.get(linkIndex++);
-        	for (int k = 0; k < perCore.size(); k++) {
-        		fragAllCores += cf.relativeFragmentation(perCore.get(k), c);
-        	}
+		for (Link link : mesh.getLinkList()) {
+			double fragAllCores = 0.0;
 
-        	fragAllCores = fragAllCores / link.getNumberOfCores();
-        	averageFragLink += fragAllCores;
-        }
+			final List<List<int[]>> perCore = bands.get(linkIndex++);
 
-        averageFragLink = averageFragLink / ((double) mesh.getLinkList().size());
+			for (int k = 0; k < perCore.size(); k++) {
+				fragAllCores += cf.relativeFragmentation(perCore.get(k), c);
+			}
 
-        double fCurrent = this.relativeFrag.get(c);
-        fCurrent += averageFragLink;
-        this.relativeFrag.put(c, fCurrent);
-    }
+			fragAllCores = fragAllCores / link.getNumberOfCores();
+			averageFragLink += fragAllCores;
+		}
 
-    /**
+		averageFragLink = averageFragLink / ((double) mesh.getLinkList().size());
+
+		double fCurrent = this.relativeFrag.get(c);
+		fCurrent += averageFragLink;
+		this.relativeFrag.put(c, fCurrent);
+	}
+
+	/**
      * Returns the list of configured C values for the realization of observations relative
      * of relative fragmentation
      *
      * @return
      */
-    public List<Integer> getCList() {
-        return new ArrayList<>(relativeFrag.keySet());
-    }
+	public List<Integer> getCList() {
+		return new ArrayList<>(relativeFrag.keySet());
+	}
 
-    /**
+	/**
      * Returns the average relative fragmentation
      *
      * @param c int
      * @return double
      */
-    public double getAverageRelativeFragmentation(int c) {
-        return this.relativeFrag.get(c) / ((double) this.numberObservations);
-    }
+	public double getAverageRelativeFragmentation(int c) {
+		return this.relativeFrag.get(c) / ((double) this.numberObservations);
+	}
 
 }

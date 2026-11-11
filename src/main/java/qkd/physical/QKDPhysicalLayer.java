@@ -14,6 +14,7 @@ import network.Crosstalk;
 import network.Link;
 import network.PhysicalLayer;
 import qkd.capacity.QKDLinkChannelPhysicalResult;
+import qkd.capacity.QKDPichCircuit;
 import qkd.network.QKDLinkPlan;
 import qkd.network.QKDRoutePlan;
 import qkd.network.QKDSpan;
@@ -62,79 +63,122 @@ import qkd.resource.QKDSession;
  */
 public final class QKDPhysicalLayer implements java.io.Serializable {
 
-    private final QKDPhysicalParameters parameters;
-    private final BB84DecoyModel bb84Model;
+	private final QKDPhysicalParameters parameters;
+	private final BB84DecoyModel bb84Model;
+	/** Production admission limit; standalone calculations retain 1.0 for reference-curve tests. */
+	private double maximumQber = 1.0;
+	public void setMaximumQber(double value) {
+		if (!Double.isFinite(value) || value < 0.0 || value > 1.0)
+			throw new IllegalArgumentException("maximumQber must be in [0,1]");
+		maximumQber = value;
+	}
+	public double getMaximumQber() { return maximumQber; }
+	private boolean longitudinalXtEnabled;
+	public void setLongitudinalXtEnabled(boolean enabled) { longitudinalXtEnabled = enabled; }
+	public boolean isLongitudinalXtEnabled() { return longitudinalXtEnabled; }
 
-    public QKDPhysicalLayer() {
-        this(new QKDPhysicalParameters());
-    }
+	private QKDCrosstalkPowerResult optionalReceiverIntegratedXt(
+			QKDCrosstalkPowerResult original, PhysicalLayer physical,
+			Link link, int qCore, int[] qBand, QKDSpan span,
+			double wavelengthNm, Circuit candidate) {
+		if (!longitudinalXtEnabled || !parameters.isIntercoreCrosstalkEnabled()) return original;
+		return original.withReceiverPowerW(physical.qkdLongitudinalXtReceiverPower(
+				link,qCore,qBand,span,parameters.attenuationDbPerKm(wavelengthNm),candidate));
+	}
 
-    public QKDPhysicalLayer(QKDPhysicalParameters parameters) {
-        if (parameters == null) {
-            throw new IllegalArgumentException("parameters cannot be null");
-        }
-        this.parameters = parameters;
-        this.bb84Model = new BB84DecoyModel(parameters);
-    }
+	private static double receivedXtPower(QKDCrosstalkPowerResult power,
+			double lengthKm, double attenuationDbPerKm, QKDCrosstalkReceiverTransferMode mode) {
+		return power.hasReceiverPowerOverride() ? power.getReceiverPowerOverrideW()
+				: toReceiverPowerW(power.getTotalPowerW(), lengthKm, attenuationDbPerKm, mode);
+	}
 
-    public QKDPhysicalParameters getParameters() {
-        return parameters;
-    }
+	private qkd.multiband.ClassicalPowerEvolution sharedBoosterTemplate;
 
-    /** The BB84 decoy-state model used for QBER/SKR. */
-    public BB84DecoyModel getBb84Model() {
-        return bb84Model;
-    }
+	/** Input classical MUX transmission when the shared EDFA model is active. */
+	private double sharedClassicalMuxTransmission = 1.0;
 
-    /** Fibre attenuation alpha(lambda) in dB/km (quadratic fit around the minimum, [DIBAJ24]). */
-    public double attenuationDbPerKm(double wavelengthNm) {
-        return parameters.attenuationDbPerKm(wavelengthNm);
-    }
+	public void setSharedClassicalMuxInsertionLossDb(double dB) {
+		if (!Double.isFinite(dB) || dB < 0.0)
+			throw new IllegalArgumentException("invalid shared classical MUX loss");
+		sharedClassicalMuxTransmission = Math.pow(10.0, -dB / 10.0);
+	}
 
-    // =====================================================================
-    // 1. Inter-core crosstalk power on a QKD span
-    // =====================================================================
+	/** Inject the same booster law as classical QoT; no network state is retained. */
+	public void setSharedBoosterTemplate(qkd.multiband.ClassicalPowerEvolution template) {
+		this.sharedBoosterTemplate = template;
+	}
 
+	public QKDPhysicalLayer() {
+		this(new QKDPhysicalParameters());
+	}
 
-    /** Evaluates the whole physical link with the live SNetS physical layer. */
-    public QKDCrosstalkPowerResult evaluateLink(
-            Link link,
-            final PhysicalLayer physicalLayer,
-            int quantumCoreId,
-            int[] quantumSpectrumAssigned) {
+	public QKDPhysicalLayer(QKDPhysicalParameters parameters) {
+		if (parameters == null) {
+			throw new IllegalArgumentException("parameters cannot be null");
+		}
 
-        if (link == null) {
-            throw new IllegalArgumentException("link cannot be null");
-        }
-        return evaluateSegment(
-                link,
-                physicalLayer,
-                quantumCoreId,
-                quantumSpectrumAssigned,
-                link.getDistance());
-    }
+		this.parameters = parameters;
+		this.bb84Model = new BB84DecoyModel(parameters);
+	}
 
-    /**
+	public QKDPhysicalParameters getParameters() {
+		return parameters;
+	}
+
+	/** The BB84 decoy-state model used for QBER/SKR. */
+	public BB84DecoyModel getBb84Model() {
+		return bb84Model;
+	}
+
+	/** Fibre attenuation alpha(lambda) in dB/km (quadratic fit around the minimum, [DIBAJ24]). */
+	public double attenuationDbPerKm(double wavelengthNm) {
+		return parameters.attenuationDbPerKm(wavelengthNm);
+	}
+
+	// =====================================================================
+	// 1. Inter-core crosstalk power on a QKD span
+	// =====================================================================
+
+	/** Evaluates the whole physical link with the live SNetS physical layer. */
+	public QKDCrosstalkPowerResult evaluateLink(
+			Link link,
+			final PhysicalLayer physicalLayer,
+			int quantumCoreId,
+			int[] quantumSpectrumAssigned) {
+
+		if (link == null) {
+			throw new IllegalArgumentException("link cannot be null");
+		}
+
+		return evaluateSegment(
+				link,
+				physicalLayer,
+				quantumCoreId,
+				quantumSpectrumAssigned,
+				link.getDistance());
+	}
+
+	/**
      * Production evaluation of one logical QKD span contained in a physical
      * SNetS link.
      */
-    public QKDCrosstalkPowerResult evaluateSegment(
-            Link link,
-            final PhysicalLayer physicalLayer,
-            int quantumCoreId,
-            int[] quantumSpectrumAssigned,
-            double evaluatedLengthKm) {
+	public QKDCrosstalkPowerResult evaluateSegment(
+			Link link,
+			final PhysicalLayer physicalLayer,
+			int quantumCoreId,
+			int[] quantumSpectrumAssigned,
+			double evaluatedLengthKm) {
 
-        return evaluateSegmentWithAdditionalClassicalCircuit(
-                link,
-                physicalLayer,
-                quantumCoreId,
-                quantumSpectrumAssigned,
-                evaluatedLengthKm,
-                null);
-    }
+		return evaluateSegmentWithAdditionalClassicalCircuit(
+				link,
+				physicalLayer,
+				quantumCoreId,
+				quantumSpectrumAssigned,
+				evaluatedLengthKm,
+				null);
+	}
 
-    /**
+	/**
      * Evaluates one QKD span while hypothetically adding one classical circuit
      * that has not yet been committed to the network.
      *
@@ -150,410 +194,437 @@ public final class QKDPhysicalLayer implements java.io.Serializable {
      * <p>No {@link Core}, {@link Link} or spectrum state is modified by this
      * method.</p>
      */
-    public QKDCrosstalkPowerResult evaluateSegmentWithAdditionalClassicalCircuit(
-            Link link,
-            final PhysicalLayer physicalLayer,
-            int quantumCoreId,
-            int[] quantumSpectrumAssigned,
-            double evaluatedLengthKm,
-            Circuit additionalClassicalCircuit) {
+	public QKDCrosstalkPowerResult evaluateSegmentWithAdditionalClassicalCircuit(
+			Link link,
+			final PhysicalLayer physicalLayer,
+			int quantumCoreId,
+			int[] quantumSpectrumAssigned,
+			double evaluatedLengthKm,
+			Circuit additionalClassicalCircuit) {
 
-        if (physicalLayer == null) {
-            throw new IllegalArgumentException("physicalLayer cannot be null");
-        }
-        final Crosstalk crosstalk = physicalLayer.getCrosstalk();
-        if (crosstalk == null) {
-            throw new IllegalStateException(
-                    "SNetS PhysicalLayer does not have a Crosstalk model");
-        }
+		if (physicalLayer == null) {
+			throw new IllegalArgumentException("physicalLayer cannot be null");
+		}
 
-        return evaluateInternal(
-                link,
-                quantumCoreId,
-                quantumSpectrumAssigned,
-                crosstalk.getH(),
-                evaluatedLengthKm,
-                new LaunchPowerResolver() {
-                    @Override
-                    public double resolve(Circuit circuit) {
-                        final Modulation modulation = circuit.getModulation();
-                        if (modulation == null) {
-                            throw new IllegalStateException(
-                                    "Classical circuit " + circuit.getId()
-                                    + " has no modulation assigned");
-                        }
-                        return physicalLayer.getCircuitLaunchPower(circuit, modulation);
-                    }
-                },
-                additionalClassicalCircuit);
-    }
+		final Crosstalk crosstalk = physicalLayer.getCrosstalk();
 
-    /** Deterministic verification path using stored launch powers. */
-    public QKDCrosstalkPowerResult evaluateLinkUsingStoredLaunchPowers(
-            Link link,
-            int quantumCoreId,
-            int[] quantumSpectrumAssigned,
-            double couplingCoefficientPerM) {
+		if (crosstalk == null) {
+			throw new IllegalStateException(
+					"SNetS PhysicalLayer does not have a Crosstalk model");
+		}
 
-        if (link == null) {
-            throw new IllegalArgumentException("link cannot be null");
-        }
-        return evaluateSegmentUsingStoredLaunchPowers(
-                link,
-                quantumCoreId,
-                quantumSpectrumAssigned,
-                couplingCoefficientPerM,
-                link.getDistance());
-    }
+		return evaluateInternal(
+				link,
+				quantumCoreId,
+				quantumSpectrumAssigned,
+				crosstalk.getH(),
+				evaluatedLengthKm,
+				new LaunchPowerResolver() {
+					@Override
+					public double resolve(Circuit circuit) {
+						final Modulation modulation = circuit.getModulation();
 
-    /** Deterministic span evaluation using stored launch powers. */
-    public QKDCrosstalkPowerResult evaluateSegmentUsingStoredLaunchPowers(
-            Link link,
-            int quantumCoreId,
-            int[] quantumSpectrumAssigned,
-            double couplingCoefficientPerM,
-            double evaluatedLengthKm) {
+						if (modulation == null) {
+							throw new IllegalStateException(
+									"Classical circuit " + circuit.getId()
+									+ " has no modulation assigned");
+						}
 
-        return evaluateSegmentUsingStoredLaunchPowersWithAdditionalClassicalCircuit(
-                link,
-                quantumCoreId,
-                quantumSpectrumAssigned,
-                couplingCoefficientPerM,
-                evaluatedLengthKm,
-                null);
-    }
+						return physicalLayer.getCircuitLaunchPower(circuit, modulation);
+					}
 
-    /**
+				},
+				additionalClassicalCircuit);
+	}
+
+	/** Span-aware XT: the origin and end are physical kilometres from the link source.
+	 * PICh optical sources only interfere over the intersection of their own span
+	 * with the QCh span. Ordinary DChs occupy the entire directed link.
+	 */
+	public QKDCrosstalkPowerResult evaluatePhysicalSpan(Link link, PhysicalLayer physicalLayer,
+			int quantumCoreId, int[] quantumSpectrumAssigned, QKDSpan span,
+			Circuit additionalClassicalCircuit) {
+		if (span == null) throw new IllegalArgumentException("span is required");
+		qkd.capacity.QKDPichPool.validateSpanInsideLink(link, span);
+		if (physicalLayer == null || physicalLayer.getCrosstalk() == null)
+			throw new IllegalArgumentException("a SNetS crosstalk model is required");
+		return evaluateInternal(link, quantumCoreId, quantumSpectrumAssigned,
+				physicalLayer.getCrosstalk().getH(), span.getLengthKm(), span.getStartKm(),
+				liveResolver(physicalLayer), additionalClassicalCircuit);
+	}
+
+	/** Deterministic physical-span evaluation without mutating network state. */
+	public QKDCrosstalkPowerResult evaluatePhysicalSpanUsingStoredLaunchPowers(
+			Link link, int quantumCoreId, int[] quantumSpectrumAssigned,
+			double couplingCoefficientPerM, QKDSpan span, Circuit candidate) {
+		if (span == null) throw new IllegalArgumentException("span is required");
+		qkd.capacity.QKDPichPool.validateSpanInsideLink(link, span);
+		return evaluateInternal(link, quantumCoreId, quantumSpectrumAssigned,
+				couplingCoefficientPerM, span.getLengthKm(), span.getStartKm(),
+				STORED_RESOLVER, candidate);
+	}
+
+	/** Deterministic verification path using stored launch powers. */
+	public QKDCrosstalkPowerResult evaluateLinkUsingStoredLaunchPowers(
+			Link link,
+			int quantumCoreId,
+			int[] quantumSpectrumAssigned,
+			double couplingCoefficientPerM) {
+
+		if (link == null) {
+			throw new IllegalArgumentException("link cannot be null");
+		}
+
+		return evaluateSegmentUsingStoredLaunchPowers(
+				link,
+				quantumCoreId,
+				quantumSpectrumAssigned,
+				couplingCoefficientPerM,
+				link.getDistance());
+	}
+
+	/** Deterministic span evaluation using stored launch powers. */
+	public QKDCrosstalkPowerResult evaluateSegmentUsingStoredLaunchPowers(
+			Link link,
+			int quantumCoreId,
+			int[] quantumSpectrumAssigned,
+			double couplingCoefficientPerM,
+			double evaluatedLengthKm) {
+
+		return evaluateSegmentUsingStoredLaunchPowersWithAdditionalClassicalCircuit(
+				link,
+				quantumCoreId,
+				quantumSpectrumAssigned,
+				couplingCoefficientPerM,
+				evaluatedLengthKm,
+				null);
+	}
+
+	/**
      * Deterministic "what-if" variant used by Part-10 verification. The same
      * candidate filtering rules as the production method are applied.
      */
-    public QKDCrosstalkPowerResult evaluateSegmentUsingStoredLaunchPowersWithAdditionalClassicalCircuit(
-            Link link,
-            int quantumCoreId,
-            int[] quantumSpectrumAssigned,
-            double couplingCoefficientPerM,
-            double evaluatedLengthKm,
-            Circuit additionalClassicalCircuit) {
+	public QKDCrosstalkPowerResult evaluateSegmentUsingStoredLaunchPowersWithAdditionalClassicalCircuit(
+			Link link,
+			int quantumCoreId,
+			int[] quantumSpectrumAssigned,
+			double couplingCoefficientPerM,
+			double evaluatedLengthKm,
+			Circuit additionalClassicalCircuit) {
 
-        return evaluateInternal(
-                link,
-                quantumCoreId,
-                quantumSpectrumAssigned,
-                couplingCoefficientPerM,
-                evaluatedLengthKm,
-                new LaunchPowerResolver() {
-                    @Override
-                    public double resolve(Circuit circuit) {
-                        final double powerW = circuit.getLaunchPowerLinear();
-                        requireNonNegativeFinite(
-                                powerW,
-                                "stored launch power of circuit " + circuit.getId());
-                        return powerW;
-                    }
-                },
-                additionalClassicalCircuit);
-    }
+		return evaluateInternal(
+				link,
+				quantumCoreId,
+				quantumSpectrumAssigned,
+				couplingCoefficientPerM,
+				evaluatedLengthKm,
+				new LaunchPowerResolver() {
+					@Override
+					public double resolve(Circuit circuit) {
+						final double powerW = circuit.getLaunchPowerLinear();
+						requireNonNegativeFinite(
+								powerW,
+								"stored launch power of circuit " + circuit.getId());
 
-    private QKDCrosstalkPowerResult evaluateInternal(
-            Link link,
-            int quantumCoreId,
-            int[] quantumSpectrumAssigned,
-            double couplingCoefficientPerM,
-            double evaluatedLengthKm,
-            LaunchPowerResolver launchPowerResolver,
-            Circuit additionalClassicalCircuit) {
+						return powerW;
+					}
 
-        if (link == null) {
-            throw new IllegalArgumentException("link cannot be null");
-        }
-        validateSpectrumBand(quantumSpectrumAssigned, "quantumSpectrumAssigned");
-        requireNonNegativeFinite(couplingCoefficientPerM, "couplingCoefficientPerM");
-        requirePositiveFinite(evaluatedLengthKm, "evaluatedLengthKm");
+				},
+				additionalClassicalCircuit);
+	}
 
-        if (evaluatedLengthKm - link.getDistance() > 1e-9) {
-            throw new IllegalArgumentException(
-                    "evaluatedLengthKm=" + evaluatedLengthKm
-                    + " exceeds physical link length=" + link.getDistance());
-        }
+	private QKDCrosstalkPowerResult evaluateInternal(
+			Link link, int quantumCoreId, int[] quantumSpectrumAssigned,
+			double couplingCoefficientPerM, double evaluatedLengthKm,
+			LaunchPowerResolver launchPowerResolver, Circuit additionalClassicalCircuit) {
+		return evaluateInternal(link, quantumCoreId, quantumSpectrumAssigned,
+				couplingCoefficientPerM, evaluatedLengthKm, 0.0,
+				launchPowerResolver, additionalClassicalCircuit);
+	}
 
-        if (link.getCore(quantumCoreId) == null) {
-            throw new IllegalArgumentException(
-                    "Link " + safeLinkName(link) + " has no core with ID " + quantumCoreId);
-        }
+	private QKDCrosstalkPowerResult evaluateInternal(
+			Link link, int quantumCoreId, int[] quantumSpectrumAssigned,
+			double couplingCoefficientPerM, double evaluatedLengthKm, double startKm,
+			LaunchPowerResolver launchPowerResolver, Circuit additionalClassicalCircuit) {
 
-        final List<Core> adjacentCores = link.getAdjacentCores(quantumCoreId);
-        if (adjacentCores == null) {
-            throw new IllegalStateException(
-                    "Adjacent-core list is null for QKD core " + quantumCoreId
-                    + " in link " + safeLinkName(link));
-        }
+		if (link == null) {
+			throw new IllegalArgumentException("link cannot be null");
+		}
 
-        final List<InterfererReference> interferers =
-                collectInterferersCached(link, quantumCoreId, adjacentCores, additionalClassicalCircuit);
+		validateSpectrumBand(quantumSpectrumAssigned, "quantumSpectrumAssigned");
+		requireNonNegativeFinite(couplingCoefficientPerM, "couplingCoefficientPerM");
+		requirePositiveFinite(evaluatedLengthKm, "evaluatedLengthKm");
 
-        int overlappingCircuits = 0;
-        double totalPowerW = 0.0;
-        final List<QKDCrosstalkContribution> contributions =
-                new ArrayList<QKDCrosstalkContribution>();
+		if (!Double.isFinite(startKm) || startKm < 0.0 ||
+				startKm + evaluatedLengthKm > link.getDistance() + 1e-9)
+			throw new IllegalArgumentException("XT QCh segment outside physical link");
+		if (evaluatedLengthKm - link.getDistance() > 1e-9) {
+			throw new IllegalArgumentException(
+					"evaluatedLengthKm=" + evaluatedLengthKm
+					+ " exceeds physical link length=" + link.getDistance());
+		}
 
-        for (InterfererReference reference : interferers) {
-            final Circuit interferer = reference.circuit;
-            final int[] interfererSpectrum = interferer.getSpectrumAssigned();
-            if (interfererSpectrum == null) {
-                continue;
-            }
-            validateSpectrumBand(interfererSpectrum, "interfererSpectrum");
+		if (link.getCore(quantumCoreId) == null) {
+			throw new IllegalArgumentException(
+					"Link " + safeLinkName(link) + " has no core with ID " + quantumCoreId);
+		}
 
-            final int overlapSlots = numberOfOverlappingSlots(
-                    quantumSpectrumAssigned,
-                    interfererSpectrum);
-            if (overlapSlots <= 0) {
-                continue;
-            }
+		final List<Core> adjacentCores = link.getAdjacentCores(quantumCoreId);
 
-            final int interfererSlots = spectrumSize(interfererSpectrum);
-            final double overlapIndex = overlapSlots / (double) interfererSlots;
-            final double launchPowerW = launchPowerResolver.resolve(interferer);
-            final double contributionW = calculateContributionPowerW(
-                    launchPowerW,
-                    overlapIndex,
-                    couplingCoefficientPerM,
-                    evaluatedLengthKm);
+		if (adjacentCores == null) {
+			throw new IllegalStateException(
+					"Adjacent-core list is null for QKD core " + quantumCoreId
+					+ " in link " + safeLinkName(link));
+		}
 
-            requireNonNegativeFinite(contributionW, "XT contribution");
-            totalPowerW += contributionW;
-            overlappingCircuits++;
+		final List<InterfererReference> interferers =
+				collectInterferers(link, adjacentCores, additionalClassicalCircuit);
 
-            contributions.add(new QKDCrosstalkContribution(
-                    interferer.getId(),
-                    reference.coreId,
-                    interfererSpectrum[0],
-                    interfererSpectrum[1],
-                    overlapSlots,
-                    interfererSlots,
-                    overlapIndex,
-                    launchPowerW,
-                    couplingCoefficientPerM,
-                    evaluatedLengthKm,
-                    contributionW));
-        }
+		int overlappingCircuits = 0;
+		double totalPowerW = 0.0;
+		final List<QKDCrosstalkContribution> contributions =
+				new ArrayList<QKDCrosstalkContribution>();
 
-        return new QKDCrosstalkPowerResult(
-                safeLinkName(link),
-                quantumCoreId,
-                quantumSpectrumAssigned[0],
-                quantumSpectrumAssigned[1],
-                couplingCoefficientPerM,
-                evaluatedLengthKm,
-                adjacentCores.size(),
-                interferers.size(),
-                overlappingCircuits,
-                contributions,
-                totalPowerW);
-    }
+		for (InterfererReference reference : interferers) {
+			final Circuit interferer = reference.circuit;
+			final int[] interfererSpectrum = interferer.getSpectrumAssigned();
 
-    /*
-     * Parte 54 (desempenho): a QKD channel is evaluated once per span, and a link has several spans, so the same list
-     * of interferers (circuits of the cores adjacent to the QKD core) was built again for each span. Without a
-     * candidate circuit the list is kept per (link, QKD core) and reused while the link version
-     * (Link.getPhysicalVersion, changed whenever a circuit enters or leaves a core of the link) is the same. The list
-     * only holds the circuits; their spectrum and power are read when the XT is computed, as before.
-     */
-    private transient java.util.IdentityHashMap<Link, java.util.HashMap<Integer, Object[]>> interfererCache;
+			if (interfererSpectrum == null) {
+				continue;
+			}
 
-    private List<InterfererReference> collectInterferersCached(Link link, int quantumCoreId,
-            List<Core> adjacentCores, Circuit additionalClassicalCircuit) {
-        if (additionalClassicalCircuit != null || !simulator.PerfChecks.ENABLED) {
-            return collectInterferers(link, adjacentCores, additionalClassicalCircuit);
-        }
-        if (interfererCache == null) {
-            interfererCache = new java.util.IdentityHashMap<Link, java.util.HashMap<Integer, Object[]>>();
-        }
-        final long version = link.getPhysicalVersion();
-        java.util.HashMap<Integer, Object[]> perCore = interfererCache.get(link);
-        if (perCore == null) {
-            perCore = new java.util.HashMap<Integer, Object[]>();
-            interfererCache.put(link, perCore);
-        }
-        final Object[] e = perCore.get(Integer.valueOf(quantumCoreId));
-        if (e != null && ((Long) e[0]).longValue() == version && e[2] == adjacentCores) {
-            @SuppressWarnings("unchecked")
-            final List<InterfererReference> cached = (List<InterfererReference>) e[3];
-            if (simulator.PerfChecks.STATS) simulator.PerfChecks.count(simulator.PerfChecks.INTERF_HIT);
-            if (simulator.PerfChecks.VERIFY) {
-                final List<InterfererReference> fresh = collectInterferers(link, adjacentCores, null);
-                boolean same = fresh.size() == cached.size();
-                for (int k = 0; same && k < fresh.size(); k++) {
-                    same = fresh.get(k).circuit == cached.get(k).circuit && fresh.get(k).coreId == cached.get(k).coreId;
-                }
-                if (!same) throw new IllegalStateException("snets.verifyPerf: cache de interferentes do QCh difere");
-            }
-            return cached;
-        }
-        if (simulator.PerfChecks.STATS) simulator.PerfChecks.count(simulator.PerfChecks.INTERF_MISS);
-        final List<InterfererReference> list = collectInterferers(link, adjacentCores, null);
-        if (link.getPhysicalVersion() == version) {
-            perCore.put(Integer.valueOf(quantumCoreId), new Object[] { Long.valueOf(version),
-                    Integer.valueOf(quantumCoreId), adjacentCores, java.util.Collections.unmodifiableList(list) });
-        }
-        return list;
-    }
+			validateSpectrumBand(interfererSpectrum, "interfererSpectrum");
 
-    private static List<InterfererReference> collectInterferers(
-            Link link,
-            List<Core> adjacentCores,
-            Circuit additionalClassicalCircuit) {
+			final int overlapSlots = numberOfOverlappingSlots(
+					quantumSpectrumAssigned,
+					interfererSpectrum);
 
-        final List<InterfererReference> result =
-                new ArrayList<InterfererReference>();
-        final HashSet<Circuit> seen = new HashSet<Circuit>();
+			if (overlapSlots <= 0) {
+				continue;
+			}
 
-        for (Core adjacentCore : adjacentCores) {
-            if (adjacentCore == null || adjacentCore.getCircuitList() == null) {
-                continue;
-            }
-            for (Circuit circuit : adjacentCore.getCircuitList()) {
-                if (circuit != null && seen.add(circuit)) {
-                    result.add(new InterfererReference(circuit, adjacentCore.getId()));
-                }
-            }
-        }
+			// Do not extend a per-span PICh optical carrier to the full link.
+			// A conventional DCh occupies the full directed physical link.
+			double overlapLengthKm = evaluatedLengthKm;
+			if (interferer instanceof QKDPichCircuit) {
+				QKDPichCircuit pich = (QKDPichCircuit) interferer;
+				if (pich.getPhysicalLink() != link) continue;
+				QKDSpan piSpan = pich.getSpan();
+				overlapLengthKm = Math.max(0.0,
+						Math.min(startKm + evaluatedLengthKm, piSpan.getEndKm())
+						- Math.max(startKm, piSpan.getStartKm()));
+			}
+			if (overlapLengthKm <= 1e-12) continue;
+			final int interfererSlots = spectrumSize(interfererSpectrum);
+			final double overlapIndex = overlapSlots / (double) interfererSlots;
+			final double launchPowerW = launchPowerResolver.resolve(interferer);
+			final double contributionW = calculateContributionPowerW(
+					launchPowerW,
+					overlapIndex,
+					couplingCoefficientPerM,
+					overlapLengthKm);
 
-        if (additionalClassicalCircuit != null
-                && !seen.contains(additionalClassicalCircuit)
-                && candidateTraversesLink(additionalClassicalCircuit, link)) {
+			requireNonNegativeFinite(contributionW, "XT contribution");
+			totalPowerW += contributionW;
+			overlappingCircuits++;
 
-            final int candidateCoreId = qkd.metrics.BlockingDetailRecorder.rawCore(additionalClassicalCircuit);
-            if (isAdjacentCore(adjacentCores, candidateCoreId)) {
-                result.add(new InterfererReference(
-                        additionalClassicalCircuit,
-                        candidateCoreId));
-            }
-        }
+			contributions.add(new QKDCrosstalkContribution(
+					interferer.getId(),
+					reference.coreId,
+					interfererSpectrum[0],
+					interfererSpectrum[1],
+					overlapSlots,
+					interfererSlots,
+					overlapIndex,
+					launchPowerW,
+					couplingCoefficientPerM,
+					overlapLengthKm,
+					contributionW));
+		}
 
-        return result;
-    }
+		return new QKDCrosstalkPowerResult(
+				safeLinkName(link),
+				quantumCoreId,
+				quantumSpectrumAssigned[0],
+				quantumSpectrumAssigned[1],
+				couplingCoefficientPerM,
+				evaluatedLengthKm,
+				adjacentCores.size(),
+				interferers.size(),
+				overlappingCircuits,
+				contributions,
+				totalPowerW);
+	}
 
-    private static boolean candidateTraversesLink(Circuit candidate, Link link) {
-        if (candidate == null || candidate.getRoute() == null
-                || candidate.getRoute().getLinkList() == null) {
-            return false;
-        }
-        for (Link routeLink : candidate.getRoute().getLinkList()) {
-            if (routeLink == link) {
-                return true;
-            }
-        }
-        return false;
-    }
+	private static List<InterfererReference> collectInterferers(
+			Link link,
+			List<Core> adjacentCores,
+			Circuit additionalClassicalCircuit) {
 
-    private static boolean isAdjacentCore(List<Core> adjacentCores, int coreId) {
-        for (Core core : adjacentCores) {
-            if (core != null && core.getId() == coreId) {
-                return true;
-            }
-        }
-        return false;
-    }
+		final List<InterfererReference> result =
+				new ArrayList<InterfererReference>();
+		final java.util.Set<Circuit> seen = java.util.Collections.newSetFromMap(
+				new java.util.IdentityHashMap<Circuit, Boolean>());
 
-    /**
+		for (Core adjacentCore : adjacentCores) {
+			if (adjacentCore == null) continue;
+
+			if (adjacentCore.getCircuitList() != null) {
+				for (Circuit circuit : adjacentCore.getCircuitList()) {
+					if (circuit != null && seen.add(circuit))
+						result.add(new InterfererReference(circuit, adjacentCore.getId()));
+				}
+			}
+			// PIChs are optical sources in a separate SNetS list: include them
+			// exactly once without equating a shared virtual TN to a full-link DCh.
+			if (adjacentCore.getAuxiliaryClassicalCircuitList() != null) {
+				for (Circuit circuit : adjacentCore.getAuxiliaryClassicalCircuitList()) {
+					if (circuit instanceof QKDPichCircuit
+							&& ((QKDPichCircuit)circuit).getPhysicalLink() == link
+							&& seen.add(circuit))
+						result.add(new InterfererReference(circuit, adjacentCore.getId()));
+				}
+			}
+		}
+
+		if (additionalClassicalCircuit != null
+				&& !seen.contains(additionalClassicalCircuit)
+				&& candidateTraversesLink(additionalClassicalCircuit, link)) {
+
+			final int candidateCoreId = qkd.metrics.BlockingDetailRecorder.rawCore(additionalClassicalCircuit);
+
+			if (isAdjacentCore(adjacentCores, candidateCoreId)) {
+				result.add(new InterfererReference(
+						additionalClassicalCircuit,
+						candidateCoreId));
+			}
+		}
+
+		return result;
+	}
+
+	private static boolean candidateTraversesLink(Circuit candidate, Link link) {
+		if (candidate == null || candidate.getRoute() == null
+				|| candidate.getRoute().getLinkList() == null) {
+			return false;
+		}
+
+		for (Link routeLink : candidate.getRoute().getLinkList()) {
+			if (routeLink == link) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static boolean isAdjacentCore(List<Core> adjacentCores, int coreId) {
+		for (Core core : adjacentCores) {
+			if (core != null && core.getId() == coreId) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
      * Computes one term P_n * ISO * h * L using the same km -> m conversion
      * used in the current SNetS Crosstalk implementation.
      *
      * <p>Refer\u00eancias: P_n * ISO * h * L, o mesmo termo do modelo de crosstalk do SNetS de [LACERDA24] J. C. Lacerda Jr., A. V. T. Cartaxo, A. C. B. Soares, "Novel dynamic impairment-aware algorithm for modulation, core, and spectrum assignment in SDM-EONs", Opt. Switch. Netw. 51, 2024 e [LOBATO19] F. R. L. Lobato et al., "Inter-core crosstalk aware greedy algorithm for spectrum and core assignment in SDM-EONs", Opt. Switch. Netw. 33, 2019; h = 2 k^2 r/(beta Lambda) de [HAYASHI11] T. Hayashi et al., "Design and fabrication of ultra-low crosstalk and low-loss multi-core fiber", Opt. Express, 2011.</p>
      */
-    public static double calculateContributionPowerW(
-            double launchPowerW,
-            double overlapIndex,
-            double couplingCoefficientPerM,
-            double linkDistanceKm) {
+	public static double calculateContributionPowerW(
+			double launchPowerW,
+			double overlapIndex,
+			double couplingCoefficientPerM,
+			double linkDistanceKm) {
 
-        requireNonNegativeFinite(launchPowerW, "launchPowerW");
-        requireProbability(overlapIndex, "overlapIndex");
-        requireNonNegativeFinite(couplingCoefficientPerM, "couplingCoefficientPerM");
-        requireNonNegativeFinite(linkDistanceKm, "linkDistanceKm");
+		requireNonNegativeFinite(launchPowerW, "launchPowerW");
+		requireProbability(overlapIndex, "overlapIndex");
+		requireNonNegativeFinite(couplingCoefficientPerM, "couplingCoefficientPerM");
+		requireNonNegativeFinite(linkDistanceKm, "linkDistanceKm");
 
-        return launchPowerW
-                * overlapIndex
-                * couplingCoefficientPerM
-                * linkDistanceKm
-                * 1000.0;
-    }
+		return launchPowerW
+				* overlapIndex
+				* couplingCoefficientPerM
+				* linkDistanceKm
+				* 1000.0;
+	}
 
-    /** Same ISO definition used by SNetS. */
-    public static double calculateOverlapIndex(
-            int[] quantumSpectrumAssigned,
-            int[] interfererSpectrumAssigned) {
+	/** Same ISO definition used by SNetS. */
+	public static double calculateOverlapIndex(
+			int[] quantumSpectrumAssigned,
+			int[] interfererSpectrumAssigned) {
 
-        validateSpectrumBand(quantumSpectrumAssigned, "quantumSpectrumAssigned");
-        validateSpectrumBand(interfererSpectrumAssigned, "interfererSpectrumAssigned");
+		validateSpectrumBand(quantumSpectrumAssigned, "quantumSpectrumAssigned");
+		validateSpectrumBand(interfererSpectrumAssigned, "interfererSpectrumAssigned");
 
-        final int overlap = numberOfOverlappingSlots(
-                quantumSpectrumAssigned,
-                interfererSpectrumAssigned);
-        return overlap / (double) spectrumSize(interfererSpectrumAssigned);
-    }
+		final int overlap = numberOfOverlappingSlots(
+				quantumSpectrumAssigned,
+				interfererSpectrumAssigned);
 
-    /** Counts inclusive slot overlap. A band [10,19] contains ten slots. */
-    public static int numberOfOverlappingSlots(int[] firstBand, int[] secondBand) {
-        validateSpectrumBand(firstBand, "firstBand");
-        validateSpectrumBand(secondBand, "secondBand");
+		return overlap / (double) spectrumSize(interfererSpectrumAssigned);
+	}
 
-        final int first = Math.max(firstBand[0], secondBand[0]);
-        final int last = Math.min(firstBand[1], secondBand[1]);
-        return last < first ? 0 : last - first + 1;
-    }
+	/** Counts inclusive slot overlap. A band [10,19] contains ten slots. */
+	public static int numberOfOverlappingSlots(int[] firstBand, int[] secondBand) {
+		validateSpectrumBand(firstBand, "firstBand");
+		validateSpectrumBand(secondBand, "secondBand");
 
-    /** Returns the inclusive number of slots in [firstSlot,lastSlot]. */
-    public static int spectrumSize(int[] spectrumBand) {
-        validateSpectrumBand(spectrumBand, "spectrumBand");
-        return spectrumBand[1] - spectrumBand[0] + 1;
-    }
+		final int first = Math.max(firstBand[0], secondBand[0]);
+		final int last = Math.min(firstBand[1], secondBand[1]);
 
-    private static void validateSpectrumBand(int[] band, String name) {
-        if (band == null || band.length < 2) {
-            throw new IllegalArgumentException(name + " must contain [firstSlot,lastSlot]");
-        }
-        if (band[0] > band[1]) {
-            throw new IllegalArgumentException(
-                    name + " has firstSlot > lastSlot: [" + band[0] + ',' + band[1] + ']');
-        }
-    }
+		return last < first ? 0 : last - first + 1;
+	}
 
+	/** Returns the inclusive number of slots in [firstSlot,lastSlot]. */
+	public static int spectrumSize(int[] spectrumBand) {
+		validateSpectrumBand(spectrumBand, "spectrumBand");
 
+		return spectrumBand[1] - spectrumBand[0] + 1;
+	}
 
+	private static void validateSpectrumBand(int[] band, String name) {
+		if (band == null || band.length < 2) {
+			throw new IllegalArgumentException(name + " must contain [firstSlot,lastSlot]");
+		}
 
-    private static String safeLinkName(Link link) {
-        try {
-            return link.getName();
-        } catch (RuntimeException exception) {
-            return "<unnamed-link>";
-        }
-    }
+		if (band[0] > band[1]) {
+			throw new IllegalArgumentException(
+					name + " has firstSlot > lastSlot: [" + band[0] + ',' + band[1] + ']');
+		}
+	}
 
-    private interface LaunchPowerResolver {
-        double resolve(Circuit circuit);
-    }
+	private static String safeLinkName(Link link) {
+		try {
+			return link.getName();
+		} catch (RuntimeException exception) {
+			return "<unnamed-link>";
+		}
+	}
 
-    private static final class InterfererReference {
-        private final Circuit circuit;
-        private final int coreId;
+	private interface LaunchPowerResolver {
+		double resolve(Circuit circuit);
+	}
 
-        private InterfererReference(Circuit circuit, int coreId) {
-            this.circuit = circuit;
-            this.coreId = coreId;
-        }
-    }
+	private static final class InterfererReference {
+		private final Circuit circuit;
+		private final int coreId;
 
-    // =====================================================================
-    // 2. Reference of the span XT power to the QKD receiver input
-    // =====================================================================
+		private InterfererReference(Circuit circuit, int coreId) {
+			this.circuit = circuit;
+			this.coreId = coreId;
+		}
+	}
 
+	// =====================================================================
+	// 2. Reference of the span XT power to the QKD receiver input
+	// =====================================================================
 
-    private static final double LN_10 = Math.log(10.0);
+	private static final double LN_10 = Math.log(10.0);
 
-
-    /**
+	/**
      * Applies the selected receiver-transfer approximation.
      *
      * @param generatedSpanPowerW PXT produced by the span-length expression
@@ -564,37 +635,38 @@ public final class QKDPhysicalLayer implements java.io.Serializable {
      *
      * <p>Refer\u00eancias: [NOTA-RX] (refer\u00eancia ao receptor) e Eq. (1) de [MOGH21] (modo ATTENUATED_SPAN).</p>
      */
-    public static double toReceiverPowerW(
-            double generatedSpanPowerW,
-            double spanLengthKm,
-            double attenuationDbPerKm,
-            QKDCrosstalkReceiverTransferMode mode) {
+	public static double toReceiverPowerW(
+			double generatedSpanPowerW,
+			double spanLengthKm,
+			double attenuationDbPerKm,
+			QKDCrosstalkReceiverTransferMode mode) {
 
-        requireNonNegativeFinite(generatedSpanPowerW, "generatedSpanPowerW");
-        requirePositiveFinite(spanLengthKm, "spanLengthKm");
-        requireNonNegativeFinite(attenuationDbPerKm, "attenuationDbPerKm");
-        if (mode == null) {
-            throw new IllegalArgumentException("mode cannot be null");
-        }
+		requireNonNegativeFinite(generatedSpanPowerW, "generatedSpanPowerW");
+		requirePositiveFinite(spanLengthKm, "spanLengthKm");
+		requireNonNegativeFinite(attenuationDbPerKm, "attenuationDbPerKm");
 
-        switch (mode) {
-            case RECEIVER_REFERENCED:
-                return generatedSpanPowerW;
+		if (mode == null) {
+			throw new IllegalArgumentException("mode cannot be null");
+		}
 
-            case DISTRIBUTED_QUANTUM_ATTENUATION_REFERENCE:
-                return generatedSpanPowerW * distributedTransferFactor(
-                        spanLengthKm,
-                        attenuationDbPerKm);
+		switch (mode) {
+			case RECEIVER_REFERENCED:
+				return generatedSpanPowerW;
 
-            case ATTENUATED_SPAN:
-                return generatedSpanPowerW * Math.pow(10.0, -attenuationDbPerKm * spanLengthKm / 10.0);
+			case DISTRIBUTED_QUANTUM_ATTENUATION_REFERENCE:
+				return generatedSpanPowerW * distributedTransferFactor(
+						spanLengthKm,
+						attenuationDbPerKm);
 
-            default:
-                throw new IllegalStateException("Unsupported receiver transfer mode: " + mode);
-        }
-    }
+			case ATTENUATED_SPAN:
+				return generatedSpanPowerW * Math.pow(10.0, -attenuationDbPerKm * spanLengthKm / 10.0);
 
-    /**
+			default:
+				throw new IllegalStateException("Unsupported receiver transfer mode: " + mode);
+		}
+	}
+
+	/**
      * Effective length, in km, of the distributed reference approximation:
      *
      * <pre>
@@ -604,295 +676,288 @@ public final class QKDPhysicalLayer implements java.io.Serializable {
      * <p>This assumes constant P_n, ISO and h along the span and represents
      * only the remaining attenuation from each coupling point to Bob.</p>
      */
-    public static double distributedEffectiveLengthKm(
-            double spanLengthKm,
-            double attenuationDbPerKm) {
+	public static double distributedEffectiveLengthKm(
+			double spanLengthKm,
+			double attenuationDbPerKm) {
 
-        requirePositiveFinite(spanLengthKm, "spanLengthKm");
-        requireNonNegativeFinite(attenuationDbPerKm, "attenuationDbPerKm");
+		requirePositiveFinite(spanLengthKm, "spanLengthKm");
+		requireNonNegativeFinite(attenuationDbPerKm, "attenuationDbPerKm");
 
-        if (attenuationDbPerKm == 0.0) {
-            return spanLengthKm;
-        }
+		if (attenuationDbPerKm == 0.0) {
+			return spanLengthKm;
+		}
 
-        final double attenuationNepersPerKm =
-                attenuationDbPerKm * LN_10 / 10.0;
+		final double attenuationNepersPerKm =
+				attenuationDbPerKm * LN_10 / 10.0;
 
-        return -Math.expm1(-attenuationNepersPerKm * spanLengthKm)
-                / attenuationNepersPerKm;
-    }
+		return -Math.expm1(-attenuationNepersPerKm * spanLengthKm)
+				/ attenuationNepersPerKm;
+	}
 
-    /**
+	/**
      * Ratio L_eff/L used to map the linear span PXT approximation into the
      * distributed receiver-reference sensitivity model.
      */
-    public static double distributedTransferFactor(
-            double spanLengthKm,
-            double attenuationDbPerKm) {
+	public static double distributedTransferFactor(
+			double spanLengthKm,
+			double attenuationDbPerKm) {
 
-        return distributedEffectiveLengthKm(spanLengthKm, attenuationDbPerKm)
-                / spanLengthKm;
-    }
+		return distributedEffectiveLengthKm(spanLengthKm, attenuationDbPerKm)
+				/ spanLengthKm;
+	}
 
+	// =====================================================================
+	// 3. XT power -> detector background probability p_b
+	// =====================================================================
 
-
-    // =====================================================================
-    // 3. XT power -> detector background probability p_b
-    // =====================================================================
-
-
-
-
-
-
-    /**
+	/**
      * Converts absolute XT power at the optical input of the QKD receiver.
      * Receiver filter/demux loss is represented by eta_f from the parameters.
      *
      * <p>Refer\u00eancias: [NOTA-RX]: contagem de f\u00f3tons na janela do detector (Poisson) e p_b = 1-(1-p_dark)(1-p_XT); fundo p_b de [MOGH21], Eqs. (12)-(14).</p>
      */
-    public QKDCrosstalkNoiseResult evaluateFromReceivedPower(
-            double receivedCrosstalkPowerW,
-            double wavelengthNm) {
-        return evaluateFromReceivedPower(
-                receivedCrosstalkPowerW,
-                wavelengthNm,
-                parameters.getReceiverOpticalEfficiency(),
-                parameters.getDetectorGateWindowS()
-        );
-    }
+	public QKDCrosstalkNoiseResult evaluateFromReceivedPower(
+			double receivedCrosstalkPowerW,
+			double wavelengthNm) {
+		return evaluateFromReceivedPower(
+				receivedCrosstalkPowerW,
+				wavelengthNm,
+				parameters.getReceiverOpticalEfficiency(),
+				parameters.getDetectorGateWindowS()
+		);
+	}
 
-    /**
+	/**
      * Same calculation with receiver efficiency and gate window explicitly
      * supplied. This overload is preferred for controlled experiments because
      * it makes the two assumptions visible at the call site.
      */
-    public QKDCrosstalkNoiseResult evaluateFromReceivedPower(
-            double receivedCrosstalkPowerW,
-            double wavelengthNm,
-            double receiverOpticalEfficiency,
-            double detectorGateWindowS) {
+	public QKDCrosstalkNoiseResult evaluateFromReceivedPower(
+			double receivedCrosstalkPowerW,
+			double wavelengthNm,
+			double receiverOpticalEfficiency,
+			double detectorGateWindowS) {
 
-        requireNonNegative(receivedCrosstalkPowerW, "receivedCrosstalkPowerW");
-        requirePositive(wavelengthNm, "wavelengthNm");
-        requireProbability(receiverOpticalEfficiency, "receiverOpticalEfficiency");
-        requirePositive(detectorGateWindowS, "detectorGateWindowS");
+		requireNonNegative(receivedCrosstalkPowerW, "receivedCrosstalkPowerW");
+		requirePositive(wavelengthNm, "wavelengthNm");
+		requireProbability(receiverOpticalEfficiency, "receiverOpticalEfficiency");
+		requirePositive(detectorGateWindowS, "detectorGateWindowS");
 
-        final double wavelengthM = wavelengthNm * 1e-9;
-        final double photonFrequencyHz = parameters.getSpeedOfLightMPerS() / wavelengthM;
-        final double photonEnergyJ = parameters.getPlanckConstantJs() * photonFrequencyHz;
+		final double wavelengthM = wavelengthNm * 1e-9;
+		final double photonFrequencyHz = parameters.getSpeedOfLightMPerS() / wavelengthM;
+		final double photonEnergyJ = parameters.getPlanckConstantJs() * photonFrequencyHz;
 
-        final double detectorPowerW = receiverOpticalEfficiency * receivedCrosstalkPowerW;
-        final double meanEvents = parameters.getDetectorEfficiency()
-                * detectorPowerW
-                * detectorGateWindowS
-                / photonEnergyJ;
+		final double detectorPowerW = receiverOpticalEfficiency * receivedCrosstalkPowerW;
+		final double meanEvents = parameters.getDetectorEfficiency()
+				* detectorPowerW
+				* detectorGateWindowS
+				/ photonEnergyJ;
 
-        final double pXt = -Math.expm1(-meanEvents);
-        final double pDark = parameters.getDarkCountProbability();
-        final double totalBackground = combineIndependentProbabilities(pDark, pXt);
+		final double pXt = -Math.expm1(-meanEvents);
+		final double pDark = parameters.getDarkCountProbability();
+		final double totalBackground = combineIndependentProbabilities(pDark, pXt);
 
-        return new QKDCrosstalkNoiseResult(
-                receivedCrosstalkPowerW,
-                detectorPowerW,
-                photonEnergyJ,
-                meanEvents,
-                pXt,
-                totalBackground
-        );
-    }
+		return new QKDCrosstalkNoiseResult(
+				receivedCrosstalkPowerW,
+				detectorPowerW,
+				photonEnergyJ,
+				meanEvents,
+				pXt,
+				totalBackground
+		);
+	}
 
-    /**
+	/**
      * Applies an explicit effective transfer factor T_(e->Rx) before the
      * receiver calculation. A value of 1.0 means the supplied link contribution
      * is already referenced to the QKD receiver input.
      */
-    public QKDCrosstalkNoiseResult evaluateFromLinkContribution(
-            double linkCrosstalkPowerW,
-            double transferToReceiver,
-            double wavelengthNm,
-            double receiverOpticalEfficiency,
-            double detectorGateWindowS) {
-        requireNonNegative(linkCrosstalkPowerW, "linkCrosstalkPowerW");
-        requireProbability(transferToReceiver, "transferToReceiver");
-        return evaluateFromReceivedPower(
-                linkCrosstalkPowerW * transferToReceiver,
-                wavelengthNm,
-                receiverOpticalEfficiency,
-                detectorGateWindowS
-        );
-    }
+	public QKDCrosstalkNoiseResult evaluateFromLinkContribution(
+			double linkCrosstalkPowerW,
+			double transferToReceiver,
+			double wavelengthNm,
+			double receiverOpticalEfficiency,
+			double detectorGateWindowS) {
+		requireNonNegative(linkCrosstalkPowerW, "linkCrosstalkPowerW");
+		requireProbability(transferToReceiver, "transferToReceiver");
 
-    /**
+		return evaluateFromReceivedPower(
+				linkCrosstalkPowerW * transferToReceiver,
+				wavelengthNm,
+				receiverOpticalEfficiency,
+				detectorGateWindowS
+		);
+	}
+
+	/**
      * Probability of at least one event when two independent background-event
      * probabilities are present in the same detection window.
      */
-    public static double combineIndependentProbabilities(double p1, double p2) {
-        requireProbability(p1, "p1");
-        requireProbability(p2, "p2");
-        return p1 + p2 - p1 * p2;
-    }
+	public static double combineIndependentProbabilities(double p1, double p2) {
+		requireProbability(p1, "p1");
+		requireProbability(p2, "p2");
 
+		return p1 + p2 - p1 * p2;
+	}
 
+	// =====================================================================
+	// 4. Route evaluation: every QTND span of a route (sections 1-3 + BB84DecoyModel)
+	// =====================================================================
 
-
-    // =====================================================================
-    // 4. Route evaluation: every QTND span of a route (sections 1-3 + BB84DecoyModel)
-    // =====================================================================
-
-
-
-
-
-
-    /**
+	/**
      * Production path using the live SNetS PhysicalLayer to resolve coupling
      * coefficient and classical launch power.
      */
-    public QKDRoutePhysicalResult evaluateRoute(
-            Route classicalRoute,
-            QKDRoutePlan qkdRoutePlan,
-            PhysicalLayer physicalLayer,
-            int quantumCoreId,
-            int[] quantumSpectrumAssigned,
-            double wavelengthNm,
-            double minimumSecretKeyRateBps,
-            double maximumQber) {
+	public QKDRoutePhysicalResult evaluateRoute(
+			Route classicalRoute,
+			QKDRoutePlan qkdRoutePlan,
+			PhysicalLayer physicalLayer,
+			int quantumCoreId,
+			int[] quantumSpectrumAssigned,
+			double wavelengthNm,
+			double minimumSecretKeyRateBps,
+			double maximumQber) {
 
-        validateCommon(
-                classicalRoute,
-                qkdRoutePlan,
-                quantumSpectrumAssigned,
-                wavelengthNm,
-                minimumSecretKeyRateBps,
-                maximumQber);
-        if (physicalLayer == null) {
-            throw new IllegalArgumentException("physicalLayer cannot be null");
-        }
+		validateCommon(
+				classicalRoute,
+				qkdRoutePlan,
+				quantumSpectrumAssigned,
+				wavelengthNm,
+				minimumSecretKeyRateBps,
+				maximumQber);
 
-        final List<QKDSpanPhysicalResult> results =
-                new ArrayList<QKDSpanPhysicalResult>();
-        final Vector<Link> physicalLinks = classicalRoute.getLinkList();
+		if (physicalLayer == null) {
+			throw new IllegalArgumentException("physicalLayer cannot be null");
+		}
 
-        for (int linkIndex = 0; linkIndex < physicalLinks.size(); linkIndex++) {
-            final Link link = physicalLinks.get(linkIndex);
-            final QKDLinkPlan linkPlan = qkdRoutePlan.getLinkPlans().get(linkIndex);
-            verifyLinkCorrespondence(link, linkPlan);
+		final List<QKDSpanPhysicalResult> results =
+				new ArrayList<QKDSpanPhysicalResult>();
+		final Vector<Link> physicalLinks = classicalRoute.getLinkList();
 
-            for (QKDSpan span : linkPlan.getSpans()) {
-                final QKDCrosstalkPowerResult power = this.evaluateSegment(
-                        link,
-                        physicalLayer,
-                        quantumCoreId,
-                        quantumSpectrumAssigned,
-                        span.getLengthKm());
+		for (int linkIndex = 0; linkIndex < physicalLinks.size(); linkIndex++) {
+			final Link link = physicalLinks.get(linkIndex);
+			final QKDLinkPlan linkPlan = qkdRoutePlan.getLinkPlans().get(linkIndex);
+			verifyLinkCorrespondence(link, linkPlan);
 
-                results.add(evaluateSpanResult(
-                        span,
-                        power,
-                        wavelengthNm,
-                        minimumSecretKeyRateBps,
-                        maximumQber,
-                        link, liveResolver(physicalLayer), physicalLayer.getCrosstalk().getH(), null));
-            }
-        }
+			for (QKDSpan span : linkPlan.getSpans()) {
+				final QKDCrosstalkPowerResult power = optionalReceiverIntegratedXt(
+						this.evaluatePhysicalSpan(link, physicalLayer, quantumCoreId,
+								quantumSpectrumAssigned, span, null), physicalLayer, link,
+						quantumCoreId, quantumSpectrumAssigned, span, wavelengthNm, null);
 
-        return new QKDRoutePhysicalResult(qkdRoutePlan, results);
-    }
+				results.add(evaluateSpanResult(
+						span,
+						power,
+						wavelengthNm,
+						minimumSecretKeyRateBps,
+						maximumQber,
+						link, liveResolver(physicalLayer), physicalLayer.getCrosstalk().getH(), null));
+			}
+		}
 
+		return new QKDRoutePhysicalResult(qkdRoutePlan, results);
+	}
 
-    /**
+	/**
      * Production evaluation for a QKD session that has already reserved
      * spectrum. Part 8 permits independent first-fit bands on consecutive
      * physical links, so this overload evaluates each link using the exact
      * band stored in the corresponding {@link QKDChannelAllocation}.
      */
-    public QKDRoutePhysicalResult evaluateAllocatedSession(
-            Route classicalRoute,
-            QKDRoutePlan qkdRoutePlan,
-            PhysicalLayer physicalLayer,
-            QKDSession session,
-            double wavelengthNm,
-            double minimumSecretKeyRateBps,
-            double maximumQber) {
+	public QKDRoutePhysicalResult evaluateAllocatedSession(
+			Route classicalRoute,
+			QKDRoutePlan qkdRoutePlan,
+			PhysicalLayer physicalLayer,
+			QKDSession session,
+			double wavelengthNm,
+			double minimumSecretKeyRateBps,
+			double maximumQber) {
 
-        if (session == null) {
-            throw new IllegalArgumentException("session cannot be null");
-        }
-        if (!session.isActive()) {
-            throw new IllegalArgumentException("session must still be active");
-        }
-        if (physicalLayer == null) {
-            throw new IllegalArgumentException("physicalLayer cannot be null");
-        }
-        if (classicalRoute == null || qkdRoutePlan == null) {
-            throw new IllegalArgumentException(
-                    "classicalRoute/qkdRoutePlan cannot be null");
-        }
-        if (classicalRoute.getLinkList() == null
-                || classicalRoute.getLinkList().isEmpty()) {
-            throw new IllegalArgumentException(
-                    "classicalRoute must contain at least one physical link");
-        }
-        if (classicalRoute.getLinkList().size()
-                != qkdRoutePlan.getPhysicalLinkCount()) {
-            throw new IllegalArgumentException(
-                    "classicalRoute and qkdRoutePlan physical-link counts differ");
-        }
-        if (session.getPhysicalLinkAllocationCount()
-                != classicalRoute.getLinkList().size()) {
-            throw new IllegalArgumentException(
-                    "QKD session allocation count differs from route link count");
-        }
-        if (!Double.isFinite(wavelengthNm) || wavelengthNm <= 0.0) {
-            throw new IllegalArgumentException("wavelengthNm must be finite and > 0");
-        }
-        if (!Double.isFinite(minimumSecretKeyRateBps)
-                || minimumSecretKeyRateBps < 0.0) {
-            throw new IllegalArgumentException(
-                    "minimumSecretKeyRateBps must be finite and >= 0");
-        }
-        if (!Double.isFinite(maximumQber)
-                || maximumQber < 0.0 || maximumQber > 1.0) {
-            throw new IllegalArgumentException(
-                    "maximumQber must be finite and in [0,1]");
-        }
+		if (session == null) {
+			throw new IllegalArgumentException("session cannot be null");
+		}
 
-        final List<QKDSpanPhysicalResult> results =
-                new ArrayList<QKDSpanPhysicalResult>();
-        final Vector<Link> physicalLinks = classicalRoute.getLinkList();
-        final List<QKDChannelAllocation> allocations = session.getAllocations();
+		if (!session.isActive()) {
+			throw new IllegalArgumentException("session must still be active");
+		}
 
-        for (int linkIndex = 0; linkIndex < physicalLinks.size(); linkIndex++) {
-            final Link link = physicalLinks.get(linkIndex);
-            final QKDLinkPlan linkPlan = qkdRoutePlan.getLinkPlans().get(linkIndex);
-            final QKDChannelAllocation allocation = allocations.get(linkIndex);
+		if (physicalLayer == null) {
+			throw new IllegalArgumentException("physicalLayer cannot be null");
+		}
 
-            verifyLinkCorrespondence(link, linkPlan);
-            verifyAllocationCorrespondence(link, allocation, linkIndex);
+		if (classicalRoute == null || qkdRoutePlan == null) {
+			throw new IllegalArgumentException(
+					"classicalRoute/qkdRoutePlan cannot be null");
+		}
 
-            for (QKDSpan span : linkPlan.getSpans()) {
-                final QKDCrosstalkPowerResult power = this.evaluateSegment(
-                        link,
-                        physicalLayer,
-                        allocation.getQuantumCoreId(),
-                        allocation.getSpectrumBand(),
-                        span.getLengthKm());
+		if (classicalRoute.getLinkList() == null
+				|| classicalRoute.getLinkList().isEmpty()) {
+			throw new IllegalArgumentException(
+					"classicalRoute must contain at least one physical link");
+		}
 
-                results.add(evaluateSpanResult(
-                        span,
-                        power,
-                        wavelengthNm,
-                        minimumSecretKeyRateBps,
-                        maximumQber,
-                        link, liveResolver(physicalLayer), physicalLayer.getCrosstalk().getH(), null));
-            }
-        }
+		if (classicalRoute.getLinkList().size()
+				!= qkdRoutePlan.getPhysicalLinkCount()) {
+			throw new IllegalArgumentException(
+					"classicalRoute and qkdRoutePlan physical-link counts differ");
+		}
 
-        return new QKDRoutePhysicalResult(qkdRoutePlan, results);
-    }
+		if (session.getPhysicalLinkAllocationCount()
+				!= classicalRoute.getLinkList().size()) {
+			throw new IllegalArgumentException(
+					"QKD session allocation count differs from route link count");
+		}
 
-    /**
+		if (!Double.isFinite(wavelengthNm) || wavelengthNm <= 0.0) {
+			throw new IllegalArgumentException("wavelengthNm must be finite and > 0");
+		}
+
+		if (!Double.isFinite(minimumSecretKeyRateBps)
+				|| minimumSecretKeyRateBps < 0.0) {
+			throw new IllegalArgumentException(
+					"minimumSecretKeyRateBps must be finite and >= 0");
+		}
+
+		if (!Double.isFinite(maximumQber)
+				|| maximumQber < 0.0 || maximumQber > 1.0) {
+			throw new IllegalArgumentException(
+					"maximumQber must be finite and in [0,1]");
+		}
+
+		final List<QKDSpanPhysicalResult> results =
+				new ArrayList<QKDSpanPhysicalResult>();
+		final Vector<Link> physicalLinks = classicalRoute.getLinkList();
+		final List<QKDChannelAllocation> allocations = session.getAllocations();
+
+		for (int linkIndex = 0; linkIndex < physicalLinks.size(); linkIndex++) {
+			final Link link = physicalLinks.get(linkIndex);
+			final QKDLinkPlan linkPlan = qkdRoutePlan.getLinkPlans().get(linkIndex);
+			final QKDChannelAllocation allocation = allocations.get(linkIndex);
+
+			verifyLinkCorrespondence(link, linkPlan);
+			verifyAllocationCorrespondence(link, allocation, linkIndex);
+
+			for (QKDSpan span : linkPlan.getSpans()) {
+				final QKDCrosstalkPowerResult power = optionalReceiverIntegratedXt(
+						this.evaluatePhysicalSpan(link, physicalLayer,
+								allocation.getQuantumCoreId(), allocation.getSpectrumBand(), span, null),
+						physicalLayer, link, allocation.getQuantumCoreId(), allocation.getSpectrumBand(),
+						span, wavelengthNm, null);
+
+				results.add(evaluateSpanResult(
+						span,
+						power,
+						wavelengthNm,
+						minimumSecretKeyRateBps,
+						maximumQber,
+						link, liveResolver(physicalLayer), physicalLayer.getCrosstalk().getH(), null));
+			}
+		}
+
+		return new QKDRoutePhysicalResult(qkdRoutePlan, results);
+	}
+
+	/**
      * Part-10 what-if evaluation for an already allocated QKD session while a
      * new classical circuit is still only a candidate. The candidate is not
      * inserted into any SNetS active-circuit list; its XT contribution is added
@@ -902,368 +967,398 @@ public final class QKDPhysicalLayer implements java.io.Serializable {
      * classical circuit can be rejected when it would make an existing QKD
      * session violate its current SKR/QBER admission criteria.</p>
      */
-    public QKDRoutePhysicalResult evaluateAllocatedSessionWithAdditionalClassicalCircuit(
-            Route classicalRoute,
-            QKDRoutePlan qkdRoutePlan,
-            PhysicalLayer physicalLayer,
-            QKDSession session,
-            network.Circuit additionalClassicalCircuit,
-            double wavelengthNm,
-            double minimumSecretKeyRateBps,
-            double maximumQber) {
+	public QKDRoutePhysicalResult evaluateAllocatedSessionWithAdditionalClassicalCircuit(
+			Route classicalRoute,
+			QKDRoutePlan qkdRoutePlan,
+			PhysicalLayer physicalLayer,
+			QKDSession session,
+			network.Circuit additionalClassicalCircuit,
+			double wavelengthNm,
+			double minimumSecretKeyRateBps,
+			double maximumQber) {
 
-        if (additionalClassicalCircuit == null) {
-            return evaluateAllocatedSession(
-                    classicalRoute, qkdRoutePlan, physicalLayer, session,
-                    wavelengthNm, minimumSecretKeyRateBps, maximumQber);
-        }
-        if (session == null || !session.isActive()) {
-            throw new IllegalArgumentException("session must be non-null and active");
-        }
-        if (physicalLayer == null) {
-            throw new IllegalArgumentException("physicalLayer cannot be null");
-        }
-        if (classicalRoute == null || qkdRoutePlan == null) {
-            throw new IllegalArgumentException(
-                    "classicalRoute/qkdRoutePlan cannot be null");
-        }
-        if (classicalRoute.getLinkList() == null
-                || classicalRoute.getLinkList().isEmpty()) {
-            throw new IllegalArgumentException(
-                    "classicalRoute must contain at least one physical link");
-        }
-        if (classicalRoute.getLinkList().size()
-                != qkdRoutePlan.getPhysicalLinkCount()) {
-            throw new IllegalArgumentException(
-                    "classicalRoute and qkdRoutePlan physical-link counts differ");
-        }
-        if (session.getPhysicalLinkAllocationCount()
-                != classicalRoute.getLinkList().size()) {
-            throw new IllegalArgumentException(
-                    "QKD session allocation count differs from route link count");
-        }
-        if (!Double.isFinite(wavelengthNm) || wavelengthNm <= 0.0) {
-            throw new IllegalArgumentException("wavelengthNm must be finite and > 0");
-        }
-        if (!Double.isFinite(minimumSecretKeyRateBps)
-                || minimumSecretKeyRateBps < 0.0) {
-            throw new IllegalArgumentException(
-                    "minimumSecretKeyRateBps must be finite and >= 0");
-        }
-        if (!Double.isFinite(maximumQber)
-                || maximumQber < 0.0 || maximumQber > 1.0) {
-            throw new IllegalArgumentException(
-                    "maximumQber must be finite and in [0,1]");
-        }
+		if (additionalClassicalCircuit == null) {
+			return evaluateAllocatedSession(
+					classicalRoute, qkdRoutePlan, physicalLayer, session,
+					wavelengthNm, minimumSecretKeyRateBps, maximumQber);
+		}
 
-        final List<QKDSpanPhysicalResult> results =
-                new ArrayList<QKDSpanPhysicalResult>();
-        final Vector<Link> physicalLinks = classicalRoute.getLinkList();
-        final List<QKDChannelAllocation> allocations = session.getAllocations();
+		if (session == null || !session.isActive()) {
+			throw new IllegalArgumentException("session must be non-null and active");
+		}
 
-        for (int linkIndex = 0; linkIndex < physicalLinks.size(); linkIndex++) {
-            final Link link = physicalLinks.get(linkIndex);
-            final QKDLinkPlan linkPlan = qkdRoutePlan.getLinkPlans().get(linkIndex);
-            final QKDChannelAllocation allocation = allocations.get(linkIndex);
+		if (physicalLayer == null) {
+			throw new IllegalArgumentException("physicalLayer cannot be null");
+		}
 
-            verifyLinkCorrespondence(link, linkPlan);
-            verifyAllocationCorrespondence(link, allocation, linkIndex);
+		if (classicalRoute == null || qkdRoutePlan == null) {
+			throw new IllegalArgumentException(
+					"classicalRoute/qkdRoutePlan cannot be null");
+		}
 
-            for (QKDSpan span : linkPlan.getSpans()) {
-                final QKDCrosstalkPowerResult power =
-                        this.evaluateSegmentWithAdditionalClassicalCircuit(
-                                link,
-                                physicalLayer,
-                                allocation.getQuantumCoreId(),
-                                allocation.getSpectrumBand(),
-                                span.getLengthKm(),
-                                additionalClassicalCircuit);
+		if (classicalRoute.getLinkList() == null
+				|| classicalRoute.getLinkList().isEmpty()) {
+			throw new IllegalArgumentException(
+					"classicalRoute must contain at least one physical link");
+		}
 
-                results.add(evaluateSpanResult(
-                        span,
-                        power,
-                        wavelengthNm,
-                        minimumSecretKeyRateBps,
-                        maximumQber,
-                        link, liveResolver(physicalLayer), physicalLayer.getCrosstalk().getH(), additionalClassicalCircuit));
-            }
-        }
+		if (classicalRoute.getLinkList().size()
+				!= qkdRoutePlan.getPhysicalLinkCount()) {
+			throw new IllegalArgumentException(
+					"classicalRoute and qkdRoutePlan physical-link counts differ");
+		}
 
-        return new QKDRoutePhysicalResult(qkdRoutePlan, results);
-    }
+		if (session.getPhysicalLinkAllocationCount()
+				!= classicalRoute.getLinkList().size()) {
+			throw new IllegalArgumentException(
+					"QKD session allocation count differs from route link count");
+		}
 
-    /**
+		if (!Double.isFinite(wavelengthNm) || wavelengthNm <= 0.0) {
+			throw new IllegalArgumentException("wavelengthNm must be finite and > 0");
+		}
+
+		if (!Double.isFinite(minimumSecretKeyRateBps)
+				|| minimumSecretKeyRateBps < 0.0) {
+			throw new IllegalArgumentException(
+					"minimumSecretKeyRateBps must be finite and >= 0");
+		}
+
+		if (!Double.isFinite(maximumQber)
+				|| maximumQber < 0.0 || maximumQber > 1.0) {
+			throw new IllegalArgumentException(
+					"maximumQber must be finite and in [0,1]");
+		}
+
+		final List<QKDSpanPhysicalResult> results =
+				new ArrayList<QKDSpanPhysicalResult>();
+		final Vector<Link> physicalLinks = classicalRoute.getLinkList();
+		final List<QKDChannelAllocation> allocations = session.getAllocations();
+
+		for (int linkIndex = 0; linkIndex < physicalLinks.size(); linkIndex++) {
+			final Link link = physicalLinks.get(linkIndex);
+			final QKDLinkPlan linkPlan = qkdRoutePlan.getLinkPlans().get(linkIndex);
+			final QKDChannelAllocation allocation = allocations.get(linkIndex);
+
+			verifyLinkCorrespondence(link, linkPlan);
+			verifyAllocationCorrespondence(link, allocation, linkIndex);
+
+			for (QKDSpan span : linkPlan.getSpans()) {
+				final QKDCrosstalkPowerResult power = optionalReceiverIntegratedXt(
+						this.evaluatePhysicalSpan(link, physicalLayer,
+								allocation.getQuantumCoreId(), allocation.getSpectrumBand(),
+								span, additionalClassicalCircuit), physicalLayer,
+						link, allocation.getQuantumCoreId(), allocation.getSpectrumBand(),
+						span, wavelengthNm, additionalClassicalCircuit);
+
+				results.add(evaluateSpanResult(
+						span,
+						power,
+						wavelengthNm,
+						minimumSecretKeyRateBps,
+						maximumQber,
+						link, liveResolver(physicalLayer), physicalLayer.getCrosstalk().getH(), additionalClassicalCircuit));
+			}
+		}
+
+		return new QKDRoutePhysicalResult(qkdRoutePlan, results);
+	}
+
+	/**
      * Deterministic verification/debug path. It reads the same live SNetS
      * Core/Circuit lists as production code, but uses each circuit's stored
      * launch power and an explicitly supplied coupling coefficient.
      */
-    public QKDRoutePhysicalResult evaluateUsingStoredLaunchPowers(
-            Route classicalRoute,
-            QKDRoutePlan qkdRoutePlan,
-            int quantumCoreId,
-            int[] quantumSpectrumAssigned,
-            double couplingCoefficientPerM,
-            double wavelengthNm,
-            double minimumSecretKeyRateBps,
-            double maximumQber) {
+	public QKDRoutePhysicalResult evaluateUsingStoredLaunchPowers(
+			Route classicalRoute,
+			QKDRoutePlan qkdRoutePlan,
+			int quantumCoreId,
+			int[] quantumSpectrumAssigned,
+			double couplingCoefficientPerM,
+			double wavelengthNm,
+			double minimumSecretKeyRateBps,
+			double maximumQber) {
 
-        validateCommon(
-                classicalRoute,
-                qkdRoutePlan,
-                quantumSpectrumAssigned,
-                wavelengthNm,
-                minimumSecretKeyRateBps,
-                maximumQber);
-        if (!Double.isFinite(couplingCoefficientPerM)
-                || couplingCoefficientPerM < 0.0) {
-            throw new IllegalArgumentException(
-                    "couplingCoefficientPerM must be finite and >= 0");
-        }
+		validateCommon(
+				classicalRoute,
+				qkdRoutePlan,
+				quantumSpectrumAssigned,
+				wavelengthNm,
+				minimumSecretKeyRateBps,
+				maximumQber);
 
-        final List<QKDSpanPhysicalResult> results =
-                new ArrayList<QKDSpanPhysicalResult>();
-        final Vector<Link> physicalLinks = classicalRoute.getLinkList();
+		if (!Double.isFinite(couplingCoefficientPerM)
+				|| couplingCoefficientPerM < 0.0) {
+			throw new IllegalArgumentException(
+					"couplingCoefficientPerM must be finite and >= 0");
+		}
 
-        for (int linkIndex = 0; linkIndex < physicalLinks.size(); linkIndex++) {
-            final Link link = physicalLinks.get(linkIndex);
-            final QKDLinkPlan linkPlan = qkdRoutePlan.getLinkPlans().get(linkIndex);
-            verifyLinkCorrespondence(link, linkPlan);
+		final List<QKDSpanPhysicalResult> results =
+				new ArrayList<QKDSpanPhysicalResult>();
+		final Vector<Link> physicalLinks = classicalRoute.getLinkList();
 
-            for (QKDSpan span : linkPlan.getSpans()) {
-                final QKDCrosstalkPowerResult power =
-                        this.evaluateSegmentUsingStoredLaunchPowers(
-                                link,
-                                quantumCoreId,
-                                quantumSpectrumAssigned,
-                                couplingCoefficientPerM,
-                                span.getLengthKm());
+		for (int linkIndex = 0; linkIndex < physicalLinks.size(); linkIndex++) {
+			final Link link = physicalLinks.get(linkIndex);
+			final QKDLinkPlan linkPlan = qkdRoutePlan.getLinkPlans().get(linkIndex);
+			verifyLinkCorrespondence(link, linkPlan);
 
-                results.add(evaluateSpanResult(
-                        span,
-                        power,
-                        wavelengthNm,
-                        minimumSecretKeyRateBps,
-                        maximumQber,
-                        link, STORED_RESOLVER, couplingCoefficientPerM, null));
-            }
-        }
+			for (QKDSpan span : linkPlan.getSpans()) {
+				final QKDCrosstalkPowerResult power =
+						this.evaluatePhysicalSpanUsingStoredLaunchPowers(link, quantumCoreId,
+								quantumSpectrumAssigned, couplingCoefficientPerM, span, null);
 
-        return new QKDRoutePhysicalResult(qkdRoutePlan, results);
-    }
+				results.add(evaluateSpanResult(
+						span,
+						power,
+						wavelengthNm,
+						minimumSecretKeyRateBps,
+						maximumQber,
+						link, STORED_RESOLVER, couplingCoefficientPerM, null));
+			}
+		}
 
-    private QKDSpanPhysicalResult evaluateSpanResult(
-            QKDSpan span,
-            QKDCrosstalkPowerResult power,
-            double wavelengthNm,
-            double minimumSecretKeyRateBps,
-            double maximumQber,
-            Link link,
-            LaunchPowerResolver resolver,
-            double couplingCoefficientPerM,
-            Circuit candidate) {
+		return new QKDRoutePhysicalResult(qkdRoutePlan, results);
+	}
 
-        final qkd.multiband.MultiBandSettings mb = parameters.getMultiband();
-        if (mb != null) {
-            return evaluateSpanResultMultiBand(mb, span, power, wavelengthNm, minimumSecretKeyRateBps,
-                    maximumQber, link, resolver, couplingCoefficientPerM, candidate);
-        }
+	private QKDSpanPhysicalResult evaluateSpanResult(
+			QKDSpan span,
+			QKDCrosstalkPowerResult power,
+			double wavelengthNm,
+			double minimumSecretKeyRateBps,
+			double maximumQber,
+			Link link,
+			LaunchPowerResolver resolver,
+			double couplingCoefficientPerM,
+			Circuit candidate) {
 
-        final double attenuationDbPerKm =
-                parameters.attenuationDbPerKm(wavelengthNm);
+		final qkd.multiband.MultiBandSettings mb = parameters.getMultiband();
 
-        final double receivedCrosstalkPowerW =
-                toReceiverPowerW(
-                        power.getTotalPowerW(),
-                        span.getLengthKm(),
-                        attenuationDbPerKm,
-                        parameters.getReceiverTransferMode());
+		if (mb != null) {
+			return evaluateSpanResultMultiBand(mb, span, power, wavelengthNm, minimumSecretKeyRateBps,
+					maximumQber, link, resolver, couplingCoefficientPerM, candidate);
+		}
 
-        final QKDCrosstalkNoiseResult noise = this.evaluateFromReceivedPower(
-                receivedCrosstalkPowerW,
-                wavelengthNm,
-                parameters.getReceiverOpticalEfficiency(),
-                parameters.getDetectorGateWindowS());
+		final double attenuationDbPerKm =
+				parameters.attenuationDbPerKm(wavelengthNm);
 
-        final QKDPhysicalResult physical = bb84Model.evaluate(
-                wavelengthNm,
-                span.getLengthKm(),
-                noise.getTotalBackgroundProbability());
+		final double receivedCrosstalkPowerW =
+				receivedXtPower(
+						power,
+						span.getLengthKm(),
+						attenuationDbPerKm,
+						parameters.getReceiverTransferMode());
 
-        return new QKDSpanPhysicalResult(
-                span,
-                power,
-                noise,
-                physical,
-                minimumSecretKeyRateBps,
-                maximumQber);
-    }
+		final QKDCrosstalkNoiseResult noise = this.evaluateFromReceivedPower(
+				receivedCrosstalkPowerW,
+				wavelengthNm,
+				parameters.getReceiverOpticalEfficiency(),
+				parameters.getDetectorGateWindowS());
 
-    private static void validateCommon(
-            Route classicalRoute,
-            QKDRoutePlan qkdRoutePlan,
-            int[] quantumSpectrumAssigned,
-            double wavelengthNm,
-            double minimumSecretKeyRateBps,
-            double maximumQber) {
+		final QKDPhysicalResult physical = bb84Model.evaluate(
+				wavelengthNm,
+				span.getLengthKm(),
+				noise.getTotalBackgroundProbability());
 
-        if (classicalRoute == null) {
-            throw new IllegalArgumentException("classicalRoute cannot be null");
-        }
-        if (qkdRoutePlan == null) {
-            throw new IllegalArgumentException("qkdRoutePlan cannot be null");
-        }
-        if (classicalRoute.getLinkList() == null
-                || classicalRoute.getLinkList().isEmpty()) {
-            throw new IllegalArgumentException(
-                    "classicalRoute must contain at least one physical link");
-        }
-        if (classicalRoute.getLinkList().size()
-                != qkdRoutePlan.getPhysicalLinkCount()) {
-            throw new IllegalArgumentException(
-                    "classicalRoute and qkdRoutePlan physical-link counts differ");
-        }
-        if (quantumSpectrumAssigned == null
-                || quantumSpectrumAssigned.length < 2
-                || quantumSpectrumAssigned[0] > quantumSpectrumAssigned[1]) {
-            throw new IllegalArgumentException(
-                    "quantumSpectrumAssigned must be [firstSlot,lastSlot]");
-        }
-        if (!Double.isFinite(wavelengthNm) || wavelengthNm <= 0.0) {
-            throw new IllegalArgumentException("wavelengthNm must be finite and > 0");
-        }
-        if (!Double.isFinite(minimumSecretKeyRateBps)
-                || minimumSecretKeyRateBps < 0.0) {
-            throw new IllegalArgumentException(
-                    "minimumSecretKeyRateBps must be finite and >= 0");
-        }
-        if (!Double.isFinite(maximumQber)
-                || maximumQber < 0.0 || maximumQber > 1.0) {
-            throw new IllegalArgumentException(
-                    "maximumQber must be finite and in [0,1]");
-        }
-    }
+		return new QKDSpanPhysicalResult(
+				span,
+				power,
+				noise,
+				physical,
+				minimumSecretKeyRateBps,
+				maximumQber);
+	}
 
+	private static void validateCommon(
+			Route classicalRoute,
+			QKDRoutePlan qkdRoutePlan,
+			int[] quantumSpectrumAssigned,
+			double wavelengthNm,
+			double minimumSecretKeyRateBps,
+			double maximumQber) {
 
-    private static void verifyAllocationCorrespondence(
-            Link link,
-            QKDChannelAllocation allocation,
-            int linkIndex) {
-        if (allocation == null || allocation.getLink() != link) {
-            throw new IllegalArgumentException(
-                    "QKD session allocation does not correspond to classical link index "
-                    + linkIndex);
-        }
-    }
+		if (classicalRoute == null) {
+			throw new IllegalArgumentException("classicalRoute cannot be null");
+		}
 
-    private static void verifyLinkCorrespondence(
-            Link link,
-            QKDLinkPlan linkPlan) {
+		if (qkdRoutePlan == null) {
+			throw new IllegalArgumentException("qkdRoutePlan cannot be null");
+		}
 
-        final String source = link.getSource().getName();
-        final String destination = link.getDestination().getName();
+		if (classicalRoute.getLinkList() == null
+				|| classicalRoute.getLinkList().isEmpty()) {
+			throw new IllegalArgumentException(
+					"classicalRoute must contain at least one physical link");
+		}
 
-        if (!source.equals(linkPlan.getSource())
-                || !destination.equals(linkPlan.getDestination())) {
-            throw new IllegalArgumentException(
-                    "QKD link plan " + linkPlan.getSource() + "->"
-                    + linkPlan.getDestination()
-                    + " does not correspond to classical link "
-                    + source + "->" + destination);
-        }
-        if (Math.abs(link.getDistance() - linkPlan.getPhysicalLengthKm()) > 1e-9) {
-            throw new IllegalArgumentException(
-                    "QKD link-plan length differs from classical SNetS link length");
-        }
-    }
+		if (classicalRoute.getLinkList().size()
+				!= qkdRoutePlan.getPhysicalLinkCount()) {
+			throw new IllegalArgumentException(
+					"classicalRoute and qkdRoutePlan physical-link counts differ");
+		}
 
-    // =====================================================================
-    // 5. Link evaluation: one discrete QCh on every QTND span of one physical link
-    // =====================================================================
+		if (quantumSpectrumAssigned == null
+				|| quantumSpectrumAssigned.length < 2
+				|| quantumSpectrumAssigned[0] > quantumSpectrumAssigned[1]) {
+			throw new IllegalArgumentException(
+					"quantumSpectrumAssigned must be [firstSlot,lastSlot]");
+		}
 
+		if (!Double.isFinite(wavelengthNm) || wavelengthNm <= 0.0) {
+			throw new IllegalArgumentException("wavelengthNm must be finite and > 0");
+		}
 
+		if (!Double.isFinite(minimumSecretKeyRateBps)
+				|| minimumSecretKeyRateBps < 0.0) {
+			throw new IllegalArgumentException(
+					"minimumSecretKeyRateBps must be finite and >= 0");
+		}
 
-    public QKDLinkChannelPhysicalResult evaluateLinkChannel(Link link, QKDLinkPlan plan,
-            PhysicalLayer physicalLayer, QKDChannelAllocation allocation,
-            double wavelengthNm) {
-        return evaluateLinkChannelInternal(link, plan, physicalLayer, allocation, wavelengthNm, null);
-    }
+		if (!Double.isFinite(maximumQber)
+				|| maximumQber < 0.0 || maximumQber > 1.0) {
+			throw new IllegalArgumentException(
+					"maximumQber must be finite and in [0,1]");
+		}
+	}
 
-    public QKDLinkChannelPhysicalResult evaluateLinkChannelWithAdditionalClassicalCircuit(Link link,
-            QKDLinkPlan plan, PhysicalLayer physicalLayer,
-            QKDChannelAllocation allocation, double wavelengthNm,
-            Circuit candidate) {
-        return evaluateLinkChannelInternal(link, plan, physicalLayer, allocation, wavelengthNm, candidate);
-    }
+	private static void verifyAllocationCorrespondence(
+			Link link,
+			QKDChannelAllocation allocation,
+			int linkIndex) {
+		if (allocation == null || allocation.getLink() != link) {
+			throw new IllegalArgumentException(
+					"QKD session allocation does not correspond to classical link index "
+					+ linkIndex);
+		}
+	}
 
-    private QKDLinkChannelPhysicalResult evaluateLinkChannelInternal(Link link, QKDLinkPlan plan,
-            PhysicalLayer physicalLayer, QKDChannelAllocation allocation,
-            double wavelengthNm, Circuit candidate) {
-        if (link == null || plan == null || physicalLayer == null || allocation == null)
-            throw new IllegalArgumentException("link/plan/physicalLayer/allocation cannot be null");
-        List<QKDSpanPhysicalResult> results = new ArrayList<QKDSpanPhysicalResult>();
-        for (QKDSpan span : plan.getSpans()) {
-            QKDCrosstalkPowerResult power;
-            if (!parameters.isIntercoreCrosstalkEnabled()) {
-                int[] b = allocation.getSpectrumBand();
-                power = new QKDCrosstalkPowerResult(link.getName(), allocation.getQuantumCoreId(),
-                        b[0], b[1], 0.0, span.getLengthKm(), 0, 0, 0,
-                        Collections.<qkd.physical.QKDCrosstalkContribution>emptyList(), 0.0);
-            } else {
-                power = candidate == null
-                        ? this.evaluateSegment(link, physicalLayer,
-                                allocation.getQuantumCoreId(), allocation.getSpectrumBand(), span.getLengthKm())
-                        : this.evaluateSegmentWithAdditionalClassicalCircuit(link, physicalLayer,
-                                allocation.getQuantumCoreId(), allocation.getSpectrumBand(), span.getLengthKm(), candidate);
-            }
-            if (parameters.getMultiband() != null) {
-                results.add(evaluateSpanResultMultiBand(parameters.getMultiband(), span, power, wavelengthNm,
-                        0.0, 1.0, link, liveResolver(physicalLayer), physicalLayer.getCrosstalk().getH(), candidate));
-                continue;
-            }
-            double attenuation = parameters.attenuationDbPerKm(wavelengthNm);
-            double pxtRx = toReceiverPowerW(
-                    power.getTotalPowerW(), span.getLengthKm(), attenuation,
-                    parameters.getReceiverTransferMode());
-            QKDCrosstalkNoiseResult noise = this.evaluateFromReceivedPower(
-                    pxtRx, wavelengthNm, parameters.getReceiverOpticalEfficiency(),
-                    parameters.getDetectorGateWindowS());
-            QKDPhysicalResult physical = bb84Model.evaluate(
-                    wavelengthNm, span.getLengthKm(), noise.getTotalBackgroundProbability());
-            results.add(new QKDSpanPhysicalResult(span, power, noise, physical, 0.0, 1.0));
-        }
-        return new QKDLinkChannelPhysicalResult(results);
-    }
+	private static void verifyLinkCorrespondence(
+			Link link,
+			QKDLinkPlan linkPlan) {
 
-    // =====================================================================
-    // 6. Parte 43: multi-band spans (architecture MF/MB/MBSDM and SpRS)
-    // =====================================================================
+		final String source = link.getSource().getName();
+		final String destination = link.getDestination().getName();
 
-    /** Launch power of a live circuit from the SNetS physical layer (same rule as the crosstalk path). */
-    private static LaunchPowerResolver liveResolver(final PhysicalLayer physicalLayer) {
-        return new LaunchPowerResolver() {
-            @Override
-            public double resolve(Circuit circuit) {
-                final Modulation modulation = circuit.getModulation();
-                if (modulation == null) {
-                    throw new IllegalStateException(
-                            "Classical circuit " + circuit.getId() + " has no modulation assigned");
-                }
-                return physicalLayer.getCircuitLaunchPower(circuit, modulation);
-            }
-        };
-    }
+		if (!source.equals(linkPlan.getSource())
+				|| !destination.equals(linkPlan.getDestination())) {
+			throw new IllegalArgumentException(
+					"QKD link plan " + linkPlan.getSource() + "->"
+					+ linkPlan.getDestination()
+					+ " does not correspond to classical link "
+					+ source + "->" + destination);
+		}
 
-    /** Stored launch power of a circuit (verification path). */
-    private static final LaunchPowerResolver STORED_RESOLVER = new LaunchPowerResolver() {
-        @Override
-        public double resolve(Circuit circuit) {
-            final double powerW = circuit.getLaunchPowerLinear();
-            requireNonNegativeFinite(powerW, "stored launch power of circuit " + circuit.getId());
-            return powerW;
-        }
-    };
+		if (Math.abs(link.getDistance() - linkPlan.getPhysicalLengthKm()) > 1e-9) {
+			throw new IllegalArgumentException(
+					"QKD link-plan length differs from classical SNetS link length");
+		}
+	}
 
-    /**
+	// =====================================================================
+	// 5. Link evaluation: one discrete QCh on every QTND span of one physical link
+	// =====================================================================
+
+	public QKDLinkChannelPhysicalResult evaluateLinkChannel(Link link, QKDLinkPlan plan,
+			PhysicalLayer physicalLayer, QKDChannelAllocation allocation,
+			double wavelengthNm) {
+		return evaluateLinkChannelInternal(link, plan, physicalLayer, allocation, wavelengthNm, null);
+	}
+
+	public QKDLinkChannelPhysicalResult evaluateLinkChannelWithAdditionalClassicalCircuit(Link link,
+			QKDLinkPlan plan, PhysicalLayer physicalLayer,
+			QKDChannelAllocation allocation, double wavelengthNm,
+			Circuit candidate) {
+		return evaluateLinkChannelInternal(link, plan, physicalLayer, allocation, wavelengthNm, candidate);
+	}
+
+	private QKDLinkChannelPhysicalResult evaluateLinkChannelInternal(Link link, QKDLinkPlan plan,
+			PhysicalLayer physicalLayer, QKDChannelAllocation allocation,
+			double wavelengthNm, Circuit candidate) {
+		if (link == null || plan == null || physicalLayer == null || allocation == null)
+			throw new IllegalArgumentException("link/plan/physicalLayer/allocation cannot be null");
+		List<QKDSpanPhysicalResult> results = new ArrayList<QKDSpanPhysicalResult>();
+
+		for (QKDSpan span : plan.getSpans()) {
+			QKDCrosstalkPowerResult power;
+
+			if (!parameters.isIntercoreCrosstalkEnabled()) {
+				int[] b = allocation.getSpectrumBand();
+				power = new QKDCrosstalkPowerResult(link.getName(), allocation.getQuantumCoreId(),
+						b[0], b[1], 0.0, span.getLengthKm(), 0, 0, 0,
+						Collections.<qkd.physical.QKDCrosstalkContribution>emptyList(), 0.0);
+			} else {
+				power = candidate == null
+						? this.evaluatePhysicalSpan(link, physicalLayer,
+								allocation.getQuantumCoreId(), allocation.getSpectrumBand(), span, null)
+						: this.evaluatePhysicalSpan(link, physicalLayer,
+								allocation.getQuantumCoreId(), allocation.getSpectrumBand(), span, candidate);
+			}
+
+			power = optionalReceiverIntegratedXt(power, physicalLayer, link,
+					allocation.getQuantumCoreId(), allocation.getSpectrumBand(), span, wavelengthNm, candidate);
+
+			if (parameters.getMultiband() != null) {
+				results.add(evaluateSpanResultMultiBand(parameters.getMultiband(), span, power, wavelengthNm,
+						0.0, maximumQber, link, liveResolver(physicalLayer), physicalLayer.getCrosstalk().getH(), candidate));
+				continue;
+			}
+
+			double attenuation = parameters.attenuationDbPerKm(wavelengthNm);
+			double pxtRx = receivedXtPower(
+					power, span.getLengthKm(), attenuation,
+					parameters.getReceiverTransferMode());
+			QKDCrosstalkNoiseResult noise = this.evaluateFromReceivedPower(
+					pxtRx, wavelengthNm, parameters.getReceiverOpticalEfficiency(),
+					parameters.getDetectorGateWindowS());
+			QKDPhysicalResult physical = bb84Model.evaluate(
+					wavelengthNm, span.getLengthKm(), noise.getTotalBackgroundProbability());
+			results.add(new QKDSpanPhysicalResult(span, power, noise, physical, 0.0, maximumQber));
+		}
+
+		return new QKDLinkChannelPhysicalResult(results);
+	}
+
+	// =====================================================================
+	// 6. Parte 43: multi-band spans (architecture MF/MB/MBSDM and SpRS)
+	// =====================================================================
+
+	/** Launch power of a live circuit from the SNetS physical layer (same rule as the crosstalk path). */
+	private static LaunchPowerResolver liveResolver(final PhysicalLayer physicalLayer) {
+		return new LaunchPowerResolver() {
+			@Override
+			public double resolve(Circuit circuit) {
+				// PICh is a physical classical optical source but has no artificial
+				// application bitrate/modulation in stage 1. Its configured optical
+				// power is therefore used directly.
+				if (circuit instanceof QKDPichCircuit) {
+					return circuit.getLaunchPowerLinear();
+				}
+
+				final Modulation modulation = circuit.getModulation();
+
+				if (modulation == null) {
+					throw new IllegalStateException(
+							"Classical circuit " + circuit.getId() + " has no modulation assigned");
+				}
+
+				return physicalLayer.getCircuitLaunchPower(circuit, modulation);
+			}
+
+		};
+	}
+
+	/** Stored launch power of a circuit (verification path). */
+	private static final LaunchPowerResolver STORED_RESOLVER = new LaunchPowerResolver() {
+		@Override
+		public double resolve(Circuit circuit) {
+			final double powerW = circuit.getLaunchPowerLinear();
+			requireNonNegativeFinite(powerW, "stored launch power of circuit " + circuit.getId());
+
+			return powerW;
+		}
+
+	};
+
+	/**
      * One QKD span in multi-band mode ({@link qkd.multiband.MultiBandSettings}):
      * <ol>
      *   <li>loss alpha(lambda) of the multi-band fibre model (through {@link QKDPhysicalParameters#attenuationDbPerKm});</li>
@@ -1281,428 +1376,642 @@ public final class QKDPhysicalLayer implements java.io.Serializable {
      *
      * <p>Refer\u00eancias: [MEHDI24], [DIBAJ25], [ERAERDS10], [CAI20]; ver qkd.multiband.MultiBandQkdLinkModel.</p>
      */
-    private QKDSpanPhysicalResult evaluateSpanResultMultiBand(
-            qkd.multiband.MultiBandSettings mb,
-            QKDSpan span,
-            QKDCrosstalkPowerResult power,
-            double wavelengthNm,
-            double minimumSecretKeyRateBps,
-            double maximumQber,
-            Link link,
-            LaunchPowerResolver resolver,
-            double couplingCoefficientPerM,
-            Circuit candidate) {
+	private QKDSpanPhysicalResult evaluateSpanResultMultiBand(
+			qkd.multiband.MultiBandSettings mb,
+			QKDSpan span,
+			QKDCrosstalkPowerResult power,
+			double wavelengthNm,
+			double minimumSecretKeyRateBps,
+			double maximumQber,
+			Link link,
+			LaunchPowerResolver resolver,
+			double couplingCoefficientPerM,
+			Circuit candidate) {
 
-        final double lengthKm = span.getLengthKm();
-        final double attenuationDbPerKm = parameters.attenuationDbPerKm(wavelengthNm);
+		// Build a transaction-local gain snapshot from live channels on the host core.
+		// In particular, pending PICh/DCh sources must affect the same gains used
+		// for Raman, GN and EDFA ASE during candidate admission.
+		mb = loadedMultibandSettings(mb, link, resolver, candidate);
+		final double lengthKm = span.getLengthKm();
+		final double attenuationDbPerKm = parameters.attenuationDbPerKm(wavelengthNm);
 
-        QKDCrosstalkPowerResult xt = power;
-        if (!multiBandCrosstalkApplies(mb, link, wavelengthNm) || !parameters.isIntercoreCrosstalkEnabled()) {
-            xt = new QKDCrosstalkPowerResult(power.getLinkName(), power.getQuantumCoreId(),
-                    power.getQuantumSpectrumStart(), power.getQuantumSpectrumEnd(), 0.0, lengthKm, 0, 0, 0,
-                    Collections.<QKDCrosstalkContribution>emptyList(), 0.0);
-        }
-        final double receivedXt = toReceiverPowerW(xt.getTotalPowerW(), lengthKm, attenuationDbPerKm,
-                parameters.getReceiverTransferMode());
-        final QKDCrosstalkNoiseResult noise = this.evaluateFromReceivedPower(receivedXt, wavelengthNm,
-                parameters.getReceiverOpticalEfficiency(), parameters.getDetectorGateWindowS());
+		QKDCrosstalkPowerResult xt = power;
 
-        final double ramanW = mb.hasRaman()
-                ? ramanPowerAtReceiverW(mb, link, lengthKm, wavelengthNm, resolver,
-                        couplingCoefficientPerM * 1000.0, candidate)
-                : 0.0;
-        final double pRaman = ramanW > 0.0 ? ramanBackgroundProbability(mb, ramanW, wavelengthNm) : 0.0;
-        double pb = pRaman > 0.0
-                ? combineIndependentProbabilities(noise.getTotalBackgroundProbability(), pRaman)
-                : noise.getTotalBackgroundProbability();
-        // Parte 45: NLI of the host-core classical circuits (GN model)
-        final double nliW = mb.hasNli()
-                ? nliPowerAtReceiverW(mb, link, lengthKm, wavelengthNm, resolver, candidate) : 0.0;
-        final double pNli = nliW > 0.0 ? ramanBackgroundProbability(mb, nliW, wavelengthNm) : 0.0;
-        if (pNli > 0.0) {
-            pb = combineIndependentProbabilities(pb, pNli);
-        }
+		if (!multiBandCrosstalkApplies(mb, link, wavelengthNm) || !parameters.isIntercoreCrosstalkEnabled()) {
+			xt = new QKDCrosstalkPowerResult(power.getLinkName(), power.getQuantumCoreId(),
+					power.getQuantumSpectrumStart(), power.getQuantumSpectrumEnd(), 0.0, lengthKm, 0, 0, 0,
+					Collections.<QKDCrosstalkContribution>emptyList(), 0.0);
+		}
 
-        final QKDPhysicalResult physical = bb84Model.evaluateWithAttenuation(attenuationDbPerKm, lengthKm, pb);
-        return new QKDSpanPhysicalResult(span, xt, noise, physical, minimumSecretKeyRateBps, maximumQber,
-                ramanW, pRaman).withNli(nliW, pNli);
-    }
+		final double receivedXt = receivedXtPower(xt, lengthKm, attenuationDbPerKm,
+				parameters.getReceiverTransferMode());
+		final QKDCrosstalkNoiseResult noise = this.evaluateFromReceivedPower(receivedXt, wavelengthNm,
+				parameters.getReceiverOpticalEfficiency(), parameters.getDetectorGateWindowS());
 
-    /**
+		final boolean intrabandViolation = violatesIntrabandSeparation(mb, link, wavelengthNm, candidate, span);
+		final double ramanW = mb.hasRaman()
+				? ramanPowerAtReceiverW(mb, link, lengthKm, wavelengthNm, resolver,
+						couplingCoefficientPerM * 1000.0, candidate, span)
+				: 0.0;
+		final double pRaman = ramanW > 0.0 ? ramanBackgroundProbability(mb, ramanW, wavelengthNm) : 0.0;
+		double pb = pRaman > 0.0
+				? combineIndependentProbabilities(noise.getTotalBackgroundProbability(), pRaman)
+				: noise.getTotalBackgroundProbability();
+
+		// Parte 45: NLI of the host-core classical circuits (GN model)
+		final double nliW = mb.hasNli()
+				? nliPowerAtReceiverW(mb, link, lengthKm, wavelengthNm, resolver, candidate, span) : 0.0;
+		final double pNli = nliW > 0.0 ? ramanBackgroundProbability(mb, nliW, wavelengthNm) : 0.0;
+
+		if (pNli > 0.0) {
+			pb = combineIndependentProbabilities(pb, pNli);
+		}
+
+		// Discrete FWM beats: optional, mutually exclusive with QCh GN-NLI to avoid double counting.
+		// Products must fall within the quantum receiver filter. No reverse-fibre pumps exist.
+		final double fwmW = mb.isFwmEnabled() ? fwmPowerAtReceiverW(
+				mb, link, wavelengthNm, resolver, candidate, span) : 0.0;
+		final double pFwm = fwmW > 0.0 ? ramanBackgroundProbability(mb, fwmW, wavelengthNm) : 0.0;
+		if (pFwm > 0.0) pb = combineIndependentProbabilities(pb, pFwm);
+
+		// Per-amplifier ASE: generated only by classical EDFAs, transferred to
+		// the quantum receiver through an explicitly calibrated leakage factor.
+		// This does NOT amplify quantum signals or assume EDFAs emit in O band.
+		if (mb.getPowerEvolution() != null && span != null && mb.getArchitecture()
+				!= qkd.multiband.MultiBandSettings.Architecture.MF) {
+			final double classicalHz = mb.getClassicalBandStartHz()
+					+ 0.5 * link.getCore(mb.getHostCoreId()).getNumOfSlots()
+					* link.getCore(mb.getHostCoreId()).getSlotSpectrumBand();
+			final double lambdaClassicalNm = parameters.getSpeedOfLightMPerS() / classicalHz * 1e9;
+			final double alphaClassical = parameters.attenuationDbPerKm(lambdaClassicalNm)
+					* qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
+			final double alphaQuantum = attenuationDbPerKm
+					* qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
+			final double perAmplifierAseW = mb.getPowerEvolution().aseAtQuantumReceiverW(
+					span.getStartKm(), span.getEndKm(), alphaClassical, alphaQuantum,
+					classicalHz, parameters.getQchBandwidthHz(), parameters.getPlanckConstantJs());
+
+			if (perAmplifierAseW > 0.0) {
+				final double pAmplifierAse = this.evaluateFromReceivedPower(perAmplifierAseW,
+						wavelengthNm, parameters.getReceiverOpticalEfficiency(),
+						parameters.getDetectorGateWindowS()).getCrosstalkBackgroundProbability();
+				pb = combineIndependentProbabilities(pb, pAmplifierAse);
+			}
+		}
+
+		// Residual ASE is a receiver-referenced, pre-filtered calibration value.
+		// Do not multiply it again by fibre gain or add it as Raman/NLI power.
+		final QKDOpticalBudget budget = parameters.getOpticalBudget();
+
+		if (budget.getResidualAseReceiverW() > 0.0) {
+			final double pAse = this.evaluateFromReceivedPower(
+					budget.getResidualAseReceiverW(), wavelengthNm,
+					parameters.getReceiverOpticalEfficiency(),
+					parameters.getDetectorGateWindowS()).getCrosstalkBackgroundProbability();
+			pb = combineIndependentProbabilities(pb, pAse);
+		}
+
+		// A configured intraband guard is an admission constraint, not a new
+		// noise equation. Setting p_b=1 makes the candidate physically
+		// infeasible through the existing QBER/SKR admission path.
+		if (intrabandViolation) pb = 1.0;
+
+		final QKDPhysicalResult physical = bb84Model.evaluateWithOpticalLoss(attenuationDbPerKm, lengthKm, pb,
+				parameters.getOpticalBudget().getSignalInsertionLossDb());
+
+		return new QKDSpanPhysicalResult(span, xt, noise, physical, minimumSecretKeyRateBps, maximumQber,
+				ramanW, pRaman).withNli(nliW, pNli).withFwm(fwmW, pFwm);
+	}
+
+	/**
+     * Per-core amplifier snapshot using only sources physically present on this
+     * directed link. No reverse-link channels are inspected. The amplifier
+     * grid is indexed from the directed-link source, NOT from each QKDSpan.
+     *
+     * The common attenuation remains an explicit approximation. When spectral
+     * EDFA profiles are configured, gain/NF vary by band and all bands
+     * contribute to the same local compression state. Otherwise the legacy
+     * scalar gain law is retained.
+     */
+	private qkd.multiband.MultiBandSettings loadedMultibandSettings(
+			qkd.multiband.MultiBandSettings settings, Link link,
+			LaunchPowerResolver resolver, Circuit candidate) {
+		final qkd.multiband.ClassicalPowerEvolution base = settings.getPowerEvolution();
+
+		if (base == null || settings.getArchitecture()
+				== qkd.multiband.MultiBandSettings.Architecture.MF) return settings;
+
+		return loadedMultibandSettings(settings, link, resolver, candidate,
+				settings.getHostCoreId());
+	}
+
+	private qkd.multiband.MultiBandSettings loadedMultibandSettings(
+			qkd.multiband.MultiBandSettings settings, Link link,
+			LaunchPowerResolver resolver, Circuit candidate, int coreId) {
+		final Core host = link.getCore(coreId);
+
+		if (host == null) return settings;
+		final qkd.multiband.ClassicalPowerEvolution configured = settings.getPowerEvolution();
+
+		if (configured == null) return settings;
+		final qkd.multiband.ClassicalPowerEvolution base = sharedBoosterTemplate == null
+				? configured : sharedBoosterTemplate;
+		final java.util.List<Circuit> all = new java.util.ArrayList<Circuit>();
+
+		if (host.getCircuitList() != null) all.addAll(host.getCircuitList());
+
+		if (candidate != null && candidateTraversesLink(candidate, link)
+				&& qkd.metrics.BlockingDetailRecorder.rawCore(candidate) == host.getId()
+				&& !all.contains(candidate)) all.add(candidate);
+		final double middleHz = settings.getClassicalBandStartHz()
+				+ 0.5 * host.getNumOfSlots() * host.getSlotSpectrumBand();
+		final double centreNm = parameters.getSpeedOfLightMPerS() / middleHz * 1e9;
+		final double alpha = parameters.attenuationDbPerKm(centreNm)
+				* qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
+
+		return settings.withPowerEvolution(
+				qkd.multiband.DirectedAmplifierSnapshotFactory.build(base, link, coreId,
+						all, settings.getClassicalBandStartHz(), alpha,
+						new qkd.multiband.DirectedAmplifierSnapshotFactory.PowerResolver() {
+							@Override public double powerW(Circuit source) {
+								double value = resolver.resolve(source);
+								// Classical DChs enter the shared booster AFTER
+								// their MUX. PIChs are injected separately at
+								// QKDSpan boundaries, using fibre-port power.
+								if (sharedBoosterTemplate != null
+										&& !(source instanceof qkd.capacity.QKDPichCircuit))
+									return value * sharedClassicalMuxTransmission;
+
+								return value;
+							}
+
+						}));
+	}
+
+	/**
      * Parte 43 (verification path): one QKD span evaluated with the circuits' stored launch powers and an explicit
      * coupling coefficient, through the same code as production (multi-band or not).
      */
-    public QKDSpanPhysicalResult evaluateSpanUsingStoredLaunchPowers(Link link, QKDSpan span, int quantumCoreId,
-            int[] quantumSpectrumAssigned, double couplingCoefficientPerM, double wavelengthNm) {
-        final QKDCrosstalkPowerResult power = evaluateSegmentUsingStoredLaunchPowers(link, quantumCoreId,
-                quantumSpectrumAssigned, couplingCoefficientPerM, span.getLengthKm());
-        return evaluateSpanResult(span, power, wavelengthNm, 0.0, 1.0, link, STORED_RESOLVER,
-                couplingCoefficientPerM, null);
-    }
+	public QKDSpanPhysicalResult evaluateSpanUsingStoredLaunchPowers(Link link, QKDSpan span, int quantumCoreId,
+			int[] quantumSpectrumAssigned, double couplingCoefficientPerM, double wavelengthNm) {
+		final QKDCrosstalkPowerResult power = evaluateSegmentUsingStoredLaunchPowers(link, quantumCoreId,
+				quantumSpectrumAssigned, couplingCoefficientPerM, span.getLengthKm());
 
-    /** Linear crosstalk on the QCh: never in MF; in MB/MBSDM only when the QCh is inside the classical grid. */
-    private static boolean multiBandCrosstalkApplies(qkd.multiband.MultiBandSettings mb, Link link,
-            double wavelengthNm) {
-        if (mb.getArchitecture() == qkd.multiband.MultiBandSettings.Architecture.MF) {
-            return false;
-        }
-        final Core host = link.getCore(mb.getHostCoreId());
-        return host != null && mb.isInClassicalBand(wavelengthNm, host.getNumOfSlots(), host.getSlotSpectrumBand());
-    }
+		return evaluateSpanResult(span, power, wavelengthNm, 0.0, 1.0, link, STORED_RESOLVER,
+				couplingCoefficientPerM, null);
+	}
 
-    /**
+	/** Linear crosstalk on the QCh: never in MF; in MB/MBSDM only when the QCh is inside the classical grid. */
+	private static boolean multiBandCrosstalkApplies(qkd.multiband.MultiBandSettings mb, Link link,
+			double wavelengthNm) {
+		if (mb.getArchitecture() == qkd.multiband.MultiBandSettings.Architecture.MF) {
+			return false;
+		}
+
+		final Core host = link.getCore(mb.getHostCoreId());
+
+		return host != null && mb.isInClassicalBand(wavelengthNm, host.getNumOfSlots(), host.getSlotSpectrumBand());
+	}
+
+	/**
+     * Same-core same-band coexistence guard. Moghaddam et al. (IEEE JSAC 2021)
+     * use approximately 200 GHz in their scenario to avoid the strong Raman
+     * region. Here that distance is configurable and is evaluated against every
+     * physical classical source, including PICh.
+     */
+	private boolean violatesIntrabandSeparation(qkd.multiband.MultiBandSettings mb, Link link,
+			double qchNm, Circuit candidate, QKDSpan currentSpan) {
+		if (!mb.isIntrabandSeparationEnabled()
+				|| mb.getArchitecture() == qkd.multiband.MultiBandSettings.Architecture.MF) return false;
+		final Core host = link.getCore(mb.getHostCoreId());
+
+		if (host == null || !mb.isInClassicalBand(qchNm, host.getNumOfSlots(), host.getSlotSpectrumBand()))
+			return false;
+		final double fq = parameters.getSpeedOfLightMPerS() / (qchNm * 1e-9);
+		final double min = mb.getMinimumQchClassicalSeparationHz();
+		final List<Circuit> circuits = new ArrayList<Circuit>();
+
+		if (host.getCircuitList() != null) circuits.addAll(host.getCircuitList());
+
+		if (host.getAuxiliaryClassicalCircuitList() != null) {
+			for (Circuit aux : host.getAuxiliaryClassicalCircuitList()) {
+				if (aux == null || circuits.contains(aux)) continue;
+
+				if (aux instanceof QKDPichCircuit && currentSpan != null) {
+					final QKDSpan pump = ((QKDPichCircuit) aux).getSpan();
+
+					if (pump.getEndKm() <= currentSpan.getStartKm()
+							|| pump.getStartKm() >= currentSpan.getEndKm()) continue;
+				}
+
+				circuits.add(aux);
+			}
+		}
+
+		if (candidate != null && candidateTraversesLink(candidate, link)
+				&& qkd.metrics.BlockingDetailRecorder.rawCore(candidate) == host.getId()
+				&& !circuits.contains(candidate)) circuits.add(candidate);
+
+		for (Circuit c : circuits) {
+			if (c == null || c.getSpectrumAssigned() == null) continue;
+			final int[] b = c.getSpectrumAssigned();
+			final double fc = mb.slotCentreHz(b[0], b[1], host.getSlotSpectrumBand());
+
+			if (Math.abs(fc - fq) + 1e-6 < min) return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Monochromatic, co-propagating FWM products from DChs and optical PIChs
+	 * sharing the selected classical core (MB or MB-SDM). Product power is
+	 * attenuated from the last common pump position to the QCh receiver.
+	 * The approximation does not include the broadband GN spectral shape.
+	 */
+	double fwmPowerAtReceiverW(qkd.multiband.MultiBandSettings mb, Link link,
+			double qchNm, LaunchPowerResolver resolver, Circuit candidate, QKDSpan span) {
+		if (!mb.isFwmEnabled() || mb.getArchitecture() == qkd.multiband.MultiBandSettings.Architecture.MF)
+			return 0.0;
+		final Core core = link.getCore(mb.getHostCoreId());
+		if (core == null) return 0.0;
+		final double start = span == null ? 0.0 : span.getStartKm();
+		final double end = span == null ? link.getDistance() : span.getEndKm();
+		final double fq = parameters.getSpeedOfLightMPerS() / (qchNm * 1e-9);
+		final double halfFilterHz = parameters.getQchBandwidthHz() * 0.5;
+		final java.util.List<FwmPump> pumps = new java.util.ArrayList<FwmPump>();
+		final java.util.List<Circuit> sources = new java.util.ArrayList<Circuit>();
+		if (core.getCircuitList() != null) sources.addAll(core.getCircuitList());
+		if (core.getAuxiliaryClassicalCircuitList() != null)
+			for (Circuit x : core.getAuxiliaryClassicalCircuitList()) if (x != null && !sources.contains(x)) sources.add(x);
+		if (candidate != null && candidateTraversesLink(candidate, link)
+				&& qkd.metrics.BlockingDetailRecorder.rawCore(candidate) == core.getId()
+				&& !sources.contains(candidate)) sources.add(candidate);
+		for (Circuit source : sources) {
+			int[] band = source.getSpectrumAssigned();
+			if (band == null || band[0] < 1 || band[1] > core.getNumOfSlots()) continue;
+			double p = resolver.resolve(source);
+			if (!(p > 0.0)) continue;
+			double a = start, b = end;
+			if (source instanceof QKDPichCircuit) {
+				QKDSpan location = ((QKDPichCircuit)source).getSpan();
+				a = Math.max(start, location.getStartKm());
+				b = Math.min(end, location.getEndKm());
+			}
+			if (b <= a) continue;
+			pumps.add(new FwmPump(mb.slotCentreHz(band[0], band[1], core.getSlotSpectrumBand()), p, a, b));
+		}
+		// Find only the third pumps whose generated FWM tone falls in the
+		// QCh filter. Sorting and binary-searching is O(M^2 log M), not O(M^3).
+		java.util.Collections.sort(pumps, new java.util.Comparator<FwmPump>() {
+			@Override public int compare(FwmPump a, FwmPump b) {
+				return Double.compare(a.frequencyHz, b.frequencyHz);
+			}
+		});
+		double total = 0.0;
+		final double alpha = parameters.attenuationDbPerKm(qchNm);
+		for (int i = 0; i < pumps.size(); i++) for (int j = i; j < pumps.size(); j++) {
+			FwmPump pi = pumps.get(i), pj = pumps.get(j);
+			final double neededK = pi.frequencyHz + pj.frequencyHz - fq;
+			int low = 0, high = pumps.size();
+			while (low < high) {
+				int mid = (low + high) >>> 1;
+				if (pumps.get(mid).frequencyHz < neededK - halfFilterHz) low = mid + 1;
+				else high = mid;
+			}
+			for (int k = low; k < pumps.size(); k++) {
+				FwmPump pk = pumps.get(k);
+				if (pk.frequencyHz > neededK + halfFilterHz) break;
+				if (k == i || k == j) continue;
+				final double commonStart = Math.max(pi.startKm, Math.max(pj.startKm, pk.startKm));
+				final double commonEnd = Math.min(pi.endKm, Math.min(pj.endKm, pk.endKm));
+				if (commonEnd <= commonStart) continue;
+				final double lambdaNm = parameters.getSpeedOfLightMPerS()
+						/ ((pi.frequencyHz + pj.frequencyHz + pk.frequencyHz) / 3.0) * 1e9;
+				// Apply the attenuation of each pump before their first common
+				// interaction position. PICh injection can start inside a physical link.
+				final double aI = fwmPumpLossDbPerKm(mb, pi.frequencyHz);
+				final double aJ = fwmPumpLossDbPerKm(mb, pj.frequencyHz);
+				final double aK = fwmPumpLossDbPerKm(mb, pk.frequencyHz);
+				final double pI = pi.powerW * Math.pow(10.0, -aI * (commonStart-pi.startKm)/10.0);
+				final double pJ = pj.powerW * Math.pow(10.0, -aJ * (commonStart-pj.startKm)/10.0);
+				final double pK = pk.powerW * Math.pow(10.0, -aK * (commonStart-pk.startKm)/10.0);
+				final double generated = qkd.multiband.FourWaveMixingModel.productPowerW(
+						pi.frequencyHz, pj.frequencyHz, pk.frequencyHz,
+						pI, pJ, pK, commonEnd-commonStart,
+						alpha, mb.getFwmGammaPerWKm(), mb.getFwmDispersionPsNmKm(),
+						mb.getFwmSlopePsNm2Km(), lambdaNm, mb.isFwmPeakEnvelope());
+				if (Double.isFinite(generated) && generated > 0.0)
+					total += generated * Math.pow(10.0, -alpha * (end-commonEnd)/10.0);
+			}
+		}
+		return total;
+	}
+
+	/** Wavelength-dependent classical pump attenuation, not QCh attenuation. */
+	private double fwmPumpLossDbPerKm(qkd.multiband.MultiBandSettings mb, double frequencyHz) {
+		final double wavelengthNm = parameters.getSpeedOfLightMPerS() / frequencyHz * 1e9;
+		return mb.getAttenuation() != null
+				? mb.getAttenuation().dbPerKm(wavelengthNm)
+				: parameters.attenuationDbPerKm(wavelengthNm);
+	}
+
+	private static final class FwmPump {
+		final double frequencyHz, powerW, startKm, endKm;
+		FwmPump(double f, double p, double a, double b) {
+			frequencyHz=f; powerW=p; startKm=a; endKm=b;
+		}
+	}
+
+	/**
      * SpRS power (W) inside the QCh filter at the receiver of a span of {@code lengthKm}, from the classical
      * circuits of the host core and (MBSDM, intercoreRaman) of its adjacent classical cores.
      */
-    double ramanPowerAtReceiverW(qkd.multiband.MultiBandSettings mb, Link link, double lengthKm,
-            double qchNm, LaunchPowerResolver resolver, double couplingPerKm, Circuit candidate) {
-        final Core host = link.getCore(mb.getHostCoreId());
-        if (host == null) {
-            return 0.0;
-        }
-        final qkd.multiband.SpontaneousRamanModel raman = mb.getRaman();
-        final double alphaQ = parameters.attenuationDbPerKm(qchNm) * qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
-        final boolean equalLoss =
-                mb.getForwardForm() == qkd.multiband.MultiBandQkdLinkModel.ForwardForm.EQUAL_LOSS;
-        final int candidateCore = candidate != null && candidateTraversesLink(candidate, link)
-                ? qkd.metrics.BlockingDetailRecorder.rawCore(candidate) : Integer.MIN_VALUE;
+	double ramanPowerAtReceiverW(qkd.multiband.MultiBandSettings mb, Link link, double lengthKm,
+			double qchNm, LaunchPowerResolver resolver, double couplingPerKm, Circuit candidate) {
+		return ramanPowerAtReceiverW(mb, link, lengthKm, qchNm, resolver, couplingPerKm, candidate, null);
+	}
 
-        final RamanTerms terms = new RamanTerms();
-        // same link (co-propagating): forward
-        collectLinkRamanTerms(terms, link, host.getId(), candidateCore, candidate, mb, qchNm, alphaQ, lengthKm,
-                resolver, equalLoss, couplingPerKm, false);
-        // Parte 44: reverse link in the same fibre (counter-propagating): backward
-        if (mb.isBidirectionalFiber() && link.getSource() != null && link.getDestination() != null) {
-            final Link reverse = link.getDestination().linkTo(link.getSource());
-            if (reverse != null && reverse != link && reverse.getCore(host.getId()) != null) {
-                final int reverseCandidateCore = candidate != null && candidateTraversesLink(candidate, reverse)
-                        ? qkd.metrics.BlockingDetailRecorder.rawCore(candidate) : Integer.MIN_VALUE;
-                collectLinkRamanTerms(terms, reverse, host.getId(), reverseCandidateCore, candidate, mb, qchNm,
-                        alphaQ, lengthKm, resolver, equalLoss, couplingPerKm, true);
-            }
-        }
-        final double sum = terms.sum();
-        final double lambdaQm = qchNm * 1e-9;
-        final double filterNm = lambdaQm * lambdaQm * parameters.getQchBandwidthHz()
-                / parameters.getSpeedOfLightMPerS() * 1e9;
-        return sum * filterNm;
-    }
+	private double ramanPowerAtReceiverW(qkd.multiband.MultiBandSettings mb, Link link, double lengthKm,
+			double qchNm, LaunchPowerResolver resolver, double couplingPerKm, Circuit candidate,
+			QKDSpan currentSpan) {
+		final Core host = link.getCore(mb.getHostCoreId());
 
-    /** Host core of {@code link} (same core) and, in MBSDM with intercoreRaman, its adjacent classical cores. */
-    private void collectLinkRamanTerms(RamanTerms terms, Link link, int hostCoreId,
-            int candidateCore, Circuit candidate, qkd.multiband.MultiBandSettings mb, double qchNm, double alphaQ,
-            double lengthKm, LaunchPowerResolver resolver, boolean equalLoss, double couplingPerKm,
-            boolean backward) {
-        final Core host = link.getCore(hostCoreId);
-        if (host == null) return;
-        collectRamanTerms(terms, host, candidateCore == host.getId() ? candidate : null, mb, qchNm, alphaQ,
-                lengthKm, resolver, equalLoss, -1.0, backward);
-        if (mb.getArchitecture() == qkd.multiband.MultiBandSettings.Architecture.MBSDM && mb.isIntercoreRaman()
-                && couplingPerKm > 0.0) {
-            final List<Core> adjacent = link.getAdjacentCores(host.getId());
-            if (adjacent != null) {
-                for (Core core : adjacent) {
-                    if (core == null || core.isQkdReserved()) continue;
-                    collectRamanTerms(terms, core, candidateCore == core.getId() ? candidate : null, mb, qchNm,
-                            alphaQ, lengthKm, resolver, equalLoss, couplingPerKm, backward);
-                }
-            }
-        }
-    }
+		if (host == null) {
+			return 0.0;
+		}
 
-    /**
+		final qkd.multiband.SpontaneousRamanModel raman = mb.getRaman();
+		final double alphaQ = parameters.attenuationDbPerKm(qchNm) * qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
+		final boolean equalLoss =
+				mb.getForwardForm() == qkd.multiband.MultiBandQkdLinkModel.ForwardForm.EQUAL_LOSS;
+		final int candidateCore = candidate != null && candidateTraversesLink(candidate, link)
+				? qkd.metrics.BlockingDetailRecorder.rawCore(candidate) : Integer.MIN_VALUE;
+
+		final java.util.TreeMap<Integer, Double> terms = new java.util.TreeMap<Integer, Double>();
+
+		// same link (co-propagating): forward
+		collectLinkRamanTerms(terms, link, host.getId(), candidateCore, candidate, mb, qchNm, alphaQ, lengthKm,
+				resolver, equalLoss, couplingPerKm, currentSpan);
+		double sum = 0.0;
+
+		for (Double v : terms.values()) sum += v.doubleValue();
+		final double lambdaQm = qchNm * 1e-9;
+		final double filterNm = lambdaQm * lambdaQm * parameters.getQchBandwidthHz()
+				/ parameters.getSpeedOfLightMPerS() * 1e9;
+
+		return sum * filterNm;
+	}
+
+	/** Host core of {@code link} (same core) and, in MBSDM with intercoreRaman, its adjacent classical cores. */
+	private void collectLinkRamanTerms(java.util.TreeMap<Integer, Double> terms, Link link, int hostCoreId,
+			int candidateCore, Circuit candidate, qkd.multiband.MultiBandSettings mb, double qchNm, double alphaQ,
+			double lengthKm, LaunchPowerResolver resolver, boolean equalLoss, double couplingPerKm,
+			QKDSpan currentSpan) {
+		final Core host = link.getCore(hostCoreId);
+
+		if (host == null) return;
+		collectRamanTerms(terms, host, candidateCore == host.getId() ? candidate : null, mb, qchNm, alphaQ,
+				lengthKm, resolver, equalLoss, -1.0, currentSpan, link.getDistance());
+
+		if (mb.getArchitecture() == qkd.multiband.MultiBandSettings.Architecture.MBSDM && mb.isIntercoreRaman()
+				&& couplingPerKm > 0.0) {
+			final List<Core> adjacent = link.getAdjacentCores(host.getId());
+
+			if (adjacent != null) {
+				for (Core core : adjacent) {
+					if (core == null || core.isQkdReserved()) continue;
+					final qkd.multiband.MultiBandSettings coreMb = mb.isLongitudinalRaman()
+							? loadedMultibandSettings(mb, link, resolver, candidate, core.getId()) : mb;
+					collectRamanTerms(terms, core, candidateCore == core.getId() ? candidate : null, coreMb, qchNm,
+							alphaQ, lengthKm, resolver, equalLoss, couplingPerKm, currentSpan, link.getDistance());
+				}
+			}
+		}
+	}
+
+	/**
      * Adds P_n rho_n G_n of every circuit of {@code core} (and the candidate) to {@code terms}, keyed by id.
-     * Forward: G = forward (exact or L e^{-a_c L}) or intercore forward ([CAI20] eq. 11). Backward (Parte 44):
-     * G = (1 - e^{-(a_c+a_q) L})/(a_c+a_q) ([ERAERDS10] eq. 3) or intercore backward ([CAI20] eq. 18).
+     * Forward-only Raman on directed SNetS links; reverse links are different physical fibres.
      */
-    private void collectRamanTerms(RamanTerms terms, Core core, Circuit candidate,
-            qkd.multiband.MultiBandSettings mb, double qchNm, double alphaQ, double lengthKm,
-            LaunchPowerResolver resolver, boolean equalLoss, double couplingPerKm, boolean backward) {
-        final ArrayList<Circuit> circuits = new ArrayList<Circuit>();
-        if (core.getCircuitList() != null) circuits.addAll(core.getCircuitList());
-        if (candidate != null && !circuits.contains(candidate)) circuits.add(candidate);
-        final double slotWidth = core.getSlotSpectrumBand();
-        for (Circuit c : circuits) {
-            if (c == null) continue;
-            final int[] band = c.getSpectrumAssigned();
-            if (band == null) continue;
-            if (simulator.PerfChecks.ENABLED) {
-                // Parte 59 (desempenho): the cross section and the effective length of a circuit depend only on its
-                // slots, the QCh wavelength and loss, the span length and the kind of term (forward, backward,
-                // intercore). They are kept by these inputs and the term is formed as below: P * rho * G.
-                final double[] f = ramanFactors(band[0], band[1], slotWidth, mb, qchNm, alphaQ, lengthKm,
-                        equalLoss, couplingPerKm, backward);
-                final double term = resolver.resolve(c) * f[0] * f[1];
-                terms.add(c.getId() == null ? Integer.MAX_VALUE : c.getId().intValue(), term);
-                continue;
-            }
-            final double fHz = mb.slotCentreHz(band[0], band[1], slotWidth);
-            final double lambdaC = parameters.getSpeedOfLightMPerS() / fHz * 1e9;
-            final double alphaC = parameters.attenuationDbPerKm(lambdaC)
-                    * qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
-            final double g;
-            if (backward) {
-                g = couplingPerKm > 0.0
-                        ? qkd.multiband.SpontaneousRamanModel.intercoreBackwardLengthKm(alphaC, alphaQ, couplingPerKm,
-                                lengthKm)
-                        : qkd.multiband.SpontaneousRamanModel.backwardLengthKm(alphaC, alphaQ, lengthKm);
-            } else if (couplingPerKm > 0.0) {
-                g = qkd.multiband.SpontaneousRamanModel.intercoreForwardLengthKm(alphaC, alphaQ, couplingPerKm,
-                        lengthKm);
-            } else if (equalLoss) {
-                g = qkd.multiband.SpontaneousRamanModel.forwardLengthPaperKm(alphaC, lengthKm);
-            } else {
-                g = qkd.multiband.SpontaneousRamanModel.forwardLengthKm(alphaC, alphaQ, lengthKm);
-            }
-            final double term = resolver.resolve(c) * mb.getRaman().crossSectionPerKmNm(lambdaC, qchNm) * g;
-            terms.add(c.getId() == null ? Integer.MAX_VALUE : c.getId().intValue(), term);
-        }
-    }
+	private void collectRamanTerms(java.util.TreeMap<Integer, Double> terms, Core core, Circuit candidate,
+			qkd.multiband.MultiBandSettings mb, double qchNm, double alphaQ, double lengthKm,
+			LaunchPowerResolver resolver, boolean equalLoss, double couplingPerKm,
+			QKDSpan currentSpan, double physicalLinkKm) {
+		final ArrayList<Circuit> circuits = new ArrayList<Circuit>();
 
-    /**
-     * Parte 59: cross section rho and effective length G of the SpRS of a circuit on slots [b0, b1], computed by the
-     * same code as collectRamanTerms (original path) and kept by their inputs. f[0] = rho, f[1] = G.
-     */
-    private double[] ramanFactorsOriginal(int b0, int b1, double slotWidth, qkd.multiband.MultiBandSettings mb,
-            double qchNm, double alphaQ, double lengthKm, boolean equalLoss, double couplingPerKm, boolean backward) {
-        final double fHz = mb.slotCentreHz(b0, b1, slotWidth);
-        final double lambdaC = parameters.getSpeedOfLightMPerS() / fHz * 1e9;
-        final double alphaC = parameters.attenuationDbPerKm(lambdaC)
-                * qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
-        final double g;
-        if (backward) {
-            g = couplingPerKm > 0.0
-                    ? qkd.multiband.SpontaneousRamanModel.intercoreBackwardLengthKm(alphaC, alphaQ, couplingPerKm,
-                            lengthKm)
-                    : qkd.multiband.SpontaneousRamanModel.backwardLengthKm(alphaC, alphaQ, lengthKm);
-        } else if (couplingPerKm > 0.0) {
-            g = qkd.multiband.SpontaneousRamanModel.intercoreForwardLengthKm(alphaC, alphaQ, couplingPerKm,
-                    lengthKm);
-        } else if (equalLoss) {
-            g = qkd.multiband.SpontaneousRamanModel.forwardLengthPaperKm(alphaC, lengthKm);
-        } else {
-            g = qkd.multiband.SpontaneousRamanModel.forwardLengthKm(alphaC, alphaQ, lengthKm);
-        }
-        return new double[] { mb.getRaman().crossSectionPerKmNm(lambdaC, qchNm), g };
-    }
+		if (core.getCircuitList() != null) circuits.addAll(core.getCircuitList());
 
-    /** Parte 59: key of the factors of one circuit (see ramanFactors). */
-    private static final class RamanFactorKey {
-        final int b0, b1;
-        final long slotWidth, qch, alphaQ, length, coupling;
-        final boolean equalLoss, backward;
-        final Object settings;
-        final int hash;
+		if (core.getAuxiliaryClassicalCircuitList() != null) {
+			for (Circuit aux : core.getAuxiliaryClassicalCircuitList()) {
+				if (aux == null || circuits.contains(aux)) continue;
 
-        RamanFactorKey(int b0, int b1, double slotWidth, Object settings, double qch, double alphaQ, double length,
-                boolean equalLoss, double coupling, boolean backward) {
-            this.b0 = b0;
-            this.b1 = b1;
-            this.slotWidth = Double.doubleToRawLongBits(slotWidth);
-            this.settings = settings;
-            this.qch = Double.doubleToRawLongBits(qch);
-            this.alphaQ = Double.doubleToRawLongBits(alphaQ);
-            this.length = Double.doubleToRawLongBits(length);
-            this.equalLoss = equalLoss;
-            this.coupling = Double.doubleToRawLongBits(coupling);
-            this.backward = backward;
-            long h = b0 * 31L + b1;
-            h = h * 31L + this.slotWidth;
-            h = h * 31L + this.qch;
-            h = h * 31L + this.alphaQ;
-            h = h * 31L + this.length;
-            h = h * 31L + this.coupling;
-            h = h * 31L + (equalLoss ? 1 : 0) + (backward ? 2 : 0);
-            h = h * 31L + System.identityHashCode(settings);
-            this.hash = (int) (h ^ (h >>> 32));
-        }
+				// PICh exists only along its own QKDSpan, even though spectrum
+				// occupancy is conservatively represented on the whole SNetS link.
+				// Auxiliary sources only contribute where they physically
+				// overlap the QKD span. All PIChs are co-propagating on their directed link.
+				if (aux instanceof QKDPichCircuit && currentSpan != null) {
+					final QKDSpan pump = ((QKDPichCircuit) aux).getSpan();
 
-        @Override
-        public int hashCode() {
-            return hash;
-        }
+					if (!mb.isLongitudinalRaman()) {
+						// Preserve the previous analytic model's behaviour
+						// when the longitudinal option is disabled.
+						if (pump != currentSpan) continue;
+					} else {
+						final double pumpStart = pump.getStartKm();
+						final double pumpEnd = pump.getEndKm();
 
-        @Override
-        public boolean equals(Object o) {
-            if (!(o instanceof RamanFactorKey)) return false;
-            final RamanFactorKey k = (RamanFactorKey) o;
-            return b0 == k.b0 && b1 == k.b1 && slotWidth == k.slotWidth && qch == k.qch && alphaQ == k.alphaQ
-                    && length == k.length && coupling == k.coupling && equalLoss == k.equalLoss
-                    && backward == k.backward && settings == k.settings;
-        }
-    }
+						if (pumpEnd <= currentSpan.getStartKm()
+								|| pumpStart >= currentSpan.getEndKm()) continue;
+					}
+				}
 
-    /**
-     * Parte 59: factors already computed by this evaluator (one per simulation; not shared between threads). Not
-     * saved in save states: it is rebuilt after a restore.
-     */
-    private transient java.util.HashMap<RamanFactorKey, double[]> ramanFactorCache;
+				circuits.add(aux);
+			}
+		}
 
-    /** Parte 59: rho and G of a circuit (see ramanFactorsOriginal), from the cache when the inputs repeat. */
-    private double[] ramanFactors(int b0, int b1, double slotWidth, qkd.multiband.MultiBandSettings mb, double qchNm,
-            double alphaQ, double lengthKm, boolean equalLoss, double couplingPerKm, boolean backward) {
-        final RamanFactorKey key = new RamanFactorKey(b0, b1, slotWidth, mb, qchNm, alphaQ, lengthKm, equalLoss,
-                couplingPerKm, backward);
-        if (ramanFactorCache == null) ramanFactorCache = new java.util.HashMap<RamanFactorKey, double[]>();
-        double[] f = ramanFactorCache.get(key);
-        if (f == null) {
-            f = ramanFactorsOriginal(b0, b1, slotWidth, mb, qchNm, alphaQ, lengthKm, equalLoss, couplingPerKm,
-                    backward);
-            if (ramanFactorCache.size() > 500000) ramanFactorCache.clear(); // bound the memory
-            ramanFactorCache.put(key, f);
-        } else if (simulator.PerfChecks.VERIFY) {
-            final double[] g = ramanFactorsOriginal(b0, b1, slotWidth, mb, qchNm, alphaQ, lengthKm, equalLoss,
-                    couplingPerKm, backward);
-            simulator.PerfChecks.same(f[0], g[0], "secao de Raman");
-            simulator.PerfChecks.same(f[1], g[1], "comprimento efetivo do Raman");
-        }
-        return f;
-    }
+		if (candidate != null && !circuits.contains(candidate)) circuits.add(candidate);
+		final double slotWidth = core.getSlotSpectrumBand();
 
-    /**
-     * Parte 59: the SpRS terms of a span keyed by circuit id. Terms with the same id are added in the order they
-     * arrive, and the sum goes over the ids in increasing order, as with the TreeMap&lt;Integer, Double&gt; used
-     * before (same additions, same order, same result). Without the caches the TreeMap itself is used.
-     */
-    static final class RamanTerms {
-        private final java.util.TreeMap<Integer, Double> map =
-                simulator.PerfChecks.ENABLED && !simulator.PerfChecks.VERIFY ? null : new java.util.TreeMap<Integer, Double>();
-        private int[] ids = new int[16];
-        private double[] vals = new double[16];
-        private int n;
+		for (Circuit c : circuits) {
+			if (c == null) continue;
+			final int[] band = c.getSpectrumAssigned();
 
-        void add(int id, double term) {
-            if (map != null) {
-                final Integer key = Integer.valueOf(id);
-                final Double previous = map.get(key);
-                map.put(key, Double.valueOf(previous == null ? term : previous.doubleValue() + term));
-                if (!simulator.PerfChecks.ENABLED) return;
-            }
-            if (n == ids.length) {
-                ids = java.util.Arrays.copyOf(ids, n * 2);
-                vals = java.util.Arrays.copyOf(vals, n * 2);
-            }
-            ids[n] = id;
-            vals[n] = term;
-            n++;
-        }
+			if (band == null) continue;
+			final double fHz = mb.slotCentreHz(band[0], band[1], slotWidth);
+			final double lambdaC = parameters.getSpeedOfLightMPerS() / fHz * 1e9;
+			final double alphaC = parameters.attenuationDbPerKm(lambdaC)
+					* qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
+			final double g;
 
-        double sum() {
-            double original = 0.0;
-            if (map != null) {
-                for (Double v : map.values()) original += v.doubleValue();
-                if (!simulator.PerfChecks.ENABLED) return original;
-            }
-            // order by id, and by arrival among equal ids: (id, position) packed in a long and sorted
-            final long[] order = new long[n];
-            for (int i = 0; i < n; i++) order[i] = ((long) ids[i] << 32) | i;
-            java.util.Arrays.sort(order);
-            double sum = 0.0;
-            int i = 0;
-            while (i < n) {
-                final int id = ids[(int) order[i]];
-                double v = vals[(int) order[i]];
-                i++;
-                while (i < n && ids[(int) order[i]] == id) {
-                    v = v + vals[(int) order[i]];
-                    i++;
-                }
-                sum += v;
-            }
-            if (map != null) simulator.PerfChecks.same(sum, original, "soma do Raman");
-            return sum;
-        }
-    }
+			if (couplingPerKm > 0.0) {
+				g = qkd.multiband.SpontaneousRamanModel.intercoreForwardLengthKm(alphaC, alphaQ,
+						couplingPerKm, lengthKm);
+			} else if (equalLoss) {
+				g = qkd.multiband.SpontaneousRamanModel.forwardLengthPaperKm(alphaC, lengthKm);
+			} else {
+				g = qkd.multiband.SpontaneousRamanModel.forwardLengthKm(alphaC, alphaQ, lengthKm);
+			}
 
-    /**
+			// Forward-only Raman: PICh launch and termination positions matter.
+			double effectiveLengthKm = g;
+
+			if (currentSpan != null && mb.isLongitudinalRaman() && mb.getPowerEvolution() != null) {
+				final QKDPichCircuit pich = c instanceof QKDPichCircuit
+						? (QKDPichCircuit) c : null;
+				final double sourceKm = pich == null ? 0.0 : pich.getSpan().getStartKm();
+				final double pumpEndKm = pich == null ? physicalLinkKm : pich.getSpan().getEndKm();
+				effectiveLengthKm = mb.getPowerEvolution().forwardEffectiveLengthKm(
+						currentSpan.getStartKm(), currentSpan.getEndKm(), sourceKm, pumpEndKm,
+						alphaC, alphaQ, Math.max(0.0, couplingPerKm), fHz);
+			}
+
+			final double term = resolver.resolve(c) * mb.getRaman().crossSectionPerKmNm(lambdaC, qchNm)
+					* effectiveLengthKm;
+			final Integer key = c.getId() == null ? Integer.valueOf(Integer.MAX_VALUE) : c.getId();
+			final Double previous = terms.get(key);
+			terms.put(key, Double.valueOf(previous == null ? term : previous.doubleValue() + term));
+		}
+	}
+
+	/**
      * Parte 45: NLI power (W) inside the QCh filter at the receiver of a span: GN model
      * ({@link qkd.multiband.NonlinearInterferenceModel}) over the PSD of the circuits of the host core of this link
      * (plus the candidate), each spread evenly over its slots. The circuits' launch power is used at the span input.
      */
-    double nliPowerAtReceiverW(qkd.multiband.MultiBandSettings mb, Link link, double lengthKm, double qchNm,
-            LaunchPowerResolver resolver, Circuit candidate) {
-        final Core host = link.getCore(mb.getHostCoreId());
-        if (host == null) return 0.0;
-        final int slots = host.getNumOfSlots();
-        final double slotHz = host.getSlotSpectrumBand();
-        final double[] psd = new double[slots];
-        // circuits in id order (ids may be null for verification circuits; the candidate goes last)
-        final List<Circuit> circuits = new ArrayList<Circuit>();
-        if (host.getCircuitList() != null) {
-            for (Circuit c : host.getCircuitList()) {
-                if (c != null) circuits.add(c);
-            }
-        }
-        Collections.sort(circuits, new java.util.Comparator<Circuit>() {
-            @Override
-            public int compare(Circuit x, Circuit y) {
-                if (x.getId() == null) return y.getId() == null ? 0 : 1;
-                if (y.getId() == null) return -1;
-                return x.getId().compareTo(y.getId());
-            }
-        });
-        if (candidate != null && !circuits.contains(candidate) && candidateTraversesLink(candidate, link)
-                && qkd.metrics.BlockingDetailRecorder.rawCore(candidate) == host.getId()) {
-            circuits.add(candidate);
-        }
-        boolean any = false;
-        for (Circuit c : circuits) {
-            final int[] band = c.getSpectrumAssigned();
-            if (band == null) continue;
-            final int a = Math.max(1, band[0]);
-            final int b = Math.min(slots, band[1]);
-            if (b < a) continue;
-            final double g = resolver.resolve(c) / ((b - a + 1) * slotHz);
-            for (int k = a; k <= b; k++) psd[k - 1] += g;
-            any = true;
-        }
-        if (!any) return 0.0;
-        final double startHz = mb.getClassicalBandStartHz();
-        final double centreNm = parameters.getSpeedOfLightMPerS()
-                / qkd.multiband.NonlinearInterferenceModel.weightedCentreHz(psd, startHz, slotHz) * 1e9;
-        final double alphaC = parameters.attenuationDbPerKm(centreNm) * qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
-        final double alphaQ = parameters.attenuationDbPerKm(qchNm) * qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
-        final double fq = parameters.getSpeedOfLightMPerS() / (qchNm * 1e-9);
-        return mb.getNli().psdWPerHz(psd, startHz, slotHz, fq, lengthKm, alphaC, alphaQ)
-                * parameters.getQchBandwidthHz();
-    }
+	double nliPowerAtReceiverW(qkd.multiband.MultiBandSettings mb, Link link, double lengthKm, double qchNm,
+			LaunchPowerResolver resolver, Circuit candidate) {
+		return nliPowerAtReceiverW(mb, link, lengthKm, qchNm, resolver, candidate, null);
+	}
 
-    /** Detector background probability of an SpRS power at the QCh receiver. */
-    private double ramanBackgroundProbability(qkd.multiband.MultiBandSettings mb, double ramanW, double qchNm) {
-        final double photonEnergyJ = parameters.getPlanckConstantJs() * parameters.getSpeedOfLightMPerS()
-                / (qchNm * 1e-9);
-        final double meanEvents = parameters.getDetectorEfficiency() * parameters.getReceiverOpticalEfficiency()
-                * ramanW * parameters.getDetectorGateWindowS() * mb.getDetectedFraction() / photonEnergyJ;
-        return -Math.expm1(-meanEvents);
-    }
+	private double nliPowerAtReceiverW(qkd.multiband.MultiBandSettings mb, Link link, double lengthKm, double qchNm,
+			LaunchPowerResolver resolver, Circuit candidate, QKDSpan currentSpan) {
+		final Core host = link.getCore(mb.getHostCoreId());
 
-    // =====================================================================
-    // argument checks
-    // =====================================================================
+		if (host == null) return 0.0;
+		final int slots = host.getNumOfSlots();
+		final double slotHz = host.getSlotSpectrumBand();
+		final double[] psd = new double[slots];
 
-    private static void requireProbability(double value, String name) {
-        if (!Double.isFinite(value) || value < 0.0 || value > 1.0) {
-            throw new IllegalArgumentException(name + " must be finite and in [0,1]");
-        }
-    }
+		// circuits in id order (ids may be null for verification circuits; the candidate goes last)
+		final List<Circuit> circuits = new ArrayList<Circuit>();
 
-    private static void requireNonNegativeFinite(double value, String name) {
-        if (!Double.isFinite(value) || value < 0.0) {
-            throw new IllegalArgumentException(name + " must be finite and >= 0");
-        }
-    }
+		if (host.getCircuitList() != null) {
+			for (Circuit c : host.getCircuitList()) {
+				if (c != null) circuits.add(c);
+			}
+		}
 
-    private static void requirePositiveFinite(double value, String name) {
-        if (!Double.isFinite(value) || value <= 0.0) {
-            throw new IllegalArgumentException(name + " must be finite and > 0");
-        }
-    }
+		if (host.getAuxiliaryClassicalCircuitList() != null) {
+			for (Circuit c : host.getAuxiliaryClassicalCircuitList()) {
+				if (c == null || circuits.contains(c)) continue;
 
-    private static void requirePositive(double value, String name) {
-        requirePositiveFinite(value, name);
-    }
+				if (c instanceof QKDPichCircuit && currentSpan != null) {
+					final QKDSpan pichSpan = ((QKDPichCircuit)c).getSpan();
 
-    private static void requireNonNegative(double value, String name) {
-        requireNonNegativeFinite(value, name);
-    }
+					if (pichSpan.getEndKm() <= currentSpan.getStartKm()
+							|| pichSpan.getStartKm() >= currentSpan.getEndKm()) continue;
+				}
+
+				circuits.add(c);
+			}
+		}
+
+		Collections.sort(circuits, new java.util.Comparator<Circuit>() {
+			@Override
+			public int compare(Circuit x, Circuit y) {
+				if (x.getId() == null) return y.getId() == null ? 0 : 1;
+
+				if (y.getId() == null) return -1;
+
+				return x.getId().compareTo(y.getId());
+			}
+
+		});
+
+		if (candidate != null && !circuits.contains(candidate) && candidateTraversesLink(candidate, link)
+				&& qkd.metrics.BlockingDetailRecorder.rawCore(candidate) == host.getId()) {
+			circuits.add(candidate);
+		}
+
+		final List<qkd.multiband.NonlinearInterferenceModel.LongitudinalSource> gnSources =
+				new ArrayList<qkd.multiband.NonlinearInterferenceModel.LongitudinalSource>();
+		boolean any = false;
+
+		for (Circuit c : circuits) {
+			final int[] band = c.getSpectrumAssigned();
+
+			if (band == null) continue;
+			final int a = Math.max(1, band[0]);
+			final int b = Math.min(slots, band[1]);
+
+			if (b < a) continue;
+			final double launch = resolver.resolve(c);
+			final double g = launch / ((b - a + 1) * slotHz);
+
+			for (int k = a; k <= b; k++) psd[k - 1] += g;
+			final QKDPichCircuit pic = c instanceof QKDPichCircuit ? (QKDPichCircuit)c : null;
+			gnSources.add(new qkd.multiband.NonlinearInterferenceModel.LongitudinalSource(
+					a,b,launch,pic == null ? 0.0 : pic.getSpan().getStartKm(),
+					pic == null ? link.getDistance() : pic.getSpan().getEndKm()));
+			any = true;
+		}
+
+		if (!any) return 0.0;
+		final double startHz = mb.getClassicalBandStartHz();
+		final double centreNm = parameters.getSpeedOfLightMPerS()
+				/ qkd.multiband.NonlinearInterferenceModel.weightedCentreHz(psd, startHz, slotHz) * 1e9;
+		final double alphaC = parameters.attenuationDbPerKm(centreNm) * qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
+		final double alphaQ = parameters.attenuationDbPerKm(qchNm) * qkd.multiband.FiberAttenuationModel.DB_TO_NEPER;
+		final double fq = parameters.getSpeedOfLightMPerS() / (qchNm * 1e-9);
+
+		if (mb.isLongitudinalNli() && mb.getPowerEvolution() != null && currentSpan != null) {
+			return mb.getNli().longitudinalSourcePsdWPerHz(gnSources, slots, startHz, slotHz, fq,
+					currentSpan.getStartKm(), currentSpan.getEndKm(), alphaC, alphaQ,
+					mb.getPowerEvolution()) * parameters.getQchBandwidthHz();
+		}
+
+		return mb.getNli().psdWPerHz(psd, startHz, slotHz, fq, lengthKm, alphaC, alphaQ)
+				* parameters.getQchBandwidthHz();
+	}
+
+	/** Detector background probability of an SpRS power at the QCh receiver. */
+	private double ramanBackgroundProbability(qkd.multiband.MultiBandSettings mb, double ramanW, double qchNm) {
+		final double photonEnergyJ = parameters.getPlanckConstantJs() * parameters.getSpeedOfLightMPerS()
+				/ (qchNm * 1e-9);
+		final double meanEvents = parameters.getDetectorEfficiency() * parameters.getReceiverOpticalEfficiency()
+				* ramanW * parameters.getDetectorGateWindowS() * mb.getDetectedFraction() / photonEnergyJ;
+
+		return -Math.expm1(-meanEvents);
+	}
+
+	// =====================================================================
+	// argument checks
+	// =====================================================================
+
+	private static void requireProbability(double value, String name) {
+		if (!Double.isFinite(value) || value < 0.0 || value > 1.0) {
+			throw new IllegalArgumentException(name + " must be finite and in [0,1]");
+		}
+	}
+
+	private static void requireNonNegativeFinite(double value, String name) {
+		if (!Double.isFinite(value) || value < 0.0) {
+			throw new IllegalArgumentException(name + " must be finite and >= 0");
+		}
+	}
+
+	private static void requirePositiveFinite(double value, String name) {
+		if (!Double.isFinite(value) || value <= 0.0) {
+			throw new IllegalArgumentException(name + " must be finite and > 0");
+		}
+	}
+
+	private static void requirePositive(double value, String name) {
+		requirePositiveFinite(value, name);
+	}
+
+	private static void requireNonNegative(double value, String name) {
+		requireNonNegativeFinite(value, name);
+	}
 }

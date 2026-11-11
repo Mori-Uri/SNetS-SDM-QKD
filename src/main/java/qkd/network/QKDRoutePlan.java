@@ -16,103 +16,108 @@ import java.util.List;
  */
 public final class QKDRoutePlan implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private final String source;
-    private final String destination;
-    private final List<QKDLinkPlan> linkPlans;
-    private final List<QKDSpan> spans;
-    private final double totalDistanceKm;
+	private final String source;
+	private final String destination;
+	private final List<QKDLinkPlan> linkPlans;
+	private final List<QKDSpan> spans;
+	private final double totalDistanceKm;
 
-    public QKDRoutePlan(String source, String destination,
-            List<QKDLinkPlan> linkPlans) {
-        if (source == null || source.trim().isEmpty()
-                || destination == null || destination.trim().isEmpty()) {
-            throw new IllegalArgumentException("route endpoints cannot be blank");
-        }
-        if (linkPlans == null || linkPlans.isEmpty()) {
-            throw new IllegalArgumentException("linkPlans cannot be null/empty");
-        }
+	public QKDRoutePlan(String source, String destination,
+			List<QKDLinkPlan> linkPlans) {
+		if (source == null || source.trim().isEmpty()
+				|| destination == null || destination.trim().isEmpty()) {
+			throw new IllegalArgumentException("route endpoints cannot be blank");
+		}
 
-        this.source = source;
-        this.destination = destination;
-        this.linkPlans = Collections.unmodifiableList(
-                new ArrayList<QKDLinkPlan>(linkPlans));
+		if (linkPlans == null || linkPlans.isEmpty()) {
+			throw new IllegalArgumentException("linkPlans cannot be null/empty");
+		}
 
-        List<QKDSpan> flattened = new ArrayList<QKDSpan>();
-        double distance = 0.0;
-        for (QKDLinkPlan linkPlan : linkPlans) {
-            if (linkPlan == null) {
-                throw new IllegalArgumentException("linkPlans cannot contain null");
-            }
-            flattened.addAll(linkPlan.getSpans());
-            distance += linkPlan.getPhysicalLengthKm();
-        }
+		this.source = source;
+		this.destination = destination;
+		this.linkPlans = Collections.unmodifiableList(
+				new ArrayList<QKDLinkPlan>(linkPlans));
 
-        this.spans = Collections.unmodifiableList(flattened);
-        this.totalDistanceKm = distance;
-    }
+		List<QKDSpan> flattened = new ArrayList<QKDSpan>();
+		double distance = 0.0;
 
-    public String getSource() {
-        return source;
-    }
+		for (QKDLinkPlan linkPlan : linkPlans) {
+			if (linkPlan == null) {
+				throw new IllegalArgumentException("linkPlans cannot contain null");
+			}
 
-    public String getDestination() {
-        return destination;
-    }
+			flattened.addAll(linkPlan.getSpans());
+			distance += linkPlan.getPhysicalLengthKm();
+		}
 
-    public List<QKDLinkPlan> getLinkPlans() {
-        return linkPlans;
-    }
+		this.spans = Collections.unmodifiableList(flattened);
+		this.totalDistanceKm = distance;
+	}
 
-    public List<QKDSpan> getSpans() {
-        return spans;
-    }
+	public String getSource() {
+		return source;
+	}
 
-    public int getPhysicalLinkCount() {
-        return linkPlans.size();
-    }
+	public String getDestination() {
+		return destination;
+	}
 
-    public int getTotalSpanCount() {
-        return spans.size();
-    }
+	public List<QKDLinkPlan> getLinkPlans() {
+		return linkPlans;
+	}
 
-    public double getTotalDistanceKm() {
-        return totalDistanceKm;
-    }
+	public List<QKDSpan> getSpans() {
+		return spans;
+	}
 
-    /** Trusted nodes inserted logically inside physical links due to QTND. */
-    public int getVirtualTrustedNodeCount() {
-        int total = 0;
-        for (QKDLinkPlan linkPlan : linkPlans) {
-            total += linkPlan.getVirtualTrustedNodeCount();
-        }
-        return total;
-    }
+	public int getPhysicalLinkCount() {
+		return linkPlans.size();
+	}
 
-    /**
+	public int getTotalSpanCount() {
+		return spans.size();
+	}
+
+	public double getTotalDistanceKm() {
+		return totalDistanceKm;
+	}
+
+	/** Trusted nodes inserted logically inside physical links due to QTND. */
+	public int getVirtualTrustedNodeCount() {
+		int total = 0;
+
+		for (QKDLinkPlan linkPlan : linkPlans) {
+			total += linkPlan.getVirtualTrustedNodeCount();
+		}
+
+		return total;
+	}
+
+	/**
      * Original SNetS nodes between source and destination also act as trusted
      * relay boundaries in this simplified QKD model.
      */
-    public int getPhysicalIntermediateTrustedNodeCount() {
-        return Math.max(0, linkPlans.size() - 1);
-    }
+	public int getPhysicalIntermediateTrustedNodeCount() {
+		return Math.max(0, linkPlans.size() - 1);
+	}
 
-    public int getTotalTrustedRelayCount() {
-        return getVirtualTrustedNodeCount()
-                + getPhysicalIntermediateTrustedNodeCount();
-    }
+	public int getTotalTrustedRelayCount() {
+		return getVirtualTrustedNodeCount()
+				+ getPhysicalIntermediateTrustedNodeCount();
+	}
 
-    @Override
-    public String toString() {
-        return "QKDRoutePlan{" + source + "->" + destination
-                + ", physicalLinks=" + getPhysicalLinkCount()
-                + ", spans=" + getTotalSpanCount()
-                + ", virtualTrustedNodes=" + getVirtualTrustedNodeCount()
-                + ", physicalIntermediateTrustedNodes="
-                + getPhysicalIntermediateTrustedNodeCount()
-                + ", totalTrustedRelays=" + getTotalTrustedRelayCount()
-                + ", totalDistanceKm=" + totalDistanceKm
-                + '}';
-    }
+	@Override
+	public String toString() {
+		return "QKDRoutePlan{" + source + "->" + destination
+				+ ", physicalLinks=" + getPhysicalLinkCount()
+				+ ", spans=" + getTotalSpanCount()
+				+ ", virtualTrustedNodes=" + getVirtualTrustedNodeCount()
+				+ ", physicalIntermediateTrustedNodes="
+				+ getPhysicalIntermediateTrustedNodeCount()
+				+ ", totalTrustedRelays=" + getTotalTrustedRelayCount()
+				+ ", totalDistanceKm=" + totalDistanceKm
+				+ '}';
+	}
 }

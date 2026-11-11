@@ -36,6 +36,7 @@ public class RelativeFragmentationResultManager implements ResultManagerInterfac
 				reps.put(rf.getReplication(), (RelativeFragmentation)rf);
 			}
 		}
+
 		loadPoints = new ArrayList<>(rfs.keySet());
 		replications = new ArrayList<>(rfs.values().iterator().next().keySet());
 
@@ -55,6 +56,7 @@ public class RelativeFragmentationResultManager implements ResultManagerInterfac
 		for (Integer rep : replications) { // Checks how many replications have been made and creates the header of each column
 			res.append(sep + "rep" + rep);
 		}
+
 		res.append("\n");
 
 		res.append(resultGeneral());
@@ -70,15 +72,19 @@ public class RelativeFragmentationResultManager implements ResultManagerInterfac
 	 */
 	private String resultGeneral() {
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			for (Integer c : this.rfs.get(0).get(0).getCList()) {
 				String aux = "Relative fragmentation per spectrum size (c)" + sep + loadPoint + sep + "all" + sep + c + sep + " ";
+
 				for (Integer replication : replications) {
 					aux = aux + sep + rfs.get(loadPoint).get(replication).getAverageRelativeFragmentation(c);
 				}
+
 				res.append(aux + "\n");
 			}
 		}
+
 		return res.toString();
 	}
 

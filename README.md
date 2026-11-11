@@ -1,3 +1,5 @@
+> **Topologia óptica atual:** duas fibras físicas independentes por par de sentidos A→B / B→A; não existe fibra compartilhada contrapropagante. Ver [verificação e cenários salvos](docs/VALIDACAO_FIBRAS_DIRECIONAIS_E_CENARIOS.md).
+
 # SNetS-SDM-QKD
 
 Simulador de **distribuição quântica de chaves (QKD) em redes ópticas elásticas com multiplexação espacial
@@ -181,3 +183,11 @@ redes ópticas da UFPI.
 ## Licença
 
 MIT. Ver [`LICENSE`](LICENSE).
+
+### Unidade de renovação das chaves QKD
+
+Use `simulation.qkdKeyDemand.updateIntervalSeconds` (lista em segundos); veja `docs/QKD_UPDATE_INTERVAL_SECONDS.md` para os cenários de Moghaddam e Dibaj.
+
+## Integração seletiva da v2 — 2026-11-08
+
+A v1 incorpora agora a política QCh `maxskr` (somente `qchGranularity=route`), a calibração Raman anti-Stokes opcional `qkdPhysicalLayer.multiband.antiStokesCorrection=medida`, um cache transitório de faixas livres em `network.Spectrum` e o Launcher **1.21.0**. Os dois modos de integral Johannisson (SCI/XCI) permanecem independentes; o padrão é logarítmico com fallback numérico para domínios inválidos. Consulte `docs/INTEGRACAO_SELETIVA_V2_MAXSKR_RAMAN_CACHE_LAUNCHER.md` para parâmetros, limites científicos e testes.

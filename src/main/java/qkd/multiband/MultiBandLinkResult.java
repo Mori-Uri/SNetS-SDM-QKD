@@ -14,106 +14,107 @@ import qkd.physical.QKDPhysicalResult;
  */
 public final class MultiBandLinkResult implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private final double wavelengthNm;
-    private final double lengthKm;
-    private final double attenuationDbPerKm;
-    private final double ramanPowerSameCoreW;
-    private final double ramanPowerNeighbourW;
-    private final double darkProbability;
-    private final double ramanProbabilitySameCore;
-    private final double ramanProbabilityNeighbour;
-    private final QKDPhysicalResult qkd;
-    /** Parte 45: NLI power at the QCh receiver (W) and its background probability. */
-    private final double nliPowerW;
-    private final double nliProbability;
+	private final double wavelengthNm;
+	private final double lengthKm;
+	private final double attenuationDbPerKm;
+	private final double ramanPowerSameCoreW;
+	private final double ramanPowerNeighbourW;
+	private final double darkProbability;
+	private final double ramanProbabilitySameCore;
+	private final double ramanProbabilityNeighbour;
+	private final QKDPhysicalResult qkd;
 
-    MultiBandLinkResult(double wavelengthNm, double lengthKm, double attenuationDbPerKm, double ramanPowerSameCoreW,
-            double ramanPowerNeighbourW, double darkProbability, double ramanProbabilitySameCore,
-            double ramanProbabilityNeighbour, QKDPhysicalResult qkd) {
-        this(wavelengthNm, lengthKm, attenuationDbPerKm, ramanPowerSameCoreW, ramanPowerNeighbourW, darkProbability,
-                ramanProbabilitySameCore, ramanProbabilityNeighbour, 0.0, 0.0, qkd);
-    }
+	/** Parte 45: NLI power at the QCh receiver (W) and its background probability. */
+	private final double nliPowerW;
+	private final double nliProbability;
 
-    MultiBandLinkResult(double wavelengthNm, double lengthKm, double attenuationDbPerKm, double ramanPowerSameCoreW,
-            double ramanPowerNeighbourW, double darkProbability, double ramanProbabilitySameCore,
-            double ramanProbabilityNeighbour, double nliPowerW, double nliProbability, QKDPhysicalResult qkd) {
-        this.nliPowerW = nliPowerW;
-        this.nliProbability = nliProbability;
-        this.wavelengthNm = wavelengthNm;
-        this.lengthKm = lengthKm;
-        this.attenuationDbPerKm = attenuationDbPerKm;
-        this.ramanPowerSameCoreW = ramanPowerSameCoreW;
-        this.ramanPowerNeighbourW = ramanPowerNeighbourW;
-        this.darkProbability = darkProbability;
-        this.ramanProbabilitySameCore = ramanProbabilitySameCore;
-        this.ramanProbabilityNeighbour = ramanProbabilityNeighbour;
-        this.qkd = qkd;
-    }
+	MultiBandLinkResult(double wavelengthNm, double lengthKm, double attenuationDbPerKm, double ramanPowerSameCoreW,
+			double ramanPowerNeighbourW, double darkProbability, double ramanProbabilitySameCore,
+			double ramanProbabilityNeighbour, QKDPhysicalResult qkd) {
+		this(wavelengthNm, lengthKm, attenuationDbPerKm, ramanPowerSameCoreW, ramanPowerNeighbourW, darkProbability,
+				ramanProbabilitySameCore, ramanProbabilityNeighbour, 0.0, 0.0, qkd);
+	}
 
-    /** QCh wavelength in nm. */
-    public double getWavelengthNm() { return wavelengthNm; }
+	MultiBandLinkResult(double wavelengthNm, double lengthKm, double attenuationDbPerKm, double ramanPowerSameCoreW,
+			double ramanPowerNeighbourW, double darkProbability, double ramanProbabilitySameCore,
+			double ramanProbabilityNeighbour, double nliPowerW, double nliProbability, QKDPhysicalResult qkd) {
+		this.nliPowerW = nliPowerW;
+		this.nliProbability = nliProbability;
+		this.wavelengthNm = wavelengthNm;
+		this.lengthKm = lengthKm;
+		this.attenuationDbPerKm = attenuationDbPerKm;
+		this.ramanPowerSameCoreW = ramanPowerSameCoreW;
+		this.ramanPowerNeighbourW = ramanPowerNeighbourW;
+		this.darkProbability = darkProbability;
+		this.ramanProbabilitySameCore = ramanProbabilitySameCore;
+		this.ramanProbabilityNeighbour = ramanProbabilityNeighbour;
+		this.qkd = qkd;
+	}
 
-    /** Span length in km. */
-    public double getLengthKm() { return lengthKm; }
+	/** QCh wavelength in nm. */
+	public double getWavelengthNm() { return wavelengthNm; }
 
-    /** Fibre loss at the QCh wavelength in dB/km. */
-    public double getAttenuationDbPerKm() { return attenuationDbPerKm; }
+	/** Span length in km. */
+	public double getLengthKm() { return lengthKm; }
 
-    /** SpRS power from classical channels of the same core/fibre, inside the QCh filter, in W. */
-    public double getRamanPowerSameCoreW() { return ramanPowerSameCoreW; }
+	/** Fibre loss at the QCh wavelength in dB/km. */
+	public double getAttenuationDbPerKm() { return attenuationDbPerKm; }
 
-    /** SpRS power from classical channels of neighbour cores (intercore SpRS), inside the QCh filter, in W. */
-    public double getRamanPowerNeighbourW() { return ramanPowerNeighbourW; }
+	/** SpRS power from classical channels of the same core/fibre, inside the QCh filter, in W. */
+	public double getRamanPowerSameCoreW() { return ramanPowerSameCoreW; }
 
-    /** Detector dark-count probability per gate. */
-    public double getDarkProbability() { return darkProbability; }
+	/** SpRS power from classical channels of neighbour cores (intercore SpRS), inside the QCh filter, in W. */
+	public double getRamanPowerNeighbourW() { return ramanPowerNeighbourW; }
 
-    /** Noise probability per gate due to same-core SpRS. */
-    public double getRamanProbabilitySameCore() { return ramanProbabilitySameCore; }
+	/** Detector dark-count probability per gate. */
+	public double getDarkProbability() { return darkProbability; }
 
-    /** Noise probability per gate due to intercore SpRS. */
-    public double getRamanProbabilityNeighbour() { return ramanProbabilityNeighbour; }
+	/** Noise probability per gate due to same-core SpRS. */
+	public double getRamanProbabilitySameCore() { return ramanProbabilitySameCore; }
 
-    /** Non-linear interference noise probability per gate (0 when no NLI model is set). */
-    public double getNliProbability() { return nliProbability; }
+	/** Noise probability per gate due to intercore SpRS. */
+	public double getRamanProbabilityNeighbour() { return ramanProbabilityNeighbour; }
 
-    /** Parte 45: NLI power inside the QCh filter at the receiver (W). */
-    public double getNliPowerW() { return nliPowerW; }
+	/** Non-linear interference noise probability per gate (0 when no NLI model is set). */
+	public double getNliProbability() { return nliProbability; }
 
-    /** Total background probability p_b used in the BB84 bound. */
-    public double getBackgroundProbability() { return qkd.getBackgroundProbability(); }
+	/** Parte 45: NLI power inside the QCh filter at the receiver (W). */
+	public double getNliPowerW() { return nliPowerW; }
 
-    /** Decoy-state BB84 result (SKR, QBER, ...). */
-    public QKDPhysicalResult getQkd() { return qkd; }
+	/** Total background probability p_b used in the BB84 bound. */
+	public double getBackgroundProbability() { return qkd.getBackgroundProbability(); }
 
-    /** Secret key rate in bit/s. */
-    public double getSecretKeyRateBps() { return qkd.getSecretKeyRateBps(); }
+	/** Decoy-state BB84 result (SKR, QBER, ...). */
+	public QKDPhysicalResult getQkd() { return qkd; }
 
-    /** QBER (E_mu). */
-    public double getQber() { return qkd.getQber(); }
+	/** Secret key rate in bit/s. */
+	public double getSecretKeyRateBps() { return qkd.getSecretKeyRateBps(); }
 
-    /** CSV header matching {@link #toCsvRow()}. */
-    public static String csvHeader() {
-        return "wavelength_nm,length_km,alpha_db_km,p_raman_same_w,p_raman_neighbour_w,pb_dark,pb_raman_same,"
-                + "pb_raman_neighbour,pb_nli,pb_total,qber,skr_bps,p_nli_w";
-    }
+	/** QBER (E_mu). */
+	public double getQber() { return qkd.getQber(); }
 
-    /** One CSV row (dot as decimal separator). */
-    public String toCsvRow() {
-        return String.format(Locale.ROOT, "%.4f,%.4f,%.6f,%.6e,%.6e,%.6e,%.6e,%.6e,%.6e,%.6e,%.6f,%.6e",
-                wavelengthNm, lengthKm, attenuationDbPerKm, ramanPowerSameCoreW, ramanPowerNeighbourW,
-                darkProbability, ramanProbabilitySameCore, ramanProbabilityNeighbour, getNliProbability(),
-                getBackgroundProbability(), getQber(), getSecretKeyRateBps()) + String.format(Locale.ROOT, ",%.6e", nliPowerW);
-    }
+	/** CSV header matching {@link #toCsvRow()}. */
+	public static String csvHeader() {
+		return "wavelength_nm,length_km,alpha_db_km,p_raman_same_w,p_raman_neighbour_w,pb_dark,pb_raman_same,"
+				+ "pb_raman_neighbour,pb_nli,pb_total,qber,skr_bps,p_nli_w";
+	}
 
-    @Override
-    public String toString() {
-        return String.format(Locale.ROOT,
-                "MultiBandLinkResult[%.2f nm, %.1f km, alpha %.4f dB/km, pb %.3e (dark %.1e, SpRS %.3e + %.3e), "
-                        + "QBER %.4f, SKR %.4g bit/s]",
-                wavelengthNm, lengthKm, attenuationDbPerKm, getBackgroundProbability(), darkProbability,
-                ramanProbabilitySameCore, ramanProbabilityNeighbour, getQber(), getSecretKeyRateBps());
-    }
+	/** One CSV row (dot as decimal separator). */
+	public String toCsvRow() {
+		return String.format(Locale.ROOT, "%.4f,%.4f,%.6f,%.6e,%.6e,%.6e,%.6e,%.6e,%.6e,%.6e,%.6f,%.6e",
+				wavelengthNm, lengthKm, attenuationDbPerKm, ramanPowerSameCoreW, ramanPowerNeighbourW,
+				darkProbability, ramanProbabilitySameCore, ramanProbabilityNeighbour, getNliProbability(),
+				getBackgroundProbability(), getQber(), getSecretKeyRateBps()) + String.format(Locale.ROOT, ",%.6e", nliPowerW);
+	}
+
+	@Override
+	public String toString() {
+		return String.format(Locale.ROOT,
+				"MultiBandLinkResult[%.2f nm, %.1f km, alpha %.4f dB/km, pb %.3e (dark %.1e, SpRS %.3e + %.3e), "
+						+ "QBER %.4f, SKR %.4g bit/s]",
+				wavelengthNm, lengthKm, attenuationDbPerKm, getBackgroundProbability(), darkProbability,
+				ramanProbabilitySameCore, ramanProbabilityNeighbour, getQber(), getSecretKeyRateBps());
+	}
 }

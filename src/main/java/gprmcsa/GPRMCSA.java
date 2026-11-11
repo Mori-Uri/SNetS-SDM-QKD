@@ -70,15 +70,15 @@ public class GPRMCSA implements Serializable {
 	private static final String INTEGRATED_COMPLETESHARING_V2 = "completesharingv2";
 	private static final String INTEGRATED_SPCSA = "spcsa";
 	private static final String INTEGRATED_SPCSA_V2 = "spcsav2";
-    private static final String INTEGRATED_KSPCSA = "kspcsa";
-    private static final String INTEGRATED_KSPCSA_V2 = "kspcsav2";
-    private static final String INTEGRATED_KSPCSA_V3 = "kspcsav3";
-    private static final String INTEGRATED_PRMSCA = "prmsca";
-    private static final String INTEGRATED_PRMSCA_V2 = "prmscav2";
-    private static final String INTEGRATED_PRMSCA_V3 = "prmscav3";
-    private static final String INTEGRATED_MDJK = "mdjk";
-    private static final String INTEGRATED_MDJK_V2 = "mdjkv2";
-    private static final String INTEGRATED_KSPXT = "kspxt";
+	private static final String INTEGRATED_KSPCSA = "kspcsa";
+	private static final String INTEGRATED_KSPCSA_V2 = "kspcsav2";
+	private static final String INTEGRATED_KSPCSA_V3 = "kspcsav3";
+	private static final String INTEGRATED_PRMSCA = "prmsca";
+	private static final String INTEGRATED_PRMSCA_V2 = "prmscav2";
+	private static final String INTEGRATED_PRMSCA_V3 = "prmscav3";
+	private static final String INTEGRATED_MDJK = "mdjk";
+	private static final String INTEGRATED_MDJK_V2 = "mdjkv2";
+	private static final String INTEGRATED_KSPXT = "kspxt";
 
 	// Regenerator assignment
 	private static final String ALL_ASSIGNMENT_OF_REGENERATOR = "aar";
@@ -176,22 +176,31 @@ public class GPRMCSA implements Serializable {
 
 		if (grooming == null)
 			this.grooming = "";
+
 		if (integrated == null)
 			this.integrated = "";
+
 		if (routing == null)
 			this.routing = "";
+
 		if (kRouting == null)
 			this.kRouting = "";
+
 		if (modulationSelection == null)
 			this.modulationSelection = "";
+
 		if (spectrumAssignment == null)
 			this.spectrumAssignment = "";
+
 		if (regeneratorAssignment == null)
 			this.regeneratorAssignment = "";
+
 		if (coreAndSpectrumAssignment == null)
 			this.coreAndSpectrumAssignment = "";
+
 		if (reallocation == null)
 			this.reallocation = "";
+
 		if (powerAssignment == null)
 			this.powerAssignment = "";
 	}
@@ -311,41 +320,41 @@ public class GPRMCSA implements Serializable {
 	public IntegratedRMLSAAlgorithmInterface instantiateIntegratedRSA() {
 		switch (this.integrated) {
 			case INTEGRATED_COMPLETESHARING:
-                return new CompleteSharing();
+				return new CompleteSharing();
 			case INTEGRATED_COMPLETESHARING_V2:
-                return new CompleteSharing_v2();
-            case INTEGRATED_SPCSA:
-            	return new ShortestPathsCoreAndSpectrumAssignment();
-            case INTEGRATED_SPCSA_V2:
-            	return new ShortestPathsCoreAndSpectrumAssignment_v2();
-            case INTEGRATED_KSPCSA:
-            	return new KShortestPathsCoreAndSpectrumAssignment();
-            case INTEGRATED_KSPCSA_V2:
-            	return new KShortestPathsCoreAndSpectrumAssignment_v2();
-            case INTEGRATED_KSPCSA_V3:
-            	return new KShortestPathsCoreAndSpectrumAssignment_v3();
-            case INTEGRATED_PRMSCA:
-            	return new IntegratedPRMCSAAlgorithm();
-            case INTEGRATED_PRMSCA_V2:
-            	return new IntegratedPRMCSAAlgorithm_v2();
-            case INTEGRATED_PRMSCA_V3:
-            	return new IntegratedPRMCSAAlgorithm_v3();
-            case INTEGRATED_MDJK:
-            	return new ModifiedDijkstraPathsComputation();
-            case INTEGRATED_MDJK_V2:
-            	return new ModifiedDijkstraPathsComputation_v2();
-            case INTEGRATED_KSPXT:
-            	return new KSPXT();
-            case GBS_KSPGBSA:
-            	return new KSPGBSAlgorithm();
-            case GBS_KSPFGBA:
-            	return new KSPFixedGBAlgorithm();
-            case GBS_DJKGBSA:
-            	return new DJKGBSAlgorithm();
-            case GBS_DJKFGBA:
-            	return new DJKFixedGBAlgorithm();
-            default:
-                return null;
+				return new CompleteSharing_v2();
+			case INTEGRATED_SPCSA:
+				return new ShortestPathsCoreAndSpectrumAssignment();
+			case INTEGRATED_SPCSA_V2:
+				return new ShortestPathsCoreAndSpectrumAssignment_v2();
+			case INTEGRATED_KSPCSA:
+				return new KShortestPathsCoreAndSpectrumAssignment();
+			case INTEGRATED_KSPCSA_V2:
+				return new KShortestPathsCoreAndSpectrumAssignment_v2();
+			case INTEGRATED_KSPCSA_V3:
+				return new KShortestPathsCoreAndSpectrumAssignment_v3();
+			case INTEGRATED_PRMSCA:
+				return new IntegratedPRMCSAAlgorithm();
+			case INTEGRATED_PRMSCA_V2:
+				return new IntegratedPRMCSAAlgorithm_v2();
+			case INTEGRATED_PRMSCA_V3:
+				return new IntegratedPRMCSAAlgorithm_v3();
+			case INTEGRATED_MDJK:
+				return new ModifiedDijkstraPathsComputation();
+			case INTEGRATED_MDJK_V2:
+				return new ModifiedDijkstraPathsComputation_v2();
+			case INTEGRATED_KSPXT:
+				return new KSPXT();
+			case GBS_KSPGBSA:
+				return new KSPGBSAlgorithm();
+			case GBS_KSPFGBA:
+				return new KSPFixedGBAlgorithm();
+			case GBS_DJKGBSA:
+				return new DJKGBSAlgorithm();
+			case GBS_DJKFGBA:
+				return new DJKFixedGBAlgorithm();
+			default:
+				return null;
 		}
 	}
 
@@ -397,35 +406,35 @@ public class GPRMCSA implements Serializable {
 	 */
 	public CoreAndSpectrumAssignmentAlgorithmInterface instantiateCoreAndSpectrumAssignment() {
 		switch (this.coreAndSpectrumAssignment) {
-            case CORE_SPECTRUM_ASSIGNMENT_FIXEDCOREFIRSTFIT:
-                return new FixedCoreFirstFit();
-            case CORE_SPECTRUM_ASSIGNMENT_INCREMENTALCOREFIRSTFIT:
-                return new IncrementalCoreFirstFit();
-            case CORE_SPECTRUM_ASSIGNMENT_INCREMENTALCOREFIRSTFITV2:
-                return new IncrementalCoreFirstFitv2();
-            case CORE_SPECTRUM_ASSIGNMENT_RANDOMCOREFIRSTFIT:
-                return new RandomCoreFirstFit();
-            case CORE_SPECTRUM_ASSIGNMENT_RANDOMCORERANDOMFIT:
-                return new RandomCoreRandomFit();
-            case CORE_SPECTRUM_ASSIGNMENT_COREPRIORITIZATIONFIRSTFIT:
-            	return new CorePrioritizationFirstFit();
-            case CORE_SPECTRUM_ASSIGNMENT_COREPRIORITIZATIONRANDOMFIT:
-            	return new CorePrioritizationRandomFit();
-            case CORE_SPECTRUM_ASSIGNMENT_XTAWAREGREEDYALGORITHM:
-            	return new XtAwareGreedyAlgorithm();
-            case CORE_SPECTRUM_ASSIGNMENT_RCCAS:
-            	return new RandomCoreCrosstalkAvoidanceStrategy();
-            case CORE_SPECTRUM_ASSIGNMENT_CPCAS:
-            	return new CorePrioritizationCrosstalkAvoidanceStrategy();
-            case CORE_SPECTRUM_ASSIGNMENT_ICXTAA:
-            	return new IcxtAwareAlgorithm();
-            case CORE_SPECTRUM_ASSIGNMENT_CSBASDM:
-                return new CSBASDM();
-            case CORE_SPECTRUM_ASSIGNMENT_CSBASDM2:
-                return new CSBASDM2();
-            default:
-                return null;
-        }
+			case CORE_SPECTRUM_ASSIGNMENT_FIXEDCOREFIRSTFIT:
+				return new FixedCoreFirstFit();
+			case CORE_SPECTRUM_ASSIGNMENT_INCREMENTALCOREFIRSTFIT:
+				return new IncrementalCoreFirstFit();
+			case CORE_SPECTRUM_ASSIGNMENT_INCREMENTALCOREFIRSTFITV2:
+				return new IncrementalCoreFirstFitv2();
+			case CORE_SPECTRUM_ASSIGNMENT_RANDOMCOREFIRSTFIT:
+				return new RandomCoreFirstFit();
+			case CORE_SPECTRUM_ASSIGNMENT_RANDOMCORERANDOMFIT:
+				return new RandomCoreRandomFit();
+			case CORE_SPECTRUM_ASSIGNMENT_COREPRIORITIZATIONFIRSTFIT:
+				return new CorePrioritizationFirstFit();
+			case CORE_SPECTRUM_ASSIGNMENT_COREPRIORITIZATIONRANDOMFIT:
+				return new CorePrioritizationRandomFit();
+			case CORE_SPECTRUM_ASSIGNMENT_XTAWAREGREEDYALGORITHM:
+				return new XtAwareGreedyAlgorithm();
+			case CORE_SPECTRUM_ASSIGNMENT_RCCAS:
+				return new RandomCoreCrosstalkAvoidanceStrategy();
+			case CORE_SPECTRUM_ASSIGNMENT_CPCAS:
+				return new CorePrioritizationCrosstalkAvoidanceStrategy();
+			case CORE_SPECTRUM_ASSIGNMENT_ICXTAA:
+				return new IcxtAwareAlgorithm();
+			case CORE_SPECTRUM_ASSIGNMENT_CSBASDM:
+				return new CSBASDM();
+			case CORE_SPECTRUM_ASSIGNMENT_CSBASDM2:
+				return new CSBASDM2();
+			default:
+				return null;
+		}
 	}
 
 	/**

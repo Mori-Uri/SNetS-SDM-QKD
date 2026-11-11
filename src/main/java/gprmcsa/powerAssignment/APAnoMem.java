@@ -42,6 +42,7 @@ public class APAnoMem implements PowerAssignmentAlgorithmInterface {
 
 		if(factorMult == null){
 			Map<String, String> uv = cp.getMesh().getOthersConfig().getVariables();
+
 			if(uv.get("factorMult") != null) {
 				factorMult = Double.parseDouble((String)uv.get("factorMult"));
 			}
@@ -54,6 +55,7 @@ public class APAnoMem implements PowerAssignmentAlgorithmInterface {
 
 		if(limCount == null){
 			Map<String, String> uv = cp.getMesh().getOthersConfig().getVariables();
+
 			if(uv.get("limCount") != null) {
 				limCount = Integer.parseInt((String)uv.get("limCount"));
 			}
@@ -85,41 +87,40 @@ public class APAnoMem implements PowerAssignmentAlgorithmInterface {
 	 * @param cp ControlPlane
 	 * @return double
 	 */
-    public double AdaptivePowerAssignmentWithoutMemory(Circuit circuit, Route route, Modulation mod, int core, int sa[], ControlPlane cp){
+	public double AdaptivePowerAssignmentWithoutMemory(Circuit circuit, Route route, Modulation mod, int core, int sa[], ControlPlane cp){
 
-    	boolean EndMarker = false;
-    	int CountSub = 0;
-    	int CountAdd = 0;
+		boolean EndMarker = false;
+		int CountSub = 0;
+		int CountAdd = 0;
 
-    	boolean QoT = false;
-    	boolean QoTO = false;
-    	boolean XT = false;
-    	boolean XTO = false;
+		boolean QoT = false;
+		boolean QoTO = false;
+		boolean XT = false;
+		boolean XTO = false;
 
-    	double Pcurrent = 0.0;
+		double Pcurrent = 0.0;
 		double OSNRcurrent = 0.0;
 
-    	double OSNRth = mod.getSNRthreshold(); //dB
+		double OSNRth = mod.getOSNRthreshold(); //dB
 
-    	double Pmin = new EnPAAlgorithm().computePowerByLinearInterpolation(circuit, route, mod, core, sa, 0.0, cp);
+		double Pmin = new EnPAAlgorithm().computePowerByLinearInterpolation(circuit, route, mod, core, sa, 0.0, cp);
 
-    	double Pmax = cp.getMesh().getPhysicalLayer().computeMaximumPower(circuit, circuit.getRequiredBitRate(), route, 0, route.getNodeList().size() - 1, mod, core, sa);
+		double Pmax = cp.getMesh().getPhysicalLayer().computeMaximumPower(circuit, circuit.getRequiredBitRate(), route, 0, route.getNodeList().size() - 1, mod, core, sa);
 		circuit.setLaunchPowerLinear(Pmax);
 
 		cp.getMesh().getPhysicalLayer().isAdmissibleModultion(circuit, route, mod, core, sa, null, false);
-		double OSNRmax = circuit.getSNR(); //dB
-
+		double OSNRmax = circuit.getOSNR(); //dB
 
 		if (OSNRmax >= OSNRth) {
 			Pcurrent = Pmin + (this.factorMult * (Pmax - Pmin));
-		}else { // SNRmax < SNRth
+		}else { // OSNRmax < OSNRth
 			Pcurrent = Pmax;
 		}
 
 		while (EndMarker == false) {
 			circuit.setLaunchPowerLinear(Pcurrent);
 			QoT = cp.getMesh().getPhysicalLayer().isAdmissibleModultion(circuit, route, mod, core, sa, null, false);
-			OSNRcurrent = circuit.getSNR(); //dB
+			OSNRcurrent = circuit.getOSNR(); //dB
 
 			if (OSNRcurrent >= OSNRth) {
 
@@ -142,7 +143,7 @@ public class APAnoMem implements PowerAssignmentAlgorithmInterface {
 					}
 				}
 
-			} else { // SNRcurrent < SNRth
+			} else { // OSNRcurrent < OSNRth
 				if(Pcurrent + 0.01 * Pcurrent > Pmax) {
 					EndMarker = true;
 
@@ -159,6 +160,6 @@ public class APAnoMem implements PowerAssignmentAlgorithmInterface {
 			}
 		}
 
-    	return Pcurrent;
-    }
+		return Pcurrent;
+	}
 }

@@ -39,9 +39,9 @@ public class Crosstalk implements Serializable {
 		this.physicalLayer = physicalLayer;
 
 		this.propagationConstant = plc.getPropagationConstant();
-        this.bendingRadius = plc.getBendingRadius();
-        this.couplingCoefficient = plc.getCouplingCoefficient();
-        this.corePitch = plc.getCorePitch();
+		this.bendingRadius = plc.getBendingRadius();
+		this.couplingCoefficient = plc.getCouplingCoefficient();
+		this.corePitch = plc.getCorePitch();
 
 		this.h = calculateH();
 		this.K = calculateK();
@@ -184,6 +184,41 @@ public class Crosstalk implements Serializable {
 			}
 		}
 
+		// PICh sources are registered as auxiliary classical optical sources,
+		// so none of the legacy DCh neighbour searches above sees them.
+		// Convert PICh interference power to a linear XT ratio before the
+		// conversion to dB. This also enables the XT_SEPARATE admission path.
+		if (rota != null) {
+			for (Link link : rota.getLinkList()) {
+				final Integer victimCore = circuit.getIndexCoreByLink(link);
+
+				if (victimCore == null || victimCore < 0) continue;
+
+				final Core core = link.getCore(victimCore);
+
+				if (core == null) continue;
+
+				final int[] linkSpectrum = circuit.getSpectrumAssignedByLink(link);
+
+				if (Crosstalk.overlappingSlots(linkSpectrum, linkSpectrum) == 0)
+					continue;
+
+				// Modulation and launch power may vary from one SNetS link
+				// to the next. Never normalize all PICh XT by a global value.
+				final double signalPower = physicalLayer.getCircuitLaunchPower(
+						circuit, circuit.getModulationByLink(link));
+
+				if (!(signalPower > 0.0) || !Double.isFinite(signalPower)) continue;
+
+				final double bandwidth = (linkSpectrum[1] - linkSpectrum[0] + 1)
+						* core.getSlotSpectrumBand();
+				final double pichPsd = qkd.capacity.PichClassicalCrosstalk.noisePsd(
+						link, victimCore, linkSpectrum, bandwidth, h, 2.0, false);
+
+				totalXT += pichPsd * bandwidth / signalPower;
+			}
+		}
+
 		if(totalXT == 0.0) {
 			totalXT = lowestXT;
 		}
@@ -258,10 +293,11 @@ public class Crosstalk implements Serializable {
 		Route rota = circuit.getRoute();
 
 		for (Link link: rota.getLinkList()) {
-			ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCore());
+			ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCoreByLink(link));
+
 			for (Core core : adjacentsCores) {
 				for (Circuit adjacentCircuit : core.getCircuitList()) {
-					if (isIntersection(circuit.getSpectrumAssigned(), adjacentCircuit.getSpectrumAssigned())) {
+					if (isIntersection(circuit.getSpectrumAssignedByLink(link), adjacentCircuit.getSpectrumAssignedByLink(link))) {
 						if (!circuitosAdj.contains(adjacentCircuit)) {
 							circuitosAdj.add(adjacentCircuit);
 						}
@@ -300,10 +336,11 @@ public class Crosstalk implements Serializable {
 		Route rota = circuit.getRoute();
 
 		for(Link link: rota.getLinkList()) {
-			ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCore());
+			ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCoreByLink(link));
+
 			for(Core core : adjacentsCores) {
 				for(Circuit adjacentCircuit : core.getCircuitList()) {
-					if(isIntersection(circuit.getSpectrumAssigned(), adjacentCircuit.getSpectrumAssigned())) {
+					if (isIntersection(circuit.getSpectrumAssignedByLink(link), adjacentCircuit.getSpectrumAssignedByLink(link))) {
 						if(!circuitosAdj.contains(adjacentCircuit)) {
 							circuitosAdj.add(adjacentCircuit);
 						}
@@ -348,10 +385,11 @@ public class Crosstalk implements Serializable {
 		Route rota = circuit.getRoute();
 
 		for(Link link: rota.getLinkList()) {
-			ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCore());
+			ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCoreByLink(link));
+
 			for(Core core : adjacentsCores) {
 				for(Circuit adjacentCircuit : core.getCircuitList()) {
-					if(isIntersection(circuit.getSpectrumAssigned(), adjacentCircuit.getSpectrumAssigned()) ) {
+					if(isIntersection(circuit.getSpectrumAssignedByLink(link), adjacentCircuit.getSpectrumAssignedByLink(link)) ) {
 						if(!circuitosAdj.contains(adjacentCircuit)) {
 							circuitosAdj.add(adjacentCircuit);
 						}
@@ -375,9 +413,9 @@ public class Crosstalk implements Serializable {
 
 			for (Link link : circuitNeighbor.route.getLinkList()) {
 				if (circuit.getRoute().getLinkList().contains(link)) {
-					if(isIntersection(circuit.getSpectrumAssigned(), circuitNeighbor.getSpectrumAssigned())) {
-						nsj = sizeSpectrumAllocate(circuit.getSpectrumAssigned());
-						nsoij = numberOfOverlapping(circuitNeighbor.getSpectrumAssigned(), circuit.getSpectrumAssigned());
+					if(isIntersection(circuit.getSpectrumAssignedByLink(link), circuitNeighbor.getSpectrumAssignedByLink(link))) {
+						nsj = sizeSpectrumAllocate(circuit.getSpectrumAssignedByLink(link));
+						nsoij = numberOfOverlapping(circuitNeighbor.getSpectrumAssignedByLink(link), circuit.getSpectrumAssignedByLink(link));
 
 						if(nsj != 0.0){
 							Isoij = nsoij / nsj;
@@ -398,11 +436,13 @@ public class Crosstalk implements Serializable {
 
 			if(newXt > xtJThreshold) {
 				//System.out.println("blocking");
+
 				return false;
 			}
 		}
 
 		//System.out.println("No blocking");
+
 		return true;
 	}
 
@@ -423,10 +463,11 @@ public class Crosstalk implements Serializable {
 		Route rota = circuit.getRoute();
 
 		for(Link link: rota.getLinkList()) {
-			ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCore());
+			ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCoreByLink(link));
+
 			for(Core core : adjacentsCores) {
 				for(Circuit circuit2 : core.getCircuitList()) {
-					if(isIntersection(circuit.getSpectrumAssigned(), circuit2.getSpectrumAssigned())) {
+					if(isIntersection(circuit.getSpectrumAssignedByLink(link), circuit2.getSpectrumAssignedByLink(link))) {
 						if(!circuitosAdj.contains(circuit2)) {
 							circuitosAdj.add(circuit2);
 						}
@@ -450,9 +491,9 @@ public class Crosstalk implements Serializable {
 
 			for (Link link : circuitNeighbor.route.getLinkList()) {
 				if (circuit.getRoute().getLinkList().contains(link)) {
-					if(isIntersection(circuit.getSpectrumAssigned(), circuitNeighbor.getSpectrumAssigned())) {
-						nsj = sizeSpectrumAllocate(circuit.getSpectrumAssigned());
-						nsoij = numberOfOverlapping(circuit.getSpectrumAssigned(), circuitNeighbor.getSpectrumAssigned());
+					if(isIntersection(circuit.getSpectrumAssignedByLink(link), circuitNeighbor.getSpectrumAssignedByLink(link))) {
+						nsj = sizeSpectrumAllocate(circuit.getSpectrumAssignedByLink(link));
+						nsoij = numberOfOverlapping(circuit.getSpectrumAssignedByLink(link), circuitNeighbor.getSpectrumAssignedByLink(link));
 						newXt += (((nsoij/nsj)*SIGNALPOWER*h*link.getDistance()*1000)/SIGNALPOWER);
 					}
 				}
@@ -489,10 +530,11 @@ public class Crosstalk implements Serializable {
 		Route rota = circuit.getRoute();
 
 		for(Link link: rota.getLinkList()) {
-			ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCore());
+			ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCoreByLink(link));
+
 			for(Core core : adjacentsCores) {
 				for(Circuit adjacentCircuit : core.getCircuitList()) {
-					if(isIntersection(circuit.getSpectrumAssigned(), adjacentCircuit.getSpectrumAssigned()) ) {
+					if(isIntersection(circuit.getSpectrumAssignedByLink(link), adjacentCircuit.getSpectrumAssignedByLink(link)) ) {
 						if(!circuitosAdj.contains(adjacentCircuit)) {
 							circuitosAdj.add(adjacentCircuit);
 						}
@@ -527,10 +569,11 @@ public class Crosstalk implements Serializable {
 		Route rota = circuit.getRoute();
 
 		for(Link link: rota.getLinkList()) {
-			ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCore());
+			ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCoreByLink(link));
+
 			for(Core core : adjacentsCores) {
 				for(Circuit circuit2 : core.getCircuitList()) {
-					if(isIntersection(circuit.getSpectrumAssigned(), circuit2.getSpectrumAssigned())) {
+					if(isIntersection(circuit.getSpectrumAssignedByLink(link), circuit2.getSpectrumAssignedByLink(link))) {
 						if(!circuitosAdj.contains(circuit2)) {
 							circuitosAdj.add(circuit2);
 						}
@@ -553,9 +596,9 @@ public class Crosstalk implements Serializable {
 
 			for (Link link : circuitNeighbor2.route.getLinkList()) {
 				if (circuit.getRoute().getLinkList().contains(link)) {
-					if(isIntersection(circuit.getSpectrumAssigned(), circuitNeighbor2.getSpectrumAssigned())) {
-						nsj = sizeSpectrumAllocate(circuit.getSpectrumAssigned());
-						nsoij = numberOfOverlapping(circuit.getSpectrumAssigned(), circuitNeighbor2.getSpectrumAssigned());
+					if(isIntersection(circuit.getSpectrumAssignedByLink(link), circuitNeighbor2.getSpectrumAssignedByLink(link))) {
+						nsj = sizeSpectrumAllocate(circuit.getSpectrumAssignedByLink(link));
+						nsoij = numberOfOverlapping(circuit.getSpectrumAssignedByLink(link), circuitNeighbor2.getSpectrumAssignedByLink(link));
 						newXt += (((nsoij/nsj)*SIGNALPOWER*h*link.getDistance()*1000)/SIGNALPOWER);
 					}
 				}
@@ -585,10 +628,11 @@ public class Crosstalk implements Serializable {
 		Route rota = circuit.getRoute();
 
 		for(Link link: rota.getLinkList()) {
-			ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCore());
+			ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCoreByLink(link));
+
 			for(Core core : adjacentsCores) {
 				for(Circuit adjacentCircuit : core.getCircuitList()) {
-					if(isIntersection(circuit.getSpectrumAssigned(), adjacentCircuit.getSpectrumAssigned())) {
+					if (isIntersection(circuit.getSpectrumAssignedByLink(link), adjacentCircuit.getSpectrumAssignedByLink(link))) {
 						if(!circuitosAdj.contains(adjacentCircuit)) {
 							circuitosAdj.add(adjacentCircuit);
 						}
@@ -613,9 +657,9 @@ public class Crosstalk implements Serializable {
 
 			for (Link link : circuitNeighbor2.route.getLinkList()) {
 				if (circuit.getRoute().getLinkList().contains(link)) {
-					if(isIntersection(circuit.getSpectrumAssigned(), circuitNeighbor2.getSpectrumAssigned())) {
-						nsj = sizeSpectrumAllocate(circuit.getSpectrumAssigned());
-						nsoij = numberOfOverlapping(circuit.getSpectrumAssigned(), circuitNeighbor2.getSpectrumAssigned());
+					if(isIntersection(circuit.getSpectrumAssignedByLink(link), circuitNeighbor2.getSpectrumAssignedByLink(link))) {
+						nsj = sizeSpectrumAllocate(circuit.getSpectrumAssignedByLink(link));
+						nsoij = numberOfOverlapping(circuit.getSpectrumAssignedByLink(link), circuitNeighbor2.getSpectrumAssignedByLink(link));
 						newXt += (((nsoij/nsj)*SIGNALPOWER*h*link.getDistance()*1000)/SIGNALPOWER);
 					}
 				}
@@ -627,6 +671,7 @@ public class Crosstalk implements Serializable {
 			newXt = xtJ - newXt;
 
 			//System.out.println("\n\n\n\n"+newXt);
+
 			if(newXt <= Crosstalk.lowestXT) {
 				circuitNeighbor2.setXt(Crosstalk.lowestXT);
 			}else {
@@ -655,12 +700,38 @@ public class Crosstalk implements Serializable {
 
 		double Pm = physicalLayer.getCircuitLaunchPower(circuit, circuit.getModulation());
 
-		ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCore());
-		for(Core core : adjacentsCores) {
+		final Integer victimCore = circuit.getIndexCoreByLink(link);
 
-			final TreeSet<Circuit> adjacentCircuitList = circuitsWithTest(core, link, testCircuit, addTestCircuit); // Parte 54
+		if (victimCore == null || victimCore < 0) return 0.0;
 
-			Pxt = calculatePxt(circuit, circuit.getSpectrumAssigned(), link, adjacentCircuitList);
+		final int[] victimBand = circuit.getSpectrumAssignedByLink(link);
+
+		if (victimBand == null) return 0.0;
+
+		ArrayList<Core> adjacentsCores = link.getAdjacentCores(victimCore);
+
+		for (Core core : adjacentsCores) {
+
+			TreeSet<Circuit> adjacentCircuitList = new TreeSet<Circuit>();
+
+			for (Circuit circtuiTemp : core.getCircuitList()) {
+				adjacentCircuitList.add(circtuiTemp);
+			}
+
+			if (testCircuit != null && testCircuit.getRoute() != null
+					&& testCircuit.getRoute().getLinkList().contains(link)
+					&& testCircuit.getIndexCoreByLink(link) != null
+					&& link.getCore(testCircuit.getIndexCoreByLink(link)) == core) {
+				if(!adjacentCircuitList.contains(testCircuit) && addTestCircuit) {
+					adjacentCircuitList.add(testCircuit);
+				}
+
+				if(adjacentCircuitList.contains(testCircuit) && !addTestCircuit) {
+					adjacentCircuitList.remove(testCircuit);
+				}
+			}
+
+			Pxt = calculatePxt(circuit, victimBand, link, adjacentCircuitList);
 
 			if (Pm > 0.0) {
 				xtInLink += Pxt / Pm; //XT power normalized
@@ -685,24 +756,50 @@ public class Crosstalk implements Serializable {
 		double xtInLink = 0.0;
 		double Pxt = 0.0;
 
-		ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCore());
-		for(Core core : adjacentsCores) {
+		final Integer victimCore = circuit.getIndexCoreByLink(link);
 
-			final TreeSet<Circuit> adjacentCircuitList = circuitsWithTest(core, link, testCircuit, addTestCircuit); // Parte 54
+		if (victimCore == null || victimCore < 0) return 0.0;
 
-			Pxt = calculatePxt(circuit, circuit.getSpectrumAssigned(), link, adjacentCircuitList);
+		final int[] victimBand = circuit.getSpectrumAssignedByLink(link);
+
+		if (victimBand == null) return 0.0;
+
+		ArrayList<Core> adjacentsCores = link.getAdjacentCores(victimCore);
+
+		for (Core core : adjacentsCores) {
+
+			TreeSet<Circuit> adjacentCircuitList = new TreeSet<Circuit>();
+
+			for (Circuit circtuiTemp : core.getCircuitList()) {
+				adjacentCircuitList.add(circtuiTemp);
+			}
+
+			if (testCircuit != null && testCircuit.getRoute() != null
+					&& testCircuit.getRoute().getLinkList().contains(link)
+					&& testCircuit.getIndexCoreByLink(link) != null
+					&& link.getCore(testCircuit.getIndexCoreByLink(link)) == core) {
+				if(!adjacentCircuitList.contains(testCircuit) && addTestCircuit) {
+					adjacentCircuitList.add(testCircuit);
+				}
+
+				if(adjacentCircuitList.contains(testCircuit) && !addTestCircuit) {
+					adjacentCircuitList.remove(testCircuit);
+				}
+			}
+
+			Pxt = calculatePxt(circuit, victimBand, link, adjacentCircuitList);
 
 			xtInLink += Pxt;
 		}
 
 		return xtInLink;
 	}
-	
+
 	/**
 	 * Modelo de Lobato et al 2019
-	 * 
+	 *
 	 * This method returns the value of the crosstlak in the given link
-	 * 
+	 *
 	 * @param circuit Circuit
 	 * @param link Link
 	 * @param coreIndex int
@@ -713,76 +810,64 @@ public class Crosstalk implements Serializable {
 	 */
 	public double calculateCrosstalkPowerInLink(Circuit circuit, Link link, int coreIndex, int[] spectrumAssigned, Circuit testCircuit, boolean addTestCircuit) {
 
-	    double pxtInLink = 0.0;
+		double pxtInLink = 0.0;
 
-	    ArrayList<Core> adjacentCores = link.getAdjacentCores(coreIndex);
+		ArrayList<Core> adjacentCores = link.getAdjacentCores(coreIndex);
 
-	    for (Core adjacentCore : adjacentCores) {
+		for (Core adjacentCore : adjacentCores) {
 
-	        final TreeSet<Circuit> adjacentCircuitList = circuitsWithTest(adjacentCore, link, testCircuit, addTestCircuit); // Parte 54
+			TreeSet<Circuit> adjacentCircuitList = new TreeSet<>();
 
-	        pxtInLink += calculatePxt(circuit, spectrumAssigned, link, adjacentCircuitList);
-	    }
+			adjacentCircuitList.addAll(adjacentCore.getCircuitList());
 
-	    return pxtInLink;
+			if (testCircuit != null && testCircuit.getRoute() != null
+					&& testCircuit.getRoute().getLinkList().contains(link)
+					&& testCircuit.getIndexCoreByLink(link) != null
+					&& link.getCore(testCircuit.getIndexCoreByLink(link)) == adjacentCore) {
+
+				if (addTestCircuit) {
+					adjacentCircuitList.add(testCircuit);
+				} else {
+					adjacentCircuitList.remove(testCircuit);
+				}
+			}
+
+			pxtInLink += calculatePxt(circuit, spectrumAssigned, link, adjacentCircuitList);
+		}
+
+		return pxtInLink;
 	}
-	
+
 	/*
 	 * This method calculates the crosstalk power in a given circuit
-	 * 
+	 *
 	 * @param circuit Circuit
 	 * @param spectrumAssigned int[]
 	 * @param link Link
 	 * @param adjacentCircuitList TreeSet<Circuit>
 	 * @return double
 	 */
-	/**
-	 * Parte 54 (desempenho): the circuits of {@code core} in id order, with the test circuit added or removed as the
-	 * original code did (only when the test circuit uses this core on this link). When nothing changes, the ordered
-	 * set kept by the core is returned as it is; callers only read it.
-	 */
-	private static TreeSet<Circuit> circuitsWithTest(Core core, Link link, Circuit testCircuit, boolean addTestCircuit) {
-		final TreeSet<Circuit> base = core.getSortedCircuitList();
-		final boolean testHere = testCircuit != null && link.getCore(testCircuit.getIndexCore()) == core
-				&& testCircuit.getRoute().getLinkList().contains(link);
-		if (!testHere || addTestCircuit == base.contains(testCircuit)) {
-			return simulator.PerfChecks.ENABLED ? base : new TreeSet<Circuit>(base);
+	private double calculatePxt(Circuit victim, int[] victimBand,
+			Link link, TreeSet<Circuit> adjacentCircuitList) {
+		double interferingPowerW = 0.0;
+
+		for (Circuit interferer : adjacentCircuitList) {
+			// Circuit may choose a different signal band on each physical link.
+			// Guard reservations remain separate and are NOT passed here.
+			final int[] interfererBand = interferer.getSpectrumAssignedByLink(link);
+			final double iso = Crosstalk.interfererFraction(
+					victimBand, interfererBand);
+
+			if (iso == 0.0) continue;
+
+			final double powerW = physicalLayer.getCircuitLaunchPower(
+					interferer, interferer.getModulationByLink(link));
+
+			// Lacerda Jr., thesis Eq. (3.35), link distance in metres.
+			interferingPowerW += powerW * iso * h * link.getDistance() * 1000.0;
 		}
-		final TreeSet<Circuit> copy = new TreeSet<Circuit>(base);
-		if (addTestCircuit) {
-			copy.add(testCircuit);
-		} else {
-			copy.remove(testCircuit);
-		}
-		return copy;
-	}
 
-	private double calculatePxt(Circuit circuit, int[] spectrumAssigned, Link link, TreeSet<Circuit> adjacentCircuitList) {
-		double nsoij = 0.0; // number of overlapping slots between i and j
-		double nsj = 0.0; // number of slots of the connection j
-	    double Pxt = 0.0;
-	    double Pn = 0.0;
-	    double Isoij = 0.0;
-	    
-	    for (Circuit adjacentCircuit : adjacentCircuitList) {
-	        if (isIntersection(spectrumAssigned, adjacentCircuit.getSpectrumAssigned())) {
-	        	
-	            nsj = sizeSpectrumAllocate(adjacentCircuit.getSpectrumAssigned());
-	            nsoij = numberOfOverlapping(spectrumAssigned, adjacentCircuit.getSpectrumAssigned());
-
-	            if(nsj != 0.0){
-					Isoij = nsoij / nsj;
-				}else {
-					Isoij = 0.0;
-				}
-
-	            Pn = physicalLayer.getCircuitLaunchPower(adjacentCircuit, adjacentCircuit.getModulation());
-
-	            Pxt += Pn * Isoij * h * link.getDistance() * 1000.0; //Multiply by 1000 to convert kilometers to meters.
-	        }
-	    }
-
-	    return Pxt;
+		return interferingPowerW;
 	}
 
 	/**
@@ -795,7 +880,7 @@ public class Crosstalk implements Serializable {
 	private double calculateCrosstalkInLink2(Circuit circuit, Link link) {
 
 		double xtInLink = 0.0;
-		ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCore());
+		ArrayList<Core> adjacentsCores = link.getAdjacentCores(circuit.getIndexCoreByLink(link));
 
 		// Klinkowski 2019 accurate estimate
 		if(this.tipoEstimativa==2) {
@@ -824,6 +909,7 @@ public class Crosstalk implements Serializable {
 				//xtInLink = xtInLink + ((SIGNALPOWER*h*link.getDistance()*1000)/SIGNALPOWER);
 
 			}
+
 			//System.out.println("-------------");
 		}
 
@@ -904,35 +990,7 @@ public class Crosstalk implements Serializable {
 	 * @return boolean
 	 */
 	public boolean isIntersection(int[] spectrum1, int[] spectrum2) {
-		if (simulator.PerfChecks.ENABLED) {
-			// Parte 57 (desempenho): two bands of slots [a0, a1] and [b0, b1] share a slot exactly when
-			// max(a0, b0) <= min(a1, b1). An empty band (start after the end) shares nothing, as in the original
-			// loop below. Same answer, without building a list of boxed slots at every call.
-			final boolean fast = spectrum1[0] <= spectrum1[1] && spectrum2[0] <= spectrum2[1]
-					&& Math.max(spectrum1[0], spectrum2[0]) <= Math.min(spectrum1[1], spectrum2[1]);
-			if (simulator.PerfChecks.VERIFY && fast != isIntersectionOriginal(spectrum1, spectrum2)) {
-				throw new IllegalStateException("snets.verifyPerf: isIntersection difere");
-			}
-			return fast;
-		}
-		return isIntersectionOriginal(spectrum1, spectrum2);
-	}
-
-	/** The original test of isIntersection (Parte 57: kept for -Dsnets.noPerfCache and -Dsnets.verifyPerf). */
-	private boolean isIntersectionOriginal(int[] spectrum1, int[] spectrum2) {
-		ArrayList<Integer> slots2 = new ArrayList<Integer>();
-
-		for(int i=spectrum2[0]; i<=spectrum2[1]; i++) {
-			slots2.add(i);
-		}
-
-		for(int i=spectrum1[0]; i<=spectrum1[1]; i++) {
-			if(slots2.contains(i)) {
-				return true;
-			}
-		}
-
-		return false;
+		return Crosstalk.overlappingSlots(spectrum1, spectrum2) > 0;
 	}
 
 	/**
@@ -943,15 +1001,7 @@ public class Crosstalk implements Serializable {
 	 * @return int
 	 */
 	private int numberOfOverlapping(int[] spectrum1, int[] spectrum2) {
-		int numberOfOverlapping = 0;
-
-		for(int i = spectrum1[0]; i <= spectrum1[1]; i++) {
-			if ((i >= spectrum2[0]) && (i <= spectrum2[1])) {
-				numberOfOverlapping++;
-			}
-		}
-
-		return numberOfOverlapping;
+		return Crosstalk.overlappingSlots(spectrum1, spectrum2);
 	}
 
 	/**
@@ -978,17 +1028,19 @@ public class Crosstalk implements Serializable {
 			for (Link link: route.getLinkList()) {
 
 				ArrayList<Core> adjacentsCores = link.getAdjacentCores(core);
+
 				for (Core adjCore : adjacentsCores) {
 
 					TreeSet<Circuit> adjacentCircuitList = new TreeSet<Circuit>();
+
 					for (Circuit circtuiTemp : adjCore.getCircuitList()) {
 						adjacentCircuitList.add(circtuiTemp);
 					}
 
 					for (Circuit adjacentCircuit : adjacentCircuitList) {
-						if (isIntersection(spectrumAssigned, adjacentCircuit.getSpectrumAssigned())) {
-							nsj = sizeSpectrumAllocate(adjacentCircuit.getSpectrumAssigned());
-							nsoij = numberOfOverlapping(spectrumAssigned, adjacentCircuit.getSpectrumAssigned());
+						if (isIntersection(spectrumAssigned, adjacentCircuit.getSpectrumAssignedByLink(link))) {
+							nsj = sizeSpectrumAllocate(adjacentCircuit.getSpectrumAssignedByLink(link));
+							nsoij = numberOfOverlapping(spectrumAssigned, adjacentCircuit.getSpectrumAssignedByLink(link));
 
 							if (nsj != 0.0){
 								Isoij = nsoij / nsj;
@@ -1033,16 +1085,18 @@ public class Crosstalk implements Serializable {
 			for (Link link: route.getLinkList()) {
 
 				ArrayList<Core> adjacentsCores = link.getAdjacentCores(core);
+
 				for (Core adjCore : adjacentsCores) {
 
 					TreeSet<Circuit> adjacentCircuitList = new TreeSet<Circuit>();
+
 					for (Circuit circtuiTemp : adjCore.getCircuitList()) {
 						adjacentCircuitList.add(circtuiTemp);
 					}
 
 					for (Circuit adjacentCircuit : adjacentCircuitList) {
-						if (isIntersection(spectrumAssigned, adjacentCircuit.getSpectrumAssigned())) {
-							overlap  = numberOfOverlapping(spectrumAssigned, adjacentCircuit.getSpectrumAssigned());
+						if (isIntersection(spectrumAssigned, adjacentCircuit.getSpectrumAssignedByLink(link))) {
+							overlap  = numberOfOverlapping(spectrumAssigned, adjacentCircuit.getSpectrumAssignedByLink(link));
 							totalOverlaps += overlap;
 						}
 					}
@@ -1064,19 +1118,45 @@ public class Crosstalk implements Serializable {
 	private void printTest(Circuit circuit, String origem, String destino, double totalXT) {
 		if (circuit.getSource().getName().equals(origem) && circuit.getDestination().getName().equals(destino)) {
 			System.out.println("\n\n");
+
 			for(Link link : circuit.getRoute().getLinkList()) {
 				System.out.println("Link :"+link.getSource().getName()+"-"+link.getDestination().getName());
+
 				for(Core core : link.getCores()) {
 					System.out.print("Core: "+core.getId());
+
 					for(int[] i : core.getFreeSpectrumBands(circuit.getGuardBand())) {
 						System.out.print("||"+i[0]+"-"+i[1]);
 					}
+
 					System.out.println("");
 				}
 			}
+
 			System.out.println("Crosstalk for the circuit using core: "+circuit.getIndexCore()+" and slots: "+circuit.getSpectrumAssigned()[0]+"-"+circuit.getSpectrumAssigned()[1]+" is "+PhysicalLayer.ratioForDB(totalXT)+" With modulation: "+circuit.getModulation().getName()+" therefore: "+isAdmissible(circuit, PhysicalLayer.ratioForDB(totalXT)));
 			//System.out.println("Crosstalk for the circuit: "+circuit.getSource().getName()+"-"+circuit.getDestination().getName()+" using core: "+circuit.getIndexCore()+" and slots: "+circuit.getSpectrumAssigned()[0]+"-"+circuit.getSpectrumAssigned()[1]+" is "+calculeLog(totalXT)+" With modulation: "+circuit.getModulation().getName()+" therefore: "+isAdmissible(circuit, calculeLog(totalXT)));
 		}
 	}
 
+
+	/** Lobato spectral slot-overlap rule; denominator is the interferer signal-slot count. */
+
+public static int overlappingSlots(int[] victim, int[] interferer) {
+		if (!valid(victim) || !valid(interferer)) return 0;
+
+		return Math.max(0, Math.min(victim[1], interferer[1])
+				- Math.max(victim[0], interferer[0]) + 1);
+	}
+
+	public static double interfererFraction(int[] victim, int[] interferer) {
+		if (!valid(interferer)) return 0.0;
+
+		return overlappingSlots(victim, interferer)
+				/ (double)(interferer[1] - interferer[0] + 1);
+	}
+
+	private static boolean valid(int[] band) {
+		return band != null && band.length == 2
+				&& band[0] >= 1 && band[1] >= band[0];
+	}
 }

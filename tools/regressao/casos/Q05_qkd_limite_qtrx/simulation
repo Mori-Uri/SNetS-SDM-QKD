@@ -37,11 +37,11 @@
  "qkdProtectionRandomSeed": 1300,
  "qkdKeyDemand": {
   "keySizeBits": 256,
-  "updateIntervalsMicroseconds": [
-   64.0,
-   128.0,
-   256.0
-  ],
+  "updateIntervalSeconds": [
+   0.000064,
+   0.000128,
+   0.000256
+ ],
   "randomSeed": 130
  },
  "qkdWarmupFraction": 0.1,

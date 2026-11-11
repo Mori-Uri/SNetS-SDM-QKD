@@ -14,110 +14,110 @@ import simulationControl.resultManagers.ConsumedEnergyResultManager;
  */
 public class ConsumedEnergy extends Measurement {
 
-    private double totalConsumedEnergy;
-    private double lastInstantTime;
-    private double totalNetworkOperationTime;
+	private double totalConsumedEnergy;
+	private double lastInstantTime;
+	private double totalNetworkOperationTime;
 
-    private double totalConsumedEnergyTransponders;
-    private double totalConsumedEnergyOXCs;
-    private double totalConsumedEnergyAmplifiers;
+	private double totalConsumedEnergyTransponders;
+	private double totalConsumedEnergyOXCs;
+	private double totalConsumedEnergyAmplifiers;
 
-    private double totalDataTransmitted;
+	private double totalDataTransmitted;
 
-    /**
+	/**
      * Creates a new instance of ConsumedEnergy
      *
      * @param loadPoint int
      * @param rep int
      */
-    public ConsumedEnergy(int loadPoint, int rep) {
-        super(loadPoint, rep);
+	public ConsumedEnergy(int loadPoint, int rep) {
+		super(loadPoint, rep);
 
-        totalConsumedEnergy = 0.0;
-        lastInstantTime = 0.0;
-        totalNetworkOperationTime = 0.0;
+		totalConsumedEnergy = 0.0;
+		lastInstantTime = 0.0;
+		totalNetworkOperationTime = 0.0;
 
-        totalConsumedEnergyTransponders = 0.0;
-        totalConsumedEnergyOXCs = 0.0;
-        totalConsumedEnergyAmplifiers = 0.0;
+		totalConsumedEnergyTransponders = 0.0;
+		totalConsumedEnergyOXCs = 0.0;
+		totalConsumedEnergyAmplifiers = 0.0;
 
-        totalDataTransmitted = 0.0;
+		totalDataTransmitted = 0.0;
 
-        resultManager = new ConsumedEnergyResultManager();
-    }
+		resultManager = new ConsumedEnergyResultManager();
+	}
 
-    /**
+	/**
      * Adds the new observation.
      * @param cp the cp.
      * @param success the success.
      * @param request the request.
      */
-    public void addNewObservation(ControlPlane cp, boolean success, RequestForConnection request){
-    	double instantTime = request.getTimeOfRequestHours();
-        instantTime *= 3600.0; // Converting to seconds
+	public void addNewObservation(ControlPlane cp, boolean success, RequestForConnection request){
+		double instantTime = request.getTimeOfRequestHours();
+		instantTime *= 3600.0; // Converting to seconds
 
-        if(instantTime > totalNetworkOperationTime){
-            totalNetworkOperationTime = instantTime;
-        }
+		if(instantTime > totalNetworkOperationTime){
+			totalNetworkOperationTime = instantTime;
+		}
 
-        double timeDiffer = instantTime - lastInstantTime;
+		double timeDiffer = instantTime - lastInstantTime;
 
-        totalConsumedEnergy += timeDiffer * cp.getMesh().getTotalPowerConsumption();
-        totalConsumedEnergyTransponders += timeDiffer * cp.getMesh().getTotalPowerConsumptionTransponders();
-        totalConsumedEnergyOXCs += timeDiffer * cp.getMesh().getTotalPowerConsumptionOXCs();
-        totalConsumedEnergyAmplifiers += timeDiffer * cp.getMesh().getTotalPowerConsumptionAmplifiers();
+		totalConsumedEnergy += timeDiffer * cp.getMesh().getTotalPowerConsumption();
+		totalConsumedEnergyTransponders += timeDiffer * cp.getMesh().getTotalPowerConsumptionTransponders();
+		totalConsumedEnergyOXCs += timeDiffer * cp.getMesh().getTotalPowerConsumptionOXCs();
+		totalConsumedEnergyAmplifiers += timeDiffer * cp.getMesh().getTotalPowerConsumptionAmplifiers();
 
-        totalDataTransmitted += timeDiffer * cp.getMesh().getTotalDataTransmitted();
+		totalDataTransmitted += timeDiffer * cp.getMesh().getTotalDataTransmitted();
 
-        lastInstantTime = instantTime;
-    }
+		lastInstantTime = instantTime;
+	}
 
-    /**
+	/**
      * Returns the file name.
      * @return the file name.
      */
-    @Override
-    public String getFileName() {
-        return SimulationRequest.Result.FILE_CONSUMED_ENERGY;
-    }
+	@Override
+	public String getFileName() {
+		return SimulationRequest.Result.FILE_CONSUMED_ENERGY;
+	}
 
-    /**
+	/**
      * Returns the total consumed energy
      *
      * @return double
      */
-    public double getTotalConsumedEnergy() {
-        return totalConsumedEnergy;
-    }
+	public double getTotalConsumedEnergy() {
+		return totalConsumedEnergy;
+	}
 
-    /**
+	/**
      * Returns the total consumed energy by transponders
      *
      * @return double
      */
-    public double getTotalConsumedEnergyTransponders(){
-    	return totalConsumedEnergyTransponders;
-    }
+	public double getTotalConsumedEnergyTransponders(){
+		return totalConsumedEnergyTransponders;
+	}
 
-    /**
+	/**
      * Returns the total consumed energy by OXCs
      *
      * @return double
      */
-    public double getTotalConsumedEnergyOXCs(){
-    	return totalConsumedEnergyOXCs;
-    }
+	public double getTotalConsumedEnergyOXCs(){
+		return totalConsumedEnergyOXCs;
+	}
 
-    /**
+	/**
      * Returns the total consumed energy by amplifiers
      *
      * @return double
      */
-    public double getTotalConsumedEnergyAmplifiers(){
-    	return totalConsumedEnergyAmplifiers;
-    }
+	public double getTotalConsumedEnergyAmplifiers(){
+		return totalConsumedEnergyAmplifiers;
+	}
 
-    /**
+	/**
 	 * Returns the total data transmitted
 	 *
 	 * @return double bits
@@ -131,16 +131,16 @@ public class ConsumedEnergy extends Measurement {
      *
      * @return double
      */
-    public double getTotalPowerConsumption(){
-    	return (totalConsumedEnergy / totalNetworkOperationTime);
-    }
+	public double getTotalPowerConsumption(){
+		return (totalConsumedEnergy / totalNetworkOperationTime);
+	}
 
-    /**
+	/**
      * Returns the energy efficiency
      *
      * @return double
      */
-    public double getEnergyEfficiency(){
-    	return (totalDataTransmitted / totalConsumedEnergy);
-    }
+	public double getEnergyEfficiency(){
+		return (totalDataTransmitted / totalConsumedEnergy);
+	}
 }

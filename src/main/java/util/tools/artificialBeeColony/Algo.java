@@ -13,11 +13,13 @@ public interface Algo {
 	 * @return true if the condition is met; false otherwise.
 	 */
 	public boolean execute();
+
 	/**
 	 * Returns the ig depoch.
 	 * @return the ig depoch.
 	 */
 	public List<Double> getIGDepoch();
+
 	/**
 	 * Returns the archive.
 	 * @return the archive.

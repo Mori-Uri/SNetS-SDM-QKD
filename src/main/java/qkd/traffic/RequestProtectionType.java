@@ -9,9 +9,12 @@ package qkd.traffic;
  */
 public enum RequestProtectionType {
 
-    /** Ordinary optical request. */
-    CLASSICAL,
+	/** Ordinary optical request. */
+	CLASSICAL,
 
-    /** Optical data request that will additionally require QKD resources. */
-    QKD_PROTECTED
+	/** Optical data request that will additionally require QKD resources. */
+	QKD_PROTECTED,
+
+	/** Standalone QKD request, generating key material without any DCh circuit. */
+	QKD_ONLY
 }

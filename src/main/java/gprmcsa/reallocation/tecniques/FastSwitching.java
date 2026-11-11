@@ -55,6 +55,7 @@ public class FastSwitching implements java.io.Serializable {
 
 		// Try to realloc circuit
 		circuit.setIndexCore(newIndexCore);
+
 		if (!cp.allocateSpectrum(circuit, circuit.getSpectrumAssigned(), circuit.getRoute().getLinkList(), circuit.getGuardBand())) {
 			throw new Exception("Bad RMLSA. Spectrum cant be allocated.");
 		}
@@ -73,6 +74,7 @@ public class FastSwitching implements java.io.Serializable {
 
 			// Reallocating the spectrum and guard bands without the expansion
 			circuit.setIndexCore(oldIndexCore);
+
 			if (!cp.allocateSpectrum(circuit, circuit.getSpectrumAssigned(), circuit.getRoute().getLinkList(), circuit.getGuardBand())) {
 				throw new Exception("Bad RMLSA. Spectrum cant be allocated.");
 			}
@@ -91,6 +93,7 @@ public class FastSwitching implements java.io.Serializable {
 
 				// Reallocating the spectrum and guard bands without the expansion
 				circuit.setIndexCore(oldIndexCore);
+
 				if (!cp.allocateSpectrum(circuit, circuit.getSpectrumAssigned(), circuit.getRoute().getLinkList(), circuit.getGuardBand())) {
 					throw new Exception("Bad RMLSA. Spectrum cant be allocated.");
 				}
@@ -107,6 +110,7 @@ public class FastSwitching implements java.io.Serializable {
 				addCircuitNewCore(circuit, newIndexCore);
 
 				cp.updateNetworkPowerConsumption();
+
 				return true;
 			}
 

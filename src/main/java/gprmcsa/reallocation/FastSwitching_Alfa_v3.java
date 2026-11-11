@@ -121,6 +121,7 @@ public class FastSwitching_Alfa_v3 implements ReallocationAlgorithmInterface {
 		for (int i = 1; i <= 6; i++) {
 			cores.add(i);
 		}
+
 		// placing core 0 in the last position
 		cores.add(0);
 

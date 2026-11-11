@@ -32,7 +32,7 @@
           checks: 'O XT age: candidatos clássicos recusados para proteger QChs e bloqueio QKD ≥ B1, em cada topologia e QTND.' },
         { id: 'B2L', title: 'Limite: XT → 0', changes: 'XT ligado com acoplamento 1e-12 (desprezível).',
           checks: 'Q-TRx, aceitações, QChs e bloqueio idênticos aos do B1.' },
-        { id: 'B3', title: 'XT + OSNR/QoT (ASE + NLI)', changes: 'Liga QoT com limiares de SNR da qualificação.',
+        { id: 'B3', title: 'XT + OSNR/QoT (ASE + NLI)', changes: 'Liga QoT com limiares de OSNR da qualificação.',
           checks: 'Aparece bloqueio por OSNR (QoTN/QoTO) nos circuitos longos.' },
       ],
     },
@@ -70,7 +70,7 @@
     },
     {
       id: 'F', title: 'Fase F — Cenário completo',
-      desc: 'Modelo clássico padrão do SNetS da qualificação (slots de 12,5 GHz, qabne, 320 slots, limiares de SNR e XT), 7 núcleos, XT + QoT, dinâmico, modo route, rotas alternativas, PICh, 20 % protegidas, 2 Mbit/s, QTND 30 km.',
+      desc: 'Modelo clássico padrão do SNetS da qualificação (slots de 12,5 GHz, qabne, 320 slots, limiares de OSNR e XT), 7 núcleos, XT + QoT, dinâmico, modo route, rotas alternativas, PICh, 20 % protegidas, 2 Mbit/s, QTND 30 km.',
       steps: [
         { id: 'F1', title: 'Rede de 5 nós da qualificação', changes: 'Small Core / 5 nós, cargas 800–1600 E.',
           checks: 'Bloqueio cresce com a carga; lei de Little (20 %); fração protegida; SKR ≥ 2 Mbit/s; nós confiáveis = fórmula; simetria dos sentidos; conservação.' },

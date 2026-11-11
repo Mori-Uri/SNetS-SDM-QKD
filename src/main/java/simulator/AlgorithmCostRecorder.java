@@ -28,106 +28,121 @@ import java.util.Map;
  */
 public final class AlgorithmCostRecorder {
 
-    /** Statistics of one component. */
-    public static final class Stat {
-        public final String component;
-        public final String algorithm;
-        public long calls;
-        public long totalNanos;
-        public long maxNanos;
+	/** Statistics of one component. */
+	public static final class Stat {
+		public final String component;
+		public final String algorithm;
+		public long calls;
+		public long totalNanos;
+		public long maxNanos;
 
-        Stat(String component, String algorithm) {
-            this.component = component;
-            this.algorithm = algorithm;
-        }
-    }
+		Stat(String component, String algorithm) {
+			this.component = component;
+			this.algorithm = algorithm;
+		}
+	}
 
-    private final Map<String, Stat> stats = new LinkedHashMap<String, Stat>();
-    private long wallNanos;
+	private final Map<String, Stat> stats = new LinkedHashMap<String, Stat>();
+	private long wallNanos;
 
-    /** Wraps {@code target} (an implementation of {@code iface}) so that its calls are timed. */
-    @SuppressWarnings("unchecked")
-    public <T> T wrap(final T target, Class<T> iface, String component) {
-        if (target == null || !iface.isInterface()) {
-            return target;
-        }
-        final String name = target.getClass().getName();
-        if (name.contains("PABSAlgorithm")) {
-            return target;
-        }
-        final Stat stat = stat(component, target.getClass().getSimpleName());
-        return (T) Proxy.newProxyInstance(iface.getClassLoader(), new Class<?>[] {iface}, new InvocationHandler() {
-            @Override
-            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-                if (method.getDeclaringClass() == Object.class) {
-                    if ("equals".equals(method.getName())) return Boolean.valueOf(proxy == args[0]);
-                    if ("hashCode".equals(method.getName())) return Integer.valueOf(System.identityHashCode(proxy));
-                    if ("toString".equals(method.getName())) return target.toString();
-                }
-                final long t0 = System.nanoTime();
-                try {
-                    return method.invoke(target, args);
-                } catch (InvocationTargetException e) {
-                    throw e.getCause();
-                } finally {
-                    record(stat, System.nanoTime() - t0);
-                }
-            }
-        });
-    }
+	/** Wraps {@code target} (an implementation of {@code iface}) so that its calls are timed. */
+	@SuppressWarnings("unchecked")
+	public <T> T wrap(final T target, Class<T> iface, String component) {
+		if (target == null || !iface.isInterface()) {
+			return target;
+		}
 
-    /** Adds one timed call of a component that is not an interface (e.g. QKD admission). */
-    public synchronized void add(String component, String algorithm, long nanos) {
-        record(stat(component, algorithm), nanos);
-    }
+		final String name = target.getClass().getName();
 
-    private synchronized Stat stat(String component, String algorithm) {
-        Stat s = stats.get(component);
-        if (s == null) {
-            s = new Stat(component, algorithm);
-            stats.put(component, s);
-        }
-        return s;
-    }
+		if (name.contains("PABSAlgorithm")) {
+			return target;
+		}
 
-    private static void record(Stat s, long nanos) {
-        synchronized (s) {
-            s.calls++;
-            s.totalNanos += nanos;
-            if (nanos > s.maxNanos) s.maxNanos = nanos;
-        }
-    }
+		final Stat stat = stat(component, target.getClass().getSimpleName());
 
-    /** Wall-clock time of the whole simulation (set by the simulation manager). */
-    public void setWallNanos(long nanos) {
-        this.wallNanos = nanos;
-    }
+		return (T) Proxy.newProxyInstance(iface.getClassLoader(), new Class<?>[] {iface}, new InvocationHandler() {
+			@Override
+			public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+				if (method.getDeclaringClass() == Object.class) {
+					if ("equals".equals(method.getName())) return Boolean.valueOf(proxy == args[0]);
 
-    public long getWallNanos() {
-        return wallNanos;
-    }
+					if ("hashCode".equals(method.getName())) return Integer.valueOf(System.identityHashCode(proxy));
 
-    public synchronized Iterable<Stat> getStats() {
-        return new java.util.ArrayList<Stat>(stats.values());
-    }
+					if ("toString".equals(method.getName())) return target.toString();
+				}
 
-    /** CSV header of {@link #rows}. */
-    public static String header() {
-        return "LoadPoint,Replication,Component,Algorithm,Calls,CallsPerRequest,TotalMs,MeanUs,MaxUs,ShareOfSimulationPct\n";
-    }
+				final long t0 = System.nanoTime();
 
-    /** CSV rows of this simulation (one per component plus the whole simulation). */
-    public String rows(int loadPoint, int replication, long requests) {
-        final StringBuilder sb = new StringBuilder();
-        final double wallMs = wallNanos / 1e6;
-        for (Stat s : getStats()) {
-            sb.append(String.format(Locale.ROOT, "%d,%d,%s,%s,%d,%.4f,%.3f,%.3f,%.3f,%.2f%n", loadPoint, replication,
-                    s.component, s.algorithm, s.calls, requests > 0 ? s.calls / (double) requests : Double.NaN,
-                    s.totalNanos / 1e6, s.calls > 0 ? s.totalNanos / 1e3 / s.calls : 0.0, s.maxNanos / 1e3,
-                    wallMs > 0 ? 100.0 * (s.totalNanos / 1e6) / wallMs : Double.NaN));
-        }
-        sb.append(String.format(Locale.ROOT, "%d,%d,Simulation,(total),%d,1.0000,%.3f,%.3f,%.3f,100.00%n", loadPoint,
-                replication, requests, wallMs, requests > 0 ? wallNanos / 1e3 / requests : 0.0, 0.0));
-        return sb.toString();
-    }
+				try {
+					return method.invoke(target, args);
+				} catch (InvocationTargetException e) {
+					throw e.getCause();
+				} finally {
+					record(stat, System.nanoTime() - t0);
+				}
+			}
+
+		});
+	}
+
+	/** Adds one timed call of a component that is not an interface (e.g. QKD admission). */
+	public synchronized void add(String component, String algorithm, long nanos) {
+		record(stat(component, algorithm), nanos);
+	}
+
+	private synchronized Stat stat(String component, String algorithm) {
+		Stat s = stats.get(component);
+
+		if (s == null) {
+			s = new Stat(component, algorithm);
+			stats.put(component, s);
+		}
+
+		return s;
+	}
+
+	private static void record(Stat s, long nanos) {
+		synchronized (s) {
+			s.calls++;
+			s.totalNanos += nanos;
+
+			if (nanos > s.maxNanos) s.maxNanos = nanos;
+		}
+	}
+
+	/** Wall-clock time of the whole simulation (set by the simulation manager). */
+	public void setWallNanos(long nanos) {
+		this.wallNanos = nanos;
+	}
+
+	public long getWallNanos() {
+		return wallNanos;
+	}
+
+	public synchronized Iterable<Stat> getStats() {
+		return new java.util.ArrayList<Stat>(stats.values());
+	}
+
+	/** CSV header of {@link #rows}. */
+	public static String header() {
+		return "LoadPoint,Replication,Component,Algorithm,Calls,CallsPerRequest,TotalMs,MeanUs,MaxUs,ShareOfSimulationPct\n";
+	}
+
+	/** CSV rows of this simulation (one per component plus the whole simulation). */
+	public String rows(int loadPoint, int replication, long requests) {
+		final StringBuilder sb = new StringBuilder();
+		final double wallMs = wallNanos / 1e6;
+
+		for (Stat s : getStats()) {
+			sb.append(String.format(Locale.ROOT, "%d,%d,%s,%s,%d,%.4f,%.3f,%.3f,%.3f,%.2f%n", loadPoint, replication,
+					s.component, s.algorithm, s.calls, requests > 0 ? s.calls / (double) requests : Double.NaN,
+					s.totalNanos / 1e6, s.calls > 0 ? s.totalNanos / 1e3 / s.calls : 0.0, s.maxNanos / 1e3,
+					wallMs > 0 ? 100.0 * (s.totalNanos / 1e6) / wallMs : Double.NaN));
+		}
+
+		sb.append(String.format(Locale.ROOT, "%d,%d,Simulation,(total),%d,1.0000,%.3f,%.3f,%.3f,100.00%n", loadPoint,
+				replication, requests, wallMs, requests > 0 ? wallNanos / 1e3 / requests : 0.0, 0.0));
+
+		return sb.toString();
+	}
 }

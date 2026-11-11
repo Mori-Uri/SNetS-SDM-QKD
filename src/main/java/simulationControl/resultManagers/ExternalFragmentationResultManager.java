@@ -36,6 +36,7 @@ public class ExternalFragmentationResultManager implements ResultManagerInterfac
 				reps.put(ef.getReplication(), (ExternalFragmentation)ef);
 			}
 		}
+
 		loadPoints = new ArrayList<>(efs.keySet());
 		replications = new ArrayList<>(efs.values().iterator().next().keySet());
 	}
@@ -54,6 +55,7 @@ public class ExternalFragmentationResultManager implements ResultManagerInterfac
 		for (Integer rep : replications) { // Checks how many replications have been made and creates the header of each column
 			res.append(sep + "rep" + rep);
 		}
+
 		res.append("\n");
 
 		res.append(resultGeneralVertical());
@@ -77,13 +79,17 @@ public class ExternalFragmentationResultManager implements ResultManagerInterfac
 	 */
 	private String resultGeneralVertical() {
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			res.append("External Fragmentation (Vertical)" + sep + loadPoint + sep + "all" + sep + " ");
+
 			for (Integer replic : replications) {
 				res.append(sep + efs.get(loadPoint).get(replic).getExternalFragVertical());
 			}
+
 			res.append("\n");
 		}
+
 		return res.toString();
 	}
 
@@ -94,13 +100,17 @@ public class ExternalFragmentationResultManager implements ResultManagerInterfac
 	 */
 	private String resultGeneralEntropyVertical() {
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			res.append("Entropy External Fragmentation (Vertical)" + sep + loadPoint + sep + "all" + sep + " ");
+
 			for (Integer replic : replications) {
 				res.append(sep + efs.get(loadPoint).get(replic).getEntropyExternalFragVertical());
 			}
+
 			res.append("\n");
 		}
+
 		return res.toString();
 	}
 
@@ -111,13 +121,17 @@ public class ExternalFragmentationResultManager implements ResultManagerInterfac
 	 */
 	private String resultGeneralHorizontal() {
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			res.append("External Fragmentation (Horizontal)" + sep + loadPoint + sep + "all" + sep + " ");
+
 			for (Integer replic : replications) {
 				res.append(sep + efs.get(loadPoint).get(replic).getExternalFragHorizontal());
 			}
+
 			res.append("\n");
 		}
+
 		return res.toString();
 	}
 
@@ -128,6 +142,7 @@ public class ExternalFragmentationResultManager implements ResultManagerInterfac
 	 */
 	private String resultPerLink(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			String aux = "External Fragmentation Per Link" + sep + loadPoint + sep; // "all"+sep+" ";
 
@@ -137,10 +152,12 @@ public class ExternalFragmentationResultManager implements ResultManagerInterfac
 				for (Integer replic : replications) {
 					aux2 = aux2 + sep + efs.get(loadPoint).get(replic).getExternalFragLink(link);
 				}
+
 				res.append(aux2 + "\n");
 			}
 
 		}
+
 		return res.toString();
 	}
 
@@ -151,6 +168,7 @@ public class ExternalFragmentationResultManager implements ResultManagerInterfac
 	 */
 	private String resultEntropyPerLink(){
 		StringBuilder res = new StringBuilder();
+
 		for (Integer loadPoint : loadPoints) {
 			String aux = "Entropy External Fragmentation Per Link" + sep + loadPoint + sep; // "all"+sep+" ";
 
@@ -160,10 +178,12 @@ public class ExternalFragmentationResultManager implements ResultManagerInterfac
 				for (Integer replic : replications) {
 					aux2 = aux2 + sep + efs.get(loadPoint).get(replic).getEntropyExternalFragLink(link);
 				}
+
 				res.append(aux2 + "\n");
 			}
 
 		}
+
 		return res.toString();
 	}
 

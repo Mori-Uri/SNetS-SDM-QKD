@@ -36,6 +36,7 @@ public class Receivers implements Serializable {
 	public boolean allocatesReceivers() {
 		if(this.rxUtilization < this.numberOfRx){
 			this.rxUtilization++;
+
 			return true;
 		}else{
 			return false;

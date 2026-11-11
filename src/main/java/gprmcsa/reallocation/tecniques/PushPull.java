@@ -53,6 +53,7 @@ public class PushPull {
 
 		// Try to realloc circuit
 		circuit.setSpectrumAssigned(newBand);
+
 		if (!cp.allocateSpectrum(circuit, newBand, circuit.getRoute().getLinkList(), circuit.getGuardBand())) {
 			throw new Exception("Bad RMLSA. Spectrum cant be allocated.");
 		}
@@ -71,6 +72,7 @@ public class PushPull {
 
 			// Reallocating the spectrum and guard bands without the expansion
 			circuit.setSpectrumAssigned(oldBand);
+
 			if (!cp.allocateSpectrum(circuit, oldBand, circuit.getRoute().getLinkList(), circuit.getGuardBand())) {
 				throw new Exception("Bad RMLSA. Spectrum cant be allocated.");
 			}
@@ -89,6 +91,7 @@ public class PushPull {
 
 				// Reallocating the spectrum and guard bands without the expansion
 				circuit.setSpectrumAssigned(oldBand);
+
 				if (!cp.allocateSpectrum(circuit, oldBand, circuit.getRoute().getLinkList(), circuit.getGuardBand())) {
 					throw new Exception("Bad RMLSA. Spectrum cant be allocated.");
 				}
@@ -100,6 +103,7 @@ public class PushPull {
 				// update network power consumption
 //						System.out.println(" successful reallocation");
 				cp.updateNetworkPowerConsumption();
+
 				return true;
 			}
 
@@ -141,6 +145,7 @@ public class PushPull {
 
 		// Try to realloc circuit
 		circuit.setSpectrumAssigned(newBand);
+
 		if (!cp.allocateSpectrum(circuit, newBand, circuit.getRoute().getLinkList(), circuit.getGuardBand())) {
 			throw new Exception("Bad RMLSA. Spectrum cant be allocated.");
 		}
@@ -159,6 +164,7 @@ public class PushPull {
 
 			// Reallocating the spectrum and guard bands without the expansion
 			circuit.setSpectrumAssigned(oldBand);
+
 			if (!cp.allocateSpectrum(circuit, oldBand, circuit.getRoute().getLinkList(), circuit.getGuardBand())) {
 				throw new Exception("Bad RMLSA. Spectrum cant be allocated.");
 			}
@@ -177,6 +183,7 @@ public class PushPull {
 
 				// Reallocating the spectrum and guard bands without the expansion
 				circuit.setSpectrumAssigned(oldBand);
+
 				if (!cp.allocateSpectrum(circuit, oldBand, circuit.getRoute().getLinkList(), circuit.getGuardBand())) {
 					throw new Exception("Bad RMLSA. Spectrum cant be allocated.");
 				}
@@ -188,6 +195,7 @@ public class PushPull {
 				// update network power consumption
 //				System.out.println(" successful reallocation");
 				cp.updateNetworkPowerConsumption();
+
 				return true;
 			}
 
@@ -208,6 +216,7 @@ public class PushPull {
 		// down
 		int numSlotsUpper = IntersectionFreeSpectrum.freeSlotsUpper(circuit.getSpectrumAssigned(), composition,
 				circuit.getGuardBand());
+
 		if (numSlotsUpper <= 0) {
 			return null;
 		}
@@ -235,6 +244,7 @@ public class PushPull {
 		// down
 		int numSlotsDown = IntersectionFreeSpectrum.freeSlotsDown(circuit.getSpectrumAssigned(), composition,
 				circuit.getGuardBand());
+
 		if (numSlotsDown <= 0) {
 			return null;
 		}
@@ -275,6 +285,7 @@ public class PushPull {
 				return fl;
 			}
 		}
+
 		return null;
 	}
 
@@ -291,9 +302,11 @@ public class PushPull {
 		for (int[] fl : bandsFree) {
 			if (fl[0] == (band[1] + 1 + guardBand)) {
 				// System.out.println("Test ok");
+
 				return fl;
 			}
 		}
+
 		return null;
 	}
 

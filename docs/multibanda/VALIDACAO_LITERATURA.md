@@ -24,7 +24,6 @@ foram digitalizados à mão, com precisão de cerca de 2 % da escala.
 | **VMB-12c** | Peters 2009, Fig. 2 | espectros de SpRS **medidos** (5,5, 21,5 e 41,3 km) | OK; modelo 13 a 33 % abaixo |
 | **VMB-12d** | Mehdizadeh 2024, Fig. 3 e GNPy 2.14.2 | origem do "NLI" do artigo | OK, ±1 dB |
 | **VMB-12e** | Mehdizadeh 2024, Fig. 5(b) | QBER de 1440 a 1522 nm (5, 30 e 70 km) | OK, ±0,026; início do ruído na banda E pendente |
-| **VMB-12f** | Chapuran 2009 (Tab. 1), Nweke 2005 | correção anti-Stokes `medida` (Parte 48) | OK; Chapuran 0,98–0,99; banda E do Mehdizadeh: erro de 0,072 para 0,011 |
 
 ## O que a Parte 46 esclareceu
 
@@ -53,15 +52,3 @@ foram digitalizados à mão, com precisão de cerca de 2 % da escala.
 | VMB-12e | De 1392 a 1450 nm, a 14–20 THz da borda do comb, Mehdizadeh tem 2 a 5 vezes mais SpRS que o nosso perfil Raman com o fator de Bose-Einstein. A seção de choque medida (Eraerds) só vai de 1510 a 1650 nm, e o artigo não diz como a estendeu. |
 | VMB-10b | Ganho de +40 % do MB de Dibaj IWCIT 2024. O artigo não define a contagem de Q-TRx para divisões não inteiras. |
 | VMB-5 | Dibaj 2025 diz que o ruído é desprezível na banda O a 150 km. O modelo dá p_SpRS de 1,2e-6. |
-
-## Parte 48: o lado anti-Stokes do SpRS
-
-- Medidas em SMF-28 (Chapuran et al., 2009; Nweke et al., 2005) mostram, de 17 a 25 THz da bomba, cerca de 2,2
-  vezes o SpRS anti-Stokes do nosso modelo. Até 10 THz o modelo confere.
-- O perfil de ganho Raman do modelo confere com Hollenbeck e Cantrell (2002) nessa faixa. A diferença, portanto, não
-  vem da forma do espectro.
-- A opção `multiband.antiStokesCorrection = medida` aplica esse fator. O padrão continua `nenhuma`.
-- Com a correção, a banda E de Mehdizadeh 2024 passa a bater (erro máximo da QBER de 0,011). Sobra uma diferença a
-  1410 nm.
-- VMB-5: as mesmas medidas a 1310 nm mostram que o ruído na banda O existe. A hipótese de ruído desprezível de Dibaj
-  2025 é uma simplificação.

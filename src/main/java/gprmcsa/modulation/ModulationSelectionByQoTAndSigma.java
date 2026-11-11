@@ -8,7 +8,6 @@ import gprmcsa.routing.Route;
 import network.Circuit;
 import network.ControlPlane;
 
-
 /**
  * This class implements the modulation selection algorithm by quality of transmission and sigma value.
  * The spectrum allocation of each modulation is also checked.
@@ -64,7 +63,7 @@ public class ModulationSelectionByQoTAndSigma implements ModulationSelectionAlgo
 		Modulation alternativeMod2 = null;
 		int alternativeBand2[] = null;
 
-		double deltaSNR = 0.0;
+		double deltaOSNR = 0.0;
 
 		for (int m = 0; m < avaliableModulations.size(); m++) {
 			Modulation mod = avaliableModulations.get(m);
@@ -86,9 +85,9 @@ public class ModulationSelectionByQoTAndSigma implements ModulationSelectionAlgo
 
 					flagQoT = true;
 
-					deltaSNR = circuit.getSNR() - mod.getSNRthreshold();
+					deltaOSNR = circuit.getOSNR() - mod.getOSNRthreshold();
 
-					if(deltaSNR >= sigma){
+					if(deltaOSNR >= sigma){
 						chosenMod = mod; // Save the modulation that has admissible QoT and respect the sigma value
 						chosenBand = band;
 					}

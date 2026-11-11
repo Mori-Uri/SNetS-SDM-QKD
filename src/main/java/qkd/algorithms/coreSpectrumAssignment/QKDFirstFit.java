@@ -23,58 +23,67 @@ import util.IntersectionFreeSpectrum;
  */
 public class QKDFirstFit implements CoreAndSpectrumAssignmentAlgorithmInterface {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    @Override
-    public boolean assignCoreAndSpectrum(int numberOfSlots, Circuit circuit, ControlPlane cp) {
-        if (circuit.getRoute() == null || circuit.getRoute().getLinkList().isEmpty()) {
-            return false;
-        }
-        Link first = circuit.getRoute().getLinkList().get(0);
-        int bestCore = -1;
-        int[] best = null;
-        for (Core core : first.getCores()) {
-            if (core.isQkdReserved()) {
-                continue;
-            }
-            List<int[]> free = IntersectionFreeSpectrum.merge(circuit.getRoute(),
-                    circuit.getGuardBand(), core.getId());
-            int[] band = policy(numberOfSlots, free, circuit, cp);
-            if (band != null && (best == null || band[0] < best[0])) {
-                best = band;
-                bestCore = core.getId();
-            }
-        }
-        circuit.setIndexCore(bestCore < 0 ? firstClassicalCore(first) : bestCore);
-        circuit.setSpectrumAssigned(best);
-        return best != null;
-    }
+	@Override
+	public boolean assignCoreAndSpectrum(int numberOfSlots, Circuit circuit, ControlPlane cp) {
+		if (circuit.getRoute() == null || circuit.getRoute().getLinkList().isEmpty()) {
+			return false;
+		}
 
-    private static int firstClassicalCore(Link link) {
-        for (Core core : link.getCores()) {
-            if (!core.isQkdReserved()) {
-                return core.getId();
-            }
-        }
-        return 0;
-    }
+		Link first = circuit.getRoute().getLinkList().get(0);
+		int bestCore = -1;
+		int[] best = null;
 
-    @Override
-    public int coreAssignment() {
-        return 0;
-    }
+		for (Core core : first.getCores()) {
+			if (core.isQkdReserved()) {
+				continue;
+			}
 
-    @Override
-    public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit,
-            ControlPlane cp) {
-        if (numberOfSlots <= 0) {
-            return null;
-        }
-        for (int[] band : freeSpectrumBands) {
-            if (band[1] - band[0] + 1 >= numberOfSlots) {
-                return new int[] {band[0], band[0] + numberOfSlots - 1};
-            }
-        }
-        return null;
-    }
+			List<int[]> free = IntersectionFreeSpectrum.merge(circuit.getRoute(),
+					circuit.getGuardBand(), core.getId());
+			int[] band = policy(numberOfSlots, free, circuit, cp);
+
+			if (band != null && (best == null || band[0] < best[0])) {
+				best = band;
+				bestCore = core.getId();
+			}
+		}
+
+		circuit.setIndexCore(bestCore < 0 ? firstClassicalCore(first) : bestCore);
+		circuit.setSpectrumAssigned(best);
+
+		return best != null;
+	}
+
+	private static int firstClassicalCore(Link link) {
+		for (Core core : link.getCores()) {
+			if (!core.isQkdReserved()) {
+				return core.getId();
+			}
+		}
+
+		return 0;
+	}
+
+	@Override
+	public int coreAssignment() {
+		return 0;
+	}
+
+	@Override
+	public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit,
+			ControlPlane cp) {
+		if (numberOfSlots <= 0) {
+			return null;
+		}
+
+		for (int[] band : freeSpectrumBands) {
+			if (band[1] - band[0] + 1 >= numberOfSlots) {
+				return new int[] {band[0], band[0] + numberOfSlots - 1};
+			}
+		}
+
+		return null;
+	}
 }

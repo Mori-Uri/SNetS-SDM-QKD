@@ -17,141 +17,153 @@ import qkd.capacity.QKDLinkCapacityReservation;
  */
 public final class QKDSession implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private final QKDRoutePlan routePlan;
-    private final List<QKDChannelAllocation> allocations;
-    private final int requiredQuantumSlotsPerPhysicalLink;
-    private final List<QKDLinkCapacityReservation> capacityReservations;
-    private final boolean sharedCapacityManaged;
-    private boolean active;
+	private final QKDRoutePlan routePlan;
+	private final List<QKDChannelAllocation> allocations;
+	private final int requiredQuantumSlotsPerPhysicalLink;
+	private final List<QKDLinkCapacityReservation> capacityReservations;
+	private final boolean sharedCapacityManaged;
+	private boolean active;
 
-    QKDSession(QKDRoutePlan routePlan,
-            List<QKDChannelAllocation> allocations,
-            int requiredQuantumSlotsPerPhysicalLink) {
-        if (routePlan == null) {
-            throw new IllegalArgumentException("routePlan cannot be null");
-        }
-        if (allocations == null || allocations.isEmpty()) {
-            throw new IllegalArgumentException("allocations cannot be null/empty");
-        }
-        if (requiredQuantumSlotsPerPhysicalLink <= 0) {
-            throw new IllegalArgumentException(
-                    "requiredQuantumSlotsPerPhysicalLink must be > 0");
-        }
-        this.routePlan = routePlan;
-        this.allocations = Collections.unmodifiableList(
-                new ArrayList<QKDChannelAllocation>(allocations));
-        this.requiredQuantumSlotsPerPhysicalLink =
-                requiredQuantumSlotsPerPhysicalLink;
-        this.capacityReservations = Collections.emptyList();
-        this.sharedCapacityManaged = false;
-        this.active = true;
-    }
+	QKDSession(QKDRoutePlan routePlan,
+			List<QKDChannelAllocation> allocations,
+			int requiredQuantumSlotsPerPhysicalLink) {
+		if (routePlan == null) {
+			throw new IllegalArgumentException("routePlan cannot be null");
+		}
 
+		if (allocations == null || allocations.isEmpty()) {
+			throw new IllegalArgumentException("allocations cannot be null/empty");
+		}
 
-    /** Creates a session backed by shared discrete QCh capacity/TDM reservations. */
-    public static QKDSession forSharedCapacity(QKDRoutePlan routePlan,
-            List<QKDChannelAllocation> allocations,
-            List<QKDLinkCapacityReservation> capacityReservations,
-            int qchSlots) {
-        if (routePlan == null || allocations == null || allocations.isEmpty()
-                || capacityReservations == null || capacityReservations.isEmpty()) {
-            throw new IllegalArgumentException("shared QKD session inputs cannot be null/empty");
-        }
-        return new QKDSession(routePlan, allocations, capacityReservations, qchSlots);
-    }
+		if (requiredQuantumSlotsPerPhysicalLink <= 0) {
+			throw new IllegalArgumentException(
+					"requiredQuantumSlotsPerPhysicalLink must be > 0");
+		}
 
-    private QKDSession(QKDRoutePlan routePlan,
-            List<QKDChannelAllocation> allocations,
-            List<QKDLinkCapacityReservation> capacityReservations,
-            int qchSlots) {
-        this.routePlan = routePlan;
-        this.allocations = Collections.unmodifiableList(
-                new ArrayList<QKDChannelAllocation>(allocations));
-        this.requiredQuantumSlotsPerPhysicalLink = qchSlots;
-        this.capacityReservations = Collections.unmodifiableList(
-                new ArrayList<QKDLinkCapacityReservation>(capacityReservations));
-        this.sharedCapacityManaged = true;
-        this.active = true;
-    }
+		this.routePlan = routePlan;
+		this.allocations = Collections.unmodifiableList(
+				new ArrayList<QKDChannelAllocation>(allocations));
+		this.requiredQuantumSlotsPerPhysicalLink =
+				requiredQuantumSlotsPerPhysicalLink;
+		this.capacityReservations = Collections.emptyList();
+		this.sharedCapacityManaged = false;
+		this.active = true;
+	}
 
-    public QKDRoutePlan getRoutePlan() {
-        return routePlan;
-    }
+	/** Creates a session backed by shared discrete QCh capacity/TDM reservations. */
+	public static QKDSession forSharedCapacity(QKDRoutePlan routePlan,
+			List<QKDChannelAllocation> allocations,
+			List<QKDLinkCapacityReservation> capacityReservations,
+			int qchSlots) {
+		if (routePlan == null || allocations == null || allocations.isEmpty()
+				|| capacityReservations == null || capacityReservations.isEmpty()) {
+			throw new IllegalArgumentException("shared QKD session inputs cannot be null/empty");
+		}
 
-    public List<QKDChannelAllocation> getAllocations() {
-        return allocations;
-    }
+		return new QKDSession(routePlan, allocations, capacityReservations, qchSlots);
+	}
 
-    public int getRequiredQuantumSlotsPerPhysicalLink() {
-        return requiredQuantumSlotsPerPhysicalLink;
-    }
+	private QKDSession(QKDRoutePlan routePlan,
+			List<QKDChannelAllocation> allocations,
+			List<QKDLinkCapacityReservation> capacityReservations,
+			int qchSlots) {
+		this.routePlan = routePlan;
+		this.allocations = Collections.unmodifiableList(
+				new ArrayList<QKDChannelAllocation>(allocations));
+		this.requiredQuantumSlotsPerPhysicalLink = qchSlots;
+		this.capacityReservations = Collections.unmodifiableList(
+				new ArrayList<QKDLinkCapacityReservation>(capacityReservations));
+		this.sharedCapacityManaged = true;
+		this.active = true;
+	}
 
-    public int getPhysicalLinkAllocationCount() {
-        return sharedCapacityManaged ? capacityReservations.size() : allocations.size();
-    }
+	public QKDRoutePlan getRoutePlan() {
+		return routePlan;
+	}
 
-    public boolean isSharedCapacityManaged() { return sharedCapacityManaged; }
+	public List<QKDChannelAllocation> getAllocations() {
+		return allocations;
+	}
 
-    public List<QKDLinkCapacityReservation> getCapacityReservations() {
-        return capacityReservations;
-    }
+	public int getRequiredQuantumSlotsPerPhysicalLink() {
+		return requiredQuantumSlotsPerPhysicalLink;
+	}
 
-    public int getDistinctQuantumChannelCount() {
-        if (!sharedCapacityManaged) return allocations.size();
-        java.util.HashSet<Long> ids = new java.util.HashSet<Long>();
-        for (QKDLinkCapacityReservation r : capacityReservations)
-            for (qkd.capacity.QKDChannelShare share : r.getShares()) ids.add(share.getChannel().getId());
-        return ids.size();
-    }
+	public int getPhysicalLinkAllocationCount() {
+		return sharedCapacityManaged ? capacityReservations.size() : allocations.size();
+	}
 
-    public double getProvisionedKeyRateBps() {
-        if (!sharedCapacityManaged || capacityReservations.isEmpty()) return Double.NaN;
-        double min = Double.POSITIVE_INFINITY;
-        for (QKDLinkCapacityReservation r : capacityReservations)
-            min = Math.min(min, r.getReservedKeyRateBps());
-        return min;
-    }
+	public boolean isSharedCapacityManaged() { return sharedCapacityManaged; }
 
-    public int getQTrxPairsUsedBySession() {
-        if (!sharedCapacityManaged) return getCoveredQkdSpanCount();
-        java.util.HashSet<Long> ids = new java.util.HashSet<Long>();
-        int total = 0;
-        for (QKDLinkCapacityReservation r : capacityReservations) {
-            for (qkd.capacity.QKDChannelShare share : r.getShares()) {
-                qkd.capacity.QKDSharedChannel c = share.getChannel();
-                if (ids.add(c.getId())) total += c.getQTrxPairs();
-            }
-        }
-        return total;
-    }
+	public List<QKDLinkCapacityReservation> getCapacityReservations() {
+		return capacityReservations;
+	}
 
-    public int getCoveredQkdSpanCount() {
-        int total = 0;
-        for (QKDChannelAllocation allocation : allocations) {
-            total += allocation.getCoveredQkdSpans();
-        }
-        return total;
-    }
+	public int getDistinctQuantumChannelCount() {
+		if (!sharedCapacityManaged) return allocations.size();
+		java.util.HashSet<Long> ids = new java.util.HashSet<Long>();
 
-    public boolean isActive() {
-        return active;
-    }
+		for (QKDLinkCapacityReservation r : capacityReservations)
+			for (qkd.capacity.QKDChannelShare share : r.getShares()) ids.add(share.getChannel().getId());
 
-    public void markReleased() {
-        active = false;
-    }
+		return ids.size();
+	}
 
-    @Override
-    public String toString() {
-        return "QKDSession{" + routePlan.getSource() + "->"
-                + routePlan.getDestination()
-                + ", physicalLinkAllocations=" + allocations.size()
-                + ", coveredSpans=" + getCoveredQkdSpanCount()
-                + ", requiredSlotsPerLink="
-                + requiredQuantumSlotsPerPhysicalLink
-                + ", active=" + active
-                + '}';
-    }
+	public double getProvisionedKeyRateBps() {
+		if (!sharedCapacityManaged || capacityReservations.isEmpty()) return Double.NaN;
+		double min = Double.POSITIVE_INFINITY;
+
+		for (QKDLinkCapacityReservation r : capacityReservations)
+			min = Math.min(min, r.getReservedKeyRateBps());
+
+		return min;
+	}
+
+	public int getQTrxPairsUsedBySession() {
+		if (!sharedCapacityManaged) return getCoveredQkdSpanCount();
+		java.util.HashSet<Long> ids = new java.util.HashSet<Long>();
+		int total = 0;
+
+		for (QKDLinkCapacityReservation r : capacityReservations) {
+			for (qkd.capacity.QKDChannelShare share : r.getShares()) {
+				qkd.capacity.QKDSharedChannel c = share.getChannel();
+
+				if (ids.add(c.getId())) total += c.getQTrxPairs();
+			}
+		}
+
+		return total;
+	}
+
+	public int getCoveredQkdSpanCount() {
+		int total = 0;
+
+		for (QKDChannelAllocation allocation : allocations) {
+			total += allocation.getCoveredQkdSpans();
+		}
+
+		return total;
+	}
+
+	public boolean isActive() {
+		return active;
+	}
+
+	public void markReleased() {
+		active = false;
+	}
+
+	@Override
+	public String toString() {
+		return "QKDSession{" + routePlan.getSource() + "->"
+				+ routePlan.getDestination()
+				+ ", physicalLinkAllocations=" + allocations.size()
+				+ ", coveredSpans=" + getCoveredQkdSpanCount()
+				+ ", requiredSlotsPerLink="
+				+ requiredQuantumSlotsPerPhysicalLink
+				+ ", active=" + active
+				+ '}';
+	}
 }

@@ -42,6 +42,7 @@ public class EnPAAlgorithm implements PowerAssignmentAlgorithmInterface {
 
 		if(margin == null){
 			Map<String, String> uv = cp.getMesh().getOthersConfig().getVariables();
+
 			if(uv.get("margin") != null) {
 				margin = Double.parseDouble((String)uv.get("margin"));
 			}
@@ -77,66 +78,66 @@ public class EnPAAlgorithm implements PowerAssignmentAlgorithmInterface {
 	public double computePowerByLinearInterpolation(Circuit circuit, Route route, Modulation modulation, int core, int spectrumAssigned[], double margin, ControlPlane cp){
 
 		double Pcurrent = 0.0;
-		double SNRcurrent = 0.0;
+		double OSNRcurrent = 0.0;
 
 		double Pmin = 0.0;
-		double SNRmin = 0.0;
+		double OSNRmin = 0.0;
 
 		double Pmax = 0.0;
-		double SNRmax = 0.0;
+		double OSNRmax = 0.0;
 
-		double SNRdif = 0.0;
+		double OSNRdif = 0.0;
 		double error = 1e-3;
 
-		int attemptsCounter = 0; // Count attempts to reach SNRth
+		int attemptsCounter = 0; // Count attempts to reach OSNRth
 
-		double SNRth = modulation.getSNRthresholdLinear(); //Linear
-		SNRth = SNRth + margin;
+		double OSNRth = modulation.getOSNRthresholdLinear(); //Linear
+		OSNRth = OSNRth + margin;
 
 		Pmin = 1.0E-11; //W, -80 dBm
 		circuit.setLaunchPowerLinear(Pmin);
-		SNRmin = cp.getMesh().getPhysicalLayer().computeSNRSegment(circuit, route, 0, route.getNodeList().size() - 1, modulation, core, spectrumAssigned, null, false);
+		OSNRmin = cp.getMesh().getPhysicalLayer().computeOSNRSegment(circuit, route, 0, route.getNodeList().size() - 1, modulation, core, spectrumAssigned, null, false);
 
 		Pmax = cp.getMesh().getPhysicalLayer().computeMaximumPower(circuit, circuit.getRequiredBitRate(), route, 0, route.getNodeList().size() - 1, modulation, core, spectrumAssigned);
 		circuit.setLaunchPowerLinear(Pmax);
-		SNRmax = cp.getMesh().getPhysicalLayer().computeSNRSegment(circuit, route, 0, route.getNodeList().size() - 1, modulation, core, spectrumAssigned, null, false);
+		OSNRmax = cp.getMesh().getPhysicalLayer().computeOSNRSegment(circuit, route, 0, route.getNodeList().size() - 1, modulation, core, spectrumAssigned, null, false);
 
 		while (attemptsCounter <= maxAttemptsCounter) {
 
-			if(SNRmin - SNRth > 0.0) {
+			if(OSNRmin - OSNRth > 0.0) {
 				return Pmin;
 			}
 
-			if (SNRmax - SNRth < 0.0) {
+			if (OSNRmax - OSNRth < 0.0) {
 				return Pmax;
 			}
 
 			// Avoid division by zero
-			if (SNRmax == SNRmin) {
+			if (OSNRmax == OSNRmin) {
 				// If OSNR barely varies, use binary search as fallback
 				Pcurrent = (Pmax + Pmin) * 0.5;
 
 			} else {
 				// linear interpolation
-				Pcurrent = Pmin + ((Pmax - Pmin) * ((SNRth - SNRmin) / (SNRmax - SNRmin)));
+				Pcurrent = Pmin + ((Pmax - Pmin) * ((OSNRth - OSNRmin) / (OSNRmax - OSNRmin)));
 			}
 
 			circuit.setLaunchPowerLinear(Pcurrent);
-			SNRcurrent = cp.getMesh().getPhysicalLayer().computeSNRSegment(circuit, route, 0, route.getNodeList().size() - 1, modulation, core, spectrumAssigned, null, false);
+			OSNRcurrent = cp.getMesh().getPhysicalLayer().computeOSNRSegment(circuit, route, 0, route.getNodeList().size() - 1, modulation, core, spectrumAssigned, null, false);
 
-			SNRdif = Math.abs(SNRcurrent - SNRth);
+			OSNRdif = Math.abs(OSNRcurrent - OSNRth);
 
-			if (SNRdif <= error) {
+			if (OSNRdif <= error) {
 				break;
 
 			} else {
-				if(SNRcurrent > SNRth) {
+				if(OSNRcurrent > OSNRth) {
 					Pmax = Pcurrent;
-					SNRmax = SNRcurrent;
+					OSNRmax = OSNRcurrent;
 
 				} else {
 					Pmin = Pcurrent;
-					SNRmin = SNRcurrent;
+					OSNRmin = OSNRcurrent;
 				}
 			}
 

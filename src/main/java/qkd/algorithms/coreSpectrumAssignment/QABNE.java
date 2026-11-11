@@ -32,175 +32,194 @@ import util.IntersectionFreeSpectrum;
  */
 public class QABNE implements CoreAndSpectrumAssignmentAlgorithmInterface {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private int rotationIndex;
-    private List<Integer> classicalCoreIds;
-    private int centralCoreId;
+	private int rotationIndex;
+	private List<Integer> classicalCoreIds;
+	private int centralCoreId;
 
-    public QABNE() {
-        this.rotationIndex = 0;
-        this.classicalCoreIds = Collections.emptyList();
-        this.centralCoreId = 0;
-    }
+	public QABNE() {
+		this.rotationIndex = 0;
+		this.classicalCoreIds = Collections.emptyList();
+		this.centralCoreId = 0;
+	}
 
-    @Override
-    public boolean assignCoreAndSpectrum(int numberOfSlots, Circuit circuit,
-            ControlPlane cp) {
-        ensureCoreLayout(circuit);
+	@Override
+	public boolean assignCoreAndSpectrum(int numberOfSlots, Circuit circuit,
+			ControlPlane cp) {
+		ensureCoreLayout(circuit);
 
-        if (classicalCoreIds.isEmpty()) {
-            circuit.setSpectrumAssigned(null);
-            return false;
-        }
+		if (classicalCoreIds.isEmpty()) {
+			circuit.setSpectrumAssigned(null);
 
-        final int chosenCore = coreAssignment();
-        final List<int[]> freeSpectrumBands = IntersectionFreeSpectrum.merge(
-                circuit.getRoute(), circuit.getGuardBand(), chosenCore);
+			return false;
+		}
 
-        final int[] chosen;
-        if (chosenCore == centralCoreId) {
-            chosen = policy(numberOfSlots, freeSpectrumBands, circuit, cp);
-        } else if (chosenCore % 2 == 0) {
-            chosen = policyLastFit(numberOfSlots, freeSpectrumBands, circuit);
-        } else {
-            chosen = policyFirstFit(numberOfSlots, freeSpectrumBands, circuit);
-        }
+		final int chosenCore = coreAssignment();
+		final List<int[]> freeSpectrumBands = IntersectionFreeSpectrum.merge(
+				circuit.getRoute(), circuit.getGuardBand(), chosenCore);
 
-        // Part 36: same bookkeeping as the classical ABNE (CSBASDM2): the band and the core are written also when
-        // the assignment fails. Before, a failure left the band of the previous (other modulation) attempt in the
-        // circuit, and spcsav2 could test the physical layer with that stale band; it also printed "Core not selected.".
-        circuit.setSpectrumAssigned(chosen);
-        circuit.setIndexCore(chosenCore);
-        return chosen != null;
-    }
+		final int[] chosen;
 
-    /**
+		if (chosenCore == centralCoreId) {
+			chosen = policy(numberOfSlots, freeSpectrumBands, circuit, cp);
+		} else if (chosenCore % 2 == 0) {
+			chosen = policyLastFit(numberOfSlots, freeSpectrumBands, circuit);
+		} else {
+			chosen = policyFirstFit(numberOfSlots, freeSpectrumBands, circuit);
+		}
+
+		// Part 36: same bookkeeping as the classical ABNE (CSBASDM2): the band and the core are written also when
+		// the assignment fails. Before, a failure left the band of the previous (other modulation) attempt in the
+		// circuit, and spcsav2 could test the physical layer with that stale band; it also printed "Core not selected.".
+		circuit.setSpectrumAssigned(chosen);
+		circuit.setIndexCore(chosenCore);
+
+		return chosen != null;
+	}
+
+	/**
      * Round-robin over classical cores only. The physical core identifiers are
      * preserved, so ABNE parity-based outer-core policies keep their original
      * meaning.
      */
-    @Override
-    public int coreAssignment() {
-        if (classicalCoreIds == null || classicalCoreIds.isEmpty()) {
-            return -1;
-        }
-        if (rotationIndex >= classicalCoreIds.size()) {
-            rotationIndex = 0;
-        }
-        int selected = classicalCoreIds.get(rotationIndex).intValue();
-        rotationIndex = (rotationIndex + 1) % classicalCoreIds.size();
-        return selected;
-    }
+	@Override
+	public int coreAssignment() {
+		if (classicalCoreIds == null || classicalCoreIds.isEmpty()) {
+			return -1;
+		}
 
-    /** Medium-fit policy used by ABNE on the central core. */
-    @Override
-    public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands,
-            Circuit circuit, ControlPlane cp) {
-        int reference = circuit.getRoute().getLink(0).getCore(centralCoreId)
-                .getNumOfSlots() / 2;
-        int maxAmplitude = circuit.getPair().getSource().getTxs()
-                .getMaxSpectralAmplitude();
-        if (numberOfSlots > maxAmplitude) {
-            return null;
-        }
+		if (rotationIndex >= classicalCoreIds.size()) {
+			rotationIndex = 0;
+		}
 
-        int[] chosen = null;
-        for (int[] band : freeSpectrumBands) {
-            if (band[1] - band[0] + 1 >= numberOfSlots) {
-                chosen = band.clone();
-                chosen[1] = chosen[0] + numberOfSlots - 1;
-                break;
-            }
-        }
+		int selected = classicalCoreIds.get(rotationIndex).intValue();
+		rotationIndex = (rotationIndex + 1) % classicalCoreIds.size();
 
-        if (chosen == null) {
-            return null;
-        }
+		return selected;
+	}
 
-        for (int[] band : freeSpectrumBands) {
-            for (int i = band[0]; i <= band[1]; i++) {
-                if (Math.abs(reference - i) < Math.abs(reference - chosen[0])
-                        && band[1] - i + 1 >= numberOfSlots) {
-                    chosen[0] = i;
-                    chosen[1] = i + numberOfSlots - 1;
-                }
-            }
-        }
-        return chosen;
-    }
+	/** Medium-fit policy used by ABNE on the central core. */
+	@Override
+	public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands,
+			Circuit circuit, ControlPlane cp) {
+		int reference = circuit.getRoute().getLink(0).getCore(centralCoreId)
+				.getNumOfSlots() / 2;
+		int maxAmplitude = circuit.getPair().getSource().getTxs()
+				.getMaxSpectralAmplitude();
 
-    /** Last-fit policy used by ABNE on even outer cores. */
-    public int[] policyLastFit(int numberOfSlots,
-            List<int[]> freeSpectrumBands, Circuit circuit) {
-        int maxAmplitude = circuit.getPair().getSource().getTxs()
-                .getMaxSpectralAmplitude();
-        if (numberOfSlots > maxAmplitude) {
-            return null;
-        }
+		if (numberOfSlots > maxAmplitude) {
+			return null;
+		}
 
-        for (int i = freeSpectrumBands.size() - 1; i >= 0; i--) {
-            int[] band = freeSpectrumBands.get(i);
-            if (band[1] - band[0] + 1 >= numberOfSlots) {
-                int[] chosen = band.clone();
-                chosen[0] = chosen[1] - numberOfSlots + 1;
-                return chosen;
-            }
-        }
-        return null;
-    }
+		int[] chosen = null;
 
-    /** First-fit policy used by ABNE on odd outer cores. */
-    public int[] policyFirstFit(int numberOfSlots,
-            List<int[]> freeSpectrumBands, Circuit circuit) {
-        int maxAmplitude = circuit.getPair().getSource().getTxs()
-                .getMaxSpectralAmplitude();
-        if (numberOfSlots > maxAmplitude) {
-            return null;
-        }
+		for (int[] band : freeSpectrumBands) {
+			if (band[1] - band[0] + 1 >= numberOfSlots) {
+				chosen = band.clone();
+				chosen[1] = chosen[0] + numberOfSlots - 1;
+				break;
+			}
+		}
 
-        for (int[] band : freeSpectrumBands) {
-            if (band[1] - band[0] + 1 >= numberOfSlots) {
-                int[] chosen = band.clone();
-                chosen[1] = chosen[0] + numberOfSlots - 1;
-                return chosen;
-            }
-        }
-        return null;
-    }
+		if (chosen == null) {
+			return null;
+		}
 
-    public List<Integer> getClassicalCoreIds() {
-        return new ArrayList<Integer>(classicalCoreIds);
-    }
+		for (int[] band : freeSpectrumBands) {
+			for (int i = band[0]; i <= band[1]; i++) {
+				if (Math.abs(reference - i) < Math.abs(reference - chosen[0])
+						&& band[1] - i + 1 >= numberOfSlots) {
+					chosen[0] = i;
+					chosen[1] = i + numberOfSlots - 1;
+				}
+			}
+		}
 
-    public int getCentralCoreId() {
-        return centralCoreId;
-    }
+		return chosen;
+	}
 
-    private void ensureCoreLayout(Circuit circuit) {
-        if (classicalCoreIds != null && !classicalCoreIds.isEmpty()) {
-            return;
-        }
-        if (circuit == null || circuit.getRoute() == null
-                || circuit.getRoute().getLinkList().isEmpty()) {
-            throw new IllegalArgumentException(
-                    "qABNE requires a circuit with a non-empty route");
-        }
+	/** Last-fit policy used by ABNE on even outer cores. */
+	public int[] policyLastFit(int numberOfSlots,
+			List<int[]> freeSpectrumBands, Circuit circuit) {
+		int maxAmplitude = circuit.getPair().getSource().getTxs()
+				.getMaxSpectralAmplitude();
 
-        Link firstLink = circuit.getRoute().getLink(0);
-        List<Integer> available = new ArrayList<Integer>();
-        for (Core core : firstLink.getCores()) {
-            // Parte 39: a core disabled in the network file (network.disabledCores) is also left out of the
-            // rotation, so a 6-core classical run with qabne does not waste attempts on it (C_1Block bias).
-            if (!core.isQkdReserved() && !core.isDisabled()) {
-                available.add(Integer.valueOf(core.getId()));
-            }
-        }
-        Collections.sort(available);
-        this.classicalCoreIds = available;
+		if (numberOfSlots > maxAmplitude) {
+			return null;
+		}
 
-        // Same physical convention used by the original CSBASDM/ABNE.
-        this.centralCoreId = firstLink.getNumberOfCores() == 19 ? 18 : 0;
-        this.rotationIndex = 0;
-    }
+		for (int i = freeSpectrumBands.size() - 1; i >= 0; i--) {
+			int[] band = freeSpectrumBands.get(i);
+
+			if (band[1] - band[0] + 1 >= numberOfSlots) {
+				int[] chosen = band.clone();
+				chosen[0] = chosen[1] - numberOfSlots + 1;
+
+				return chosen;
+			}
+		}
+
+		return null;
+	}
+
+	/** First-fit policy used by ABNE on odd outer cores. */
+	public int[] policyFirstFit(int numberOfSlots,
+			List<int[]> freeSpectrumBands, Circuit circuit) {
+		int maxAmplitude = circuit.getPair().getSource().getTxs()
+				.getMaxSpectralAmplitude();
+
+		if (numberOfSlots > maxAmplitude) {
+			return null;
+		}
+
+		for (int[] band : freeSpectrumBands) {
+			if (band[1] - band[0] + 1 >= numberOfSlots) {
+				int[] chosen = band.clone();
+				chosen[1] = chosen[0] + numberOfSlots - 1;
+
+				return chosen;
+			}
+		}
+
+		return null;
+	}
+
+	public List<Integer> getClassicalCoreIds() {
+		return new ArrayList<Integer>(classicalCoreIds);
+	}
+
+	public int getCentralCoreId() {
+		return centralCoreId;
+	}
+
+	private void ensureCoreLayout(Circuit circuit) {
+		if (classicalCoreIds != null && !classicalCoreIds.isEmpty()) {
+			return;
+		}
+
+		if (circuit == null || circuit.getRoute() == null
+				|| circuit.getRoute().getLinkList().isEmpty()) {
+			throw new IllegalArgumentException(
+					"qABNE requires a circuit with a non-empty route");
+		}
+
+		Link firstLink = circuit.getRoute().getLink(0);
+		List<Integer> available = new ArrayList<Integer>();
+
+		for (Core core : firstLink.getCores()) {
+			// Parte 39: a core disabled in the network file (network.disabledCores) is also left out of the
+			// rotation, so a 6-core classical run with qabne does not waste attempts on it (C_1Block bias).
+			if (!core.isQkdReserved() && !core.isDisabled()) {
+				available.add(Integer.valueOf(core.getId()));
+			}
+		}
+
+		Collections.sort(available);
+		this.classicalCoreIds = available;
+
+		// Same physical convention used by the original CSBASDM/ABNE.
+		this.centralCoreId = firstLink.getNumberOfCores() == 19 ? 18 : 0;
+		this.rotationIndex = 0;
+	}
 }

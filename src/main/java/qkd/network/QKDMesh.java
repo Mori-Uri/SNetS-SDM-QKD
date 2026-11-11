@@ -34,209 +34,241 @@ import util.RandGenerator;
  */
 public class QKDMesh extends Mesh {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private final double protectedRequestProbability;
-    private final QKDKeyDemandPolicy keyDemandPolicy;
-    private transient simulationControl.parsers.TrafficConfig trafficConfigForQkd;
-    private final QKDNetworkParameters qkdNetworkParameters;
-    private final QKDTopologyPlan qkdTopologyPlan;
-    private final QKDPhysicalParameters qkdPhysicalParameters;
-    private final Long trafficRandomSeed;
-    private final long protectionRandomSeed;
-    /** Arrivals of a replication discarded as warm-up in the QKD statistics. */
-    private double qkdWarmupArrivals = 0.0;
-    private final qkd.traffic.QKDArrivalBudget arrivalBudget = new qkd.traffic.QKDArrivalBudget();
+	private final double protectedRequestProbability;
+	private final QKDKeyDemandPolicy keyDemandPolicy;
+	private transient simulationControl.parsers.TrafficConfig trafficConfigForQkd;
+	private final QKDNetworkParameters qkdNetworkParameters;
+	private final QKDTopologyPlan qkdTopologyPlan;
+	private final QKDPhysicalParameters qkdPhysicalParameters;
+	private final Long trafficRandomSeed;
+	private final long protectionRandomSeed;
 
-    public QKDMesh(NetworkConfig networkConfig, TrafficConfig trafficConfig,
-            PhysicalLayerConfig physicalLayerConfig, OthersConfig othersConfig,
-            HashMap<String, HashMap<Double, Double>> modulationDistances,
-            Util util, double protectedRequestProbability) {
-        this(networkConfig, trafficConfig, physicalLayerConfig, othersConfig,
-                modulationDistances, util, protectedRequestProbability,
-                QKDKeyDemandPolicy.referenceDefault(), null, 20241010L);
-    }
+	/** Arrivals of a replication discarded as warm-up in the QKD statistics. */
+	private double qkdWarmupArrivals = 0.0;
+	private final qkd.traffic.QKDArrivalBudget arrivalBudget = new qkd.traffic.QKDArrivalBudget();
 
-    public QKDMesh(NetworkConfig networkConfig, TrafficConfig trafficConfig,
-            PhysicalLayerConfig physicalLayerConfig, OthersConfig othersConfig,
-            HashMap<String, HashMap<Double, Double>> modulationDistances,
-            Util util, double protectedRequestProbability,
-            QKDKeyDemandPolicy keyDemandPolicy) {
-        this(networkConfig, trafficConfig, physicalLayerConfig, othersConfig,
-                modulationDistances, util, protectedRequestProbability,
-                keyDemandPolicy, null, 20241010L);
-    }
+	public QKDMesh(NetworkConfig networkConfig, TrafficConfig trafficConfig,
+			PhysicalLayerConfig physicalLayerConfig, OthersConfig othersConfig,
+			HashMap<String, HashMap<Double, Double>> modulationDistances,
+			Util util, double protectedRequestProbability) {
+		this(networkConfig, trafficConfig, physicalLayerConfig, othersConfig,
+				modulationDistances, util, protectedRequestProbability,
+				QKDKeyDemandPolicy.referenceDefault(), null, 20241010L);
+	}
 
-    public QKDMesh(NetworkConfig networkConfig, TrafficConfig trafficConfig,
-            PhysicalLayerConfig physicalLayerConfig, OthersConfig othersConfig,
-            HashMap<String, HashMap<Double, Double>> modulationDistances,
-            Util util, double protectedRequestProbability,
-            QKDKeyDemandPolicy keyDemandPolicy, Long trafficRandomSeed,
-            long protectionRandomSeed) {
+	public QKDMesh(NetworkConfig networkConfig, TrafficConfig trafficConfig,
+			PhysicalLayerConfig physicalLayerConfig, OthersConfig othersConfig,
+			HashMap<String, HashMap<Double, Double>> modulationDistances,
+			Util util, double protectedRequestProbability,
+			QKDKeyDemandPolicy keyDemandPolicy) {
+		this(networkConfig, trafficConfig, physicalLayerConfig, othersConfig,
+				modulationDistances, util, protectedRequestProbability,
+				keyDemandPolicy, null, 20241010L);
+	}
 
-        super(networkConfig, trafficConfig, physicalLayerConfig, othersConfig,
-                modulationDistances, util, trafficRandomSeed);
+	public QKDMesh(NetworkConfig networkConfig, TrafficConfig trafficConfig,
+			PhysicalLayerConfig physicalLayerConfig, OthersConfig othersConfig,
+			HashMap<String, HashMap<Double, Double>> modulationDistances,
+			Util util, double protectedRequestProbability,
+			QKDKeyDemandPolicy keyDemandPolicy, Long trafficRandomSeed,
+			long protectionRandomSeed) {
 
-        validateProbability(protectedRequestProbability);
-        if (keyDemandPolicy == null) {
-            throw new IllegalArgumentException("keyDemandPolicy cannot be null");
-        }
+		super(networkConfig, trafficConfig, physicalLayerConfig, othersConfig,
+				modulationDistances, util, trafficRandomSeed);
 
-        this.protectedRequestProbability = protectedRequestProbability;
-        this.keyDemandPolicy = keyDemandPolicy;
-        this.trafficConfigForQkd = trafficConfig;
-        this.trafficRandomSeed = trafficRandomSeed;
-        this.protectionRandomSeed = protectionRandomSeed;
-        this.qkdNetworkParameters = QKDNetworkParameters.from(networkConfig);
-        this.qkdTopologyPlan = new QKDTopologyPlanner().plan(networkConfig);
-        this.qkdPhysicalParameters = buildQkdPhysicalParameters(physicalLayerConfig);
+		validateProbability(protectedRequestProbability);
 
-        if (!qkdNetworkParameters.isEnabled() || !qkdTopologyPlan.isEnabled()) {
-            throw new IllegalArgumentException(
-                    "QKDMesh requires network.qkd.enabled=true");
-        }
+		if (keyDemandPolicy == null) {
+			throw new IllegalArgumentException("keyDemandPolicy cannot be null");
+		}
 
-        installQkdRequestGenerators();
-    }
+		this.protectedRequestProbability = protectedRequestProbability;
+		this.keyDemandPolicy = keyDemandPolicy;
+		this.trafficConfigForQkd = trafficConfig;
+		this.trafficRandomSeed = trafficRandomSeed;
+		this.protectionRandomSeed = protectionRandomSeed;
+		this.qkdNetworkParameters = QKDNetworkParameters.from(networkConfig);
+		this.qkdTopologyPlan = new QKDTopologyPlanner().plan(networkConfig);
+		this.qkdPhysicalParameters = buildQkdPhysicalParameters(physicalLayerConfig);
 
-    private void installQkdRequestGenerators() {
-        /*
+		if (!qkdNetworkParameters.isEnabled() || !qkdTopologyPlan.isEnabled()) {
+			throw new IllegalArgumentException(
+					"QKDMesh requires network.qkd.enabled=true");
+		}
+
+		installQkdRequestGenerators();
+	}
+
+	private void installQkdRequestGenerators() {
+		/*
          * The original Mesh uses one shared RandGenerator for all traffic
          * generators. We keep the same pattern here, but use a QKD-aware
          * generator class only when QKD is enabled.
          */
-        RandGenerator timingRandom = trafficRandomSeed == null
-                ? new RandGenerator() : new RandGenerator(trafficRandomSeed.longValue());
-        RandGenerator protectionRandom = new RandGenerator(protectionRandomSeed);
+		RandGenerator timingRandom = trafficRandomSeed == null
+				? new RandGenerator() : new RandGenerator(trafficRandomSeed.longValue());
+		RandGenerator protectionRandom = new RandGenerator(protectionRandomSeed);
 
-        /* Part 23: per-generator QKD fields of the traffic file, in file order per pair. */
-        java.util.Map<String, List<simulationControl.parsers.TrafficConfig.RequestGeneratorConfig>> byPair =
-                new java.util.HashMap<String, List<simulationControl.parsers.TrafficConfig.RequestGeneratorConfig>>();
-        if (trafficConfigForQkd != null && trafficConfigForQkd.getRequestGenerators() != null) {
-            for (simulationControl.parsers.TrafficConfig.RequestGeneratorConfig rgc : trafficConfigForQkd.getRequestGenerators()) {
-                String k = rgc.getSource() + "|" + rgc.getDestination();
-                if (!byPair.containsKey(k)) byPair.put(k, new java.util.ArrayList<simulationControl.parsers.TrafficConfig.RequestGeneratorConfig>());
-                byPair.get(k).add(rgc);
-            }
-        }
+		/* Part 23: per-generator QKD fields of the traffic file, in file order per pair. */
+		java.util.Map<String, List<simulationControl.parsers.TrafficConfig.RequestGeneratorConfig>> byPair =
+				new java.util.HashMap<String, List<simulationControl.parsers.TrafficConfig.RequestGeneratorConfig>>();
 
-        for (Pair pair : getPairList()) {
-            List<RequestGenerator> generators = pair.getRequestGenerators();
-            List<simulationControl.parsers.TrafficConfig.RequestGeneratorConfig> cfgs =
-                    byPair.get(pair.getSource().getName() + "|" + pair.getDestination().getName());
+		if (trafficConfigForQkd != null && trafficConfigForQkd.getRequestGenerators() != null) {
+			for (simulationControl.parsers.TrafficConfig.RequestGeneratorConfig rgc : trafficConfigForQkd.getRequestGenerators()) {
+				String k = rgc.getSource() + "|" + rgc.getDestination();
 
-            for (int i = 0; i < generators.size(); i++) {
-                RequestGenerator original = generators.get(i);
-                simulationControl.parsers.TrafficConfig.RequestGeneratorConfig cfg =
-                        cfgs != null && i < cfgs.size() ? cfgs.get(i) : null;
-                double probability = cfg != null && cfg.getQkdProtectedProbability() != null
-                        ? cfg.getQkdProtectedProbability().doubleValue() : protectedRequestProbability;
-                validateProbability(probability);
+				if (!byPair.containsKey(k)) byPair.put(k, new java.util.ArrayList<simulationControl.parsers.TrafficConfig.RequestGeneratorConfig>());
+				byPair.get(k).add(rgc);
+			}
+		}
 
-                QKDRequestGenerator qkdGenerator = new QKDRequestGenerator(
-                        pair,
-                        original.getBandwidth(),
-                        original.getHoldRate(),
-                        original.getArrivedRate(),
-                        original.getIncLoad(),
-                        timingRandom,
-                        protectionRandom,
-                        probability,
-                        keyDemandPolicy);
+		for (Pair pair : getPairList()) {
+			List<RequestGenerator> generators = pair.getRequestGenerators();
+			List<simulationControl.parsers.TrafficConfig.RequestGeneratorConfig> cfgs =
+					byPair.get(pair.getSource().getName() + "|" + pair.getDestination().getName());
 
-                if (cfg != null) qkdGenerator.setFixedKeyRateMbps(cfg.getKeyRateMbps());
-                qkdGenerator.setArrivalBudget(arrivalBudget);
-                generators.set(i, qkdGenerator);
-            }
-        }
+			for (int i = 0; i < generators.size(); i++) {
+				RequestGenerator original = generators.get(i);
+				simulationControl.parsers.TrafficConfig.RequestGeneratorConfig cfg =
+						cfgs != null && i < cfgs.size() ? cfgs.get(i) : null;
+				double probability = cfg != null && cfg.getQkdProtectedProbability() != null
+						? cfg.getQkdProtectedProbability().doubleValue() : protectedRequestProbability;
+				validateProbability(probability);
 
-        // Part 34: key demand that follows the classical bit rate (simulation.qkdKeyDemand.mode = "byBitRate")
-        if (keyDemandPolicy.isByBitRateRequested()) {
-            List<Double> rates = new java.util.ArrayList<Double>();
-            for (Pair pair : getPairList()) for (RequestGenerator g : pair.getRequestGenerators()) rates.add(g.getBandwidth());
-            keyDemandPolicy.configureByBitRate(rates, keyDemandPolicy.getByBitRateExplicit());
-        }
-    }
+				QKDRequestGenerator qkdGenerator = new QKDRequestGenerator(
+						pair,
+						original.getBandwidth(),
+						original.getHoldRate(),
+						original.getArrivedRate(),
+						original.getIncLoad(),
+						timingRandom,
+						protectionRandom,
+						probability,
+						keyDemandPolicy);
 
-    public double getProtectedRequestProbability() {
-        return protectedRequestProbability;
-    }
+				if (cfg != null) {
+					if (keyDemandPolicy.isPreferGeneratorFixedRate())
+						qkdGenerator.setFixedKeyRateMbps(cfg.getKeyRateMbps());
+					if (cfg.getQkdOnlyProbability() != null)
+						qkdGenerator.setQkdOnlyProbability(cfg.getQkdOnlyProbability().doubleValue());
+				}
+				qkdGenerator.setArrivalBudget(arrivalBudget);
+				generators.set(i, qkdGenerator);
+			}
+		}
 
-    public QKDKeyDemandPolicy getQkdKeyDemandPolicy() {
-        return keyDemandPolicy;
-    }
+		// Part 34: key demand that follows the classical bit rate (simulation.qkdKeyDemand.mode = "byBitRate")
+		if (keyDemandPolicy.isByBitRateRequested()) {
+			List<Double> rates = new java.util.ArrayList<Double>();
 
-    public QKDNetworkParameters getQkdNetworkParameters() {
-        return qkdNetworkParameters;
-    }
+			for (Pair pair : getPairList()) for (RequestGenerator g : pair.getRequestGenerators()) rates.add(g.getBandwidth());
+			keyDemandPolicy.configureByBitRate(rates, keyDemandPolicy.getByBitRateExplicit());
+		}
+	}
 
-    public QKDTopologyPlan getQkdTopologyPlan() {
-        return qkdTopologyPlan;
-    }
+	public double getProtectedRequestProbability() {
+		return protectedRequestProbability;
+	}
 
-    /**
+	public QKDKeyDemandPolicy getQkdKeyDemandPolicy() {
+		return keyDemandPolicy;
+	}
+
+	public QKDNetworkParameters getQkdNetworkParameters() {
+		return qkdNetworkParameters;
+	}
+
+	public QKDTopologyPlan getQkdTopologyPlan() {
+		return qkdTopologyPlan;
+	}
+
+	/**
      * QKD physical parameters after applying the explicit receiver assumptions
      * from the physical-layer scenario file.
      */
-    public QKDPhysicalParameters getQkdPhysicalParameters() {
-        return qkdPhysicalParameters;
-    }
+	public QKDPhysicalParameters getQkdPhysicalParameters() {
+		return qkdPhysicalParameters;
+	}
 
-    private static QKDPhysicalParameters buildQkdPhysicalParameters(
-            PhysicalLayerConfig physicalLayerConfig) {
-        if (physicalLayerConfig == null) {
-            throw new IllegalArgumentException(
-                    "physicalLayerConfig cannot be null for QKDMesh");
-        }
+	private QKDPhysicalParameters buildQkdPhysicalParameters(
+			PhysicalLayerConfig physicalLayerConfig) {
+		if (physicalLayerConfig == null) {
+			throw new IllegalArgumentException(
+					"physicalLayerConfig cannot be null for QKDMesh");
+		}
 
-        // Part 26: the qkdPhysicalLayer case file wins; older cases keep the
-        // qkdPhysical/qkdReceiver blocks inside physicalLayer.
-        qkd.physical.QKDPhysicalLayerConfig cfg = physicalLayerConfig.getQkdPhysicalLayer();
-        if (cfg == null) {
-            cfg = qkd.physical.QKDPhysicalLayerConfig.fromLegacy(
-                    physicalLayerConfig.getQkdPhysical(), physicalLayerConfig.getQkdReceiver());
-        }
-        return cfg.toParameters();
-    }
+		// Part 26: the qkdPhysicalLayer case file wins; older cases keep the
+		// qkdPhysical/qkdReceiver blocks inside physicalLayer.
+		qkd.physical.QKDPhysicalLayerConfig cfg = physicalLayerConfig.getQkdPhysicalLayer();
 
-    /** Limits the arrivals of this replication to exactly {@code limit} (negative = off). */
-    public void setExactArrivalLimit(int limit) {
-        arrivalBudget.setLimit(limit);
-    }
+		if (cfg == null) {
+			cfg = qkd.physical.QKDPhysicalLayerConfig.fromLegacy(
+					physicalLayerConfig.getQkdPhysical(), physicalLayerConfig.getQkdReceiver());
+		}
 
-    public qkd.traffic.QKDArrivalBudget getArrivalBudget() {
-        return arrivalBudget;
-    }
+		QKDPhysicalParameters params = cfg.toParameters();
+		qkd.multiband.MultiBandSettings mb = params.getMultiband();
+		if (mb != null) {
+			final network.Core classical = getLinkList().firstElement().getCore(mb.getHostCoreId());
+			if (classical == null) throw new IllegalArgumentException("QKD classical host core missing");
+			final int slots = classical.getNumOfSlots();
+			final double width = classical.getSlotSpectrumBand();
+			for (network.Link link : getLinkList()) {
+				final network.Core core = link.getCore(mb.getHostCoreId());
+				if (core == null || core.getNumOfSlots() != slots || core.getSlotSpectrumBand() != width)
+					throw new IllegalArgumentException("Classical frequency grid differs across directed links");
+			}
+			final double lower = network.AbsoluteFrequencyGrid.lowerEdgeHz(
+					physicalLayerConfig.getCenterFrequency(), slots, width);
+			// Legacy classicalBandStartThz in the QKD file no longer overrides the DCh/PICh slot origin.
+			params = params.withMultiband(mb.withClassicalBandStartHz(lower));
+		}
+		return params;
+	}
 
-    public double getQkdWarmupArrivals() {
-        return qkdWarmupArrivals;
-    }
+	/** Limits the arrivals of this replication to exactly {@code limit} (negative = off). */
+	public void setExactArrivalLimit(int limit) {
+		arrivalBudget.setLimit(limit);
+	}
 
-    public void setQkdWarmupArrivals(double qkdWarmupArrivals) {
-        if (!Double.isFinite(qkdWarmupArrivals) || qkdWarmupArrivals < 0.0) {
-            throw new IllegalArgumentException("qkdWarmupArrivals must be >= 0");
-        }
-        this.qkdWarmupArrivals = qkdWarmupArrivals;
-    }
+	public qkd.traffic.QKDArrivalBudget getArrivalBudget() {
+		return arrivalBudget;
+	}
 
-    public int getQkdRequestGeneratorCount() {
-        int count = 0;
-        for (Pair pair : getPairList()) {
-            for (RequestGenerator generator : pair.getRequestGenerators()) {
-                if (generator instanceof QKDRequestGenerator) {
-                    count++;
-                }
-            }
-        }
-        return count;
-    }
+	public double getQkdWarmupArrivals() {
+		return qkdWarmupArrivals;
+	}
 
-    private static void validateProbability(double probability) {
-        if (!Double.isFinite(probability)
-                || probability < 0.0
-                || probability > 1.0) {
-            throw new IllegalArgumentException(
-                    "protectedRequestProbability must be in [0,1]");
-        }
-    }
+	public void setQkdWarmupArrivals(double qkdWarmupArrivals) {
+		if (!Double.isFinite(qkdWarmupArrivals) || qkdWarmupArrivals < 0.0) {
+			throw new IllegalArgumentException("qkdWarmupArrivals must be >= 0");
+		}
+
+		this.qkdWarmupArrivals = qkdWarmupArrivals;
+	}
+
+	public int getQkdRequestGeneratorCount() {
+		int count = 0;
+
+		for (Pair pair : getPairList()) {
+			for (RequestGenerator generator : pair.getRequestGenerators()) {
+				if (generator instanceof QKDRequestGenerator) {
+					count++;
+				}
+			}
+		}
+
+		return count;
+	}
+
+	private static void validateProbability(double probability) {
+		if (!Double.isFinite(probability)
+				|| probability < 0.0
+				|| probability > 1.0) {
+			throw new IllegalArgumentException(
+					"protectedRequestProbability must be in [0,1]");
+		}
+	}
 }

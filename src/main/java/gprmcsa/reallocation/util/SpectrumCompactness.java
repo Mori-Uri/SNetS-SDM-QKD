@@ -19,7 +19,6 @@ public class SpectrumCompactness implements Serializable {
 	private int amountOfFreeFragments; // number of free-slot fragments (blocks)
 	private double sc; // resultado do calculo do spectrum compactness
 
-
 	/**
 	 * Creates a new instance of SpectrumCompactness.
 	 */
@@ -42,6 +41,7 @@ public class SpectrumCompactness implements Serializable {
 		if (!isCoreOccupied(c)) {
 			return -1;
 		}
+
 		// to be safe, reset all variables
 
 		resetAttributes();
@@ -62,23 +62,22 @@ public class SpectrumCompactness implements Serializable {
 
 		// lowest occupied slot index
 		int indexSlotMinFree = c.getSpectrum().getFreeSpectrumBands().get(0)[0];
+
 		if (indexSlotMinFree == 1) {
 			this.indexSlotMinOcup = c.getSpectrum().getFreeSpectrumBands().get(0)[1] + 1;
 		}else {
 			this.indexSlotMinOcup = 1;
 		}
 
-
 		// highest occupied slot index
 		int sizeList = c.getSpectrum().getFreeSpectrumBands().size();
 		int indexSlotMaxFree = c.getSpectrum().getFreeSpectrumBands().get(sizeList-1)[1];
+
 		if (indexSlotMaxFree == c.getNumOfSlots()) {
 			this.indexSlotMaxOcup = c.getSpectrum().getFreeSpectrumBands().get(sizeList-1)[0] - 1;
 		}else {
 			this.indexSlotMaxOcup = c.getNumOfSlots();
 		}
-
-
 
 		sc = ((indexSlotMaxOcup - indexSlotMinOcup +1)/amountSlotsOcup)*(amountSlotsFree/amountOfFreeFragments);
 
@@ -111,6 +110,5 @@ public class SpectrumCompactness implements Serializable {
 		return false;
 
 	}
-
 
 }

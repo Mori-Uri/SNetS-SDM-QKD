@@ -71,9 +71,9 @@ public class TranslucentControlPlane extends ControlPlane {
      * @param rfc RequestForConnection
      * @return Circuit
      */
-    public Circuit createNewCircuit(RequestForConnection rfc){
+	public Circuit createNewCircuit(RequestForConnection rfc){
 
-    	Circuit circuit = new TranslucentCircuit();
+		Circuit circuit = new TranslucentCircuit();
 		circuit.setPair(rfc.getPair());
 		circuit.addRequest(rfc);
 		ArrayList<Circuit> circs = new ArrayList<>();
@@ -81,15 +81,15 @@ public class TranslucentControlPlane extends ControlPlane {
 		rfc.setCircuit(circs);
 
 		return circuit;
-    }
+	}
 
-    /**
+	/**
      * Method that allocate the regenerators used by a circuit
      *
      * @param circuit TranslucentCircuit
      */
-    public void allocateRegenerators(TranslucentCircuit circuit){
-    	// Verifies that the list of regenerators is not empty
+	public void allocateRegenerators(TranslucentCircuit circuit){
+		// Verifies that the list of regenerators is not empty
 		if(circuit.getRegeneratorsNodesIndexList() != null && circuit.getRegeneratorsNodesIndexList().size() > 0){
 
 			// Releases regenerators
@@ -101,7 +101,7 @@ public class TranslucentControlPlane extends ControlPlane {
 				}
 			}
 		}
-    }
+	}
 
 	/**
 	 * Method that releases the regenerators used by a circuit.
@@ -135,15 +135,17 @@ public class TranslucentControlPlane extends ControlPlane {
      */
 	@Override
 	public boolean computeQualityOfTransmission(Circuit circuit, Circuit circuitTemp, boolean addCircuitTemp){
-    	boolean minQoT = true;
+		boolean minQoT = true;
 		int sourceNodeIndex = 0;
-		double minSNRdB = Double.MAX_VALUE;
+		double minOOSNRdB = Double.MAX_VALUE;
 		Route route = circuit.getRoute();
 
 		int mumberTransparentSegments = ((TranslucentCircuit)circuit).getRegeneratorsNodesIndexList().size() + 1;
+
 		for(int i = 0; i < mumberTransparentSegments; i++){
 
 			int destinationNodeIndex = route.getNodeList().size() - 1;
+
 			if(i < mumberTransparentSegments - 1){
 				destinationNodeIndex = ((TranslucentCircuit)circuit).getRegeneratorsNodesIndexList().get(i);
 			}
@@ -156,27 +158,31 @@ public class TranslucentControlPlane extends ControlPlane {
 			int core = circuit.getIndexCoreByLink(link);
 			int sa[] = circuit.getSpectrumAssignedByLink(link);
 
-			double SNR = getMesh().getPhysicalLayer().computeSNRSegment(circuit, route, sourceNodeIndex, destinationNodeIndex, mod, core, sa, circuitTemp, addCircuitTemp);
-			double SNRdB = PhysicalLayer.ratioForDB(SNR);
+			double OSNR = getMesh().getPhysicalLayer().computeOSNRSegment(circuit, route, sourceNodeIndex, destinationNodeIndex, mod, core, sa, circuitTemp, addCircuitTemp);
+			double OSNRdB = PhysicalLayer.ratioForDB(OSNR);
 
-			boolean QoT = getMesh().getPhysicalLayer().isAdmissible(mod, SNR);
+			boolean QoT = getMesh().getPhysicalLayer().isAdmissible(mod, OSNR);
+
 			if(!QoT){
 				minQoT = false;
-				if(SNRdB < minSNRdB)
-				    minSNRdB = SNRdB;
+
+				if(OSNRdB < minOOSNRdB)
+					minOOSNRdB = OSNRdB;
 			}
-			circuit.setSNR(SNRdB);
+
+			circuit.setOSNR(OSNRdB);
 			circuit.setQoT(QoT);
 
 			sourceNodeIndex = destinationNodeIndex;
 		}
 
 		if(!minQoT){
-			circuit.setSNR(minSNRdB);
+			circuit.setOSNR(minOOSNRdB);
 			circuit.setQoT(minQoT);
 		}
+
 		return minQoT;
-    }
+	}
 
 	/**
      * This method is called after executing RMLSA algorithms to allocate resources in the network
@@ -184,21 +190,21 @@ public class TranslucentControlPlane extends ControlPlane {
      * @param circuit Circuit
      */
 	@Override
-    public void allocateCircuit(Circuit circuit) throws Exception {
-        Route route = circuit.getRoute();
-        List<Link> links = new ArrayList<>(route.getLinkList());
+	public void allocateCircuit(Circuit circuit) throws Exception {
+		Route route = circuit.getRoute();
+		List<Link> links = new ArrayList<>(route.getLinkList());
 
-        allocateSpectrum(circuit, links, circuit.getGuardBand());
+		allocateSpectrum(circuit, links, circuit.getGuardBand());
 
-        // Allocates transmitter and receiver
-        circuit.getSource().getTxs().allocatesTransmitters();
-        circuit.getDestination().getRxs().allocatesReceivers();
+		// Allocates transmitter and receiver
+		circuit.getSource().getTxs().allocatesTransmitters();
+		circuit.getDestination().getRxs().allocatesReceivers();
 
-        addConnection(circuit);
+		addConnection(circuit);
 
-        // Allocates regenerators
-        allocateRegenerators((TranslucentCircuit)circuit);
-    }
+		// Allocates regenerators
+		allocateRegenerators((TranslucentCircuit)circuit);
+	}
 
 	/**
      * This method allocates the spectrum band selected for the circuit in the route links
@@ -207,13 +213,13 @@ public class TranslucentControlPlane extends ControlPlane {
      * @param links List<Link>
      */
 	protected void allocateSpectrum(Circuit circuit, List<Link> links, int guardBand) throws Exception {
-        for (int i = 0; i < links.size(); i++) {
-            Link link = links.get(i);
-            int[] band = circuit.getSpectrumAssignedByLink(link);
+		for (int i = 0; i < links.size(); i++) {
+			Link link = links.get(i);
+			int[] band = circuit.getSpectrumAssignedByLink(link);
 
-            link.getCore(circuit.getIndexCore()).useSpectrum(band, guardBand);
-        }
-    }
+			link.getCore(circuit.getIndexCore()).useSpectrum(band, guardBand);
+		}
+	}
 
 	/**
      * Releases the resources being used by a given circuit
@@ -221,35 +227,35 @@ public class TranslucentControlPlane extends ControlPlane {
      * @param circuit
      */
 	@Override
-    public void releaseCircuit(Circuit circuit) throws Exception {
-        Route route = circuit.getRoute();
+	public void releaseCircuit(Circuit circuit) throws Exception {
+		Route route = circuit.getRoute();
 
-        releaseSpectrum(circuit, route.getLinkList(), circuit.getGuardBand());
+		releaseSpectrum(circuit, route.getLinkList(), circuit.getGuardBand());
 
-        // Release transmitter and receiver
-        circuit.getSource().getTxs().releasesTransmitters();
-        circuit.getDestination().getRxs().releasesReceivers();
+		// Release transmitter and receiver
+		circuit.getSource().getTxs().releasesTransmitters();
+		circuit.getDestination().getRxs().releasesReceivers();
 
-        removeConnection(circuit);
+		removeConnection(circuit);
 
-        // Release regenerators
-        releasesRegenerators((TranslucentCircuit)circuit);
-    }
+		// Release regenerators
+		releasesRegenerators((TranslucentCircuit)circuit);
+	}
 
-    /**
+	/**
      * This method releases the allocated spectrum for the circuit
      *
      * @param circuit Circuit
      * @param links List<Link>
      */
 	protected void releaseSpectrum(Circuit circuit, List<Link> links, int guardBand) throws Exception {
-    	for (int i = 0; i < links.size(); i++) {
-            Link link = links.get(i);
-            int band[] = circuit.getSpectrumAssignedByLink(link);
+		for (int i = 0; i < links.size(); i++) {
+			Link link = links.get(i);
+			int band[] = circuit.getSpectrumAssignedByLink(link);
 
-            link.getCore(circuit.getIndexCore()).liberateSpectrum(band, guardBand);
-        }
-    }
+			link.getCore(circuit.getIndexCore()).liberateSpectrum(band, guardBand);
+		}
+	}
 
 	/**
      * This method tries to answer a given request by allocating the necessary resources to the same one
@@ -257,29 +263,29 @@ public class TranslucentControlPlane extends ControlPlane {
      * @param circuit Circuit
      * @return boolean
      */
-    protected boolean tryEstablishNewCircuit(Circuit circuit) {
+	protected boolean tryEstablishNewCircuit(Circuit circuit) {
 
-        switch (this.rsaType) {
-            case GPRMCSA.RMCSA_INTEGRATED:
-                return integrated.rsa(circuit, this);
+		switch (this.rsaType) {
+			case GPRMCSA.RMCSA_INTEGRATED:
+				return integrated.rsa(circuit, this);
 
-            case GPRMCSA.RMCSA_SEQUENCIAL:
-                if (routing.findRoute(circuit, this.getMesh())) {
-                	return regeneratorAssignment.assignRegenerator((TranslucentCircuit)circuit, this);
-                }
-        }
+			case GPRMCSA.RMCSA_SEQUENCIAL:
+				if (routing.findRoute(circuit, this.getMesh())) {
+					return regeneratorAssignment.assignRegenerator((TranslucentCircuit)circuit, this);
+				}
+		}
 
-        return false;
-    }
+		return false;
+	}
 
-    /**
+	/**
      * This method selects how modulation format selection and spectrum allocation will be applied.
      *
      * @param circuit TranslucentCircuit
      * @return boolean - True, if you could define the modulation format and put the spectrum, or false, otherwise
      */
-    public boolean strategySelection(TranslucentCircuit circuit){
-    	// Releases the regenerators allocated so that they can be later allocated to the other network resources
+	public boolean strategySelection(TranslucentCircuit circuit){
+		// Releases the regenerators allocated so that they can be later allocated to the other network resources
 		releasesRegenerators(circuit);
 
 		if(circuit.getRegeneratorsNodesIndexList().size() == 0){
@@ -288,9 +294,9 @@ public class TranslucentControlPlane extends ControlPlane {
 		} else {
 			return withRegenerator(circuit, circuit.getRoute(), circuit.getRegeneratorsNodesIndexList());
 		}
-    }
+	}
 
-    /**
+	/**
 	 * This method attempts to define the modulation format and the spectrum to be allocated in each link of the route selected for the circuit
 	 *
 	 * @param circuit - Circuit
@@ -304,18 +310,22 @@ public class TranslucentControlPlane extends ControlPlane {
 		if(mod != null){
 			HashMap<Link, Modulation> modulationByLink = new HashMap<Link, Modulation>();
 			Vector<Link> linkList = route.getLinkList();
+
 			for(int l = 0; l < linkList.size(); l++){
 				modulationByLink.put(linkList.get(l), mod);
 			}
+
 			circuit.setModulationByLink(modulationByLink);
 
 			if(coreAndSpectrumAssignment.assignCoreAndSpectrum(mod.requiredSlots(circuit.getRequiredBitRate()), circuit, this)){
 				int sa[] = circuit.getSpectrumAssigned();
 
 				HashMap<Link, int[]> spectrumAssignedByLink = new HashMap<Link, int[]>();
+
 				for(int l = 0; l < linkList.size(); l++){
 					spectrumAssignedByLink.put(linkList.get(l), sa);
 				}
+
 				circuit.setSpectrumAssignedByLink(spectrumAssignedByLink);;
 
 				return true;
@@ -340,9 +350,11 @@ public class TranslucentControlPlane extends ControlPlane {
 
 		int sourceNodeIndex = 0;
 		int numberTransparentSegments = regeneratorsNodesIndexList.size() + 1;
+
 		for(int i = 0; i < numberTransparentSegments; i++){
 
 			int destinationNodeIndex = route.getNodeList().size() - 1;
+
 			if(i < numberTransparentSegments - 1){
 				destinationNodeIndex = regeneratorsNodesIndexList.get(i);
 			}
@@ -437,8 +449,8 @@ public class TranslucentControlPlane extends ControlPlane {
 			int numberOfSlots = mod.requiredSlots(circuit.getRequiredBitRate());
 
 			coreAndSpectrumAssignment.assignCoreAndSpectrum(numberOfSlots, circuit, this);
-            int core = circuit.getIndexCore();
-            int band[] = circuit.getSpectrumAssigned();
+			int core = circuit.getIndexCore();
+			int band[] = circuit.getSpectrumAssigned();
 
 			if(band != null){
 				if(alternativeMod == null){
@@ -447,6 +459,7 @@ public class TranslucentControlPlane extends ControlPlane {
 				}
 
 				boolean flag = mesh.getPhysicalLayer().isAdmissibleModultionBySegment(circuit, route, sourceNodeIndex, destinationNodeIndex, mod, core, band, null, false);
+
 				if(flag){
 					chosenMod = mod; // Save the modulation that has admissible QoT
 					chosenBand = band;
@@ -489,9 +502,11 @@ public class TranslucentControlPlane extends ControlPlane {
 		Route route = circuit.getRoute();
 
 		int numberOfTransparentSegments = ((TranslucentCircuit)circuit).getRegeneratorsNodesIndexList().size() + 1;
+
 		for(int i = 0; i < numberOfTransparentSegments; i++){
 
 			int destinationNodeIndex = route.getNodeList().size() - 1;
+
 			if(i < numberOfTransparentSegments - 1){
 				destinationNodeIndex = ((TranslucentCircuit)circuit).getRegeneratorsNodesIndexList().get(i);
 			}
@@ -536,6 +551,7 @@ public class TranslucentControlPlane extends ControlPlane {
 			for (int i = 0; i < mumberTransparentSegments; i++) {
 
 				int destinationNodeIndex = route.getNodeList().size() - 1;
+
 				if (i < mumberTransparentSegments - 1) {
 					destinationNodeIndex = ((TranslucentCircuit) circuit).getRegeneratorsNodesIndexList().get(i);
 				}
@@ -581,6 +597,7 @@ public class TranslucentControlPlane extends ControlPlane {
 		for (int i = 0; i < mumberTransparentSegments; i++) {
 
 			int destinationNodeIndex = route.getNodeList().size() - 1;
+
 			if (i < mumberTransparentSegments - 1) {
 				destinationNodeIndex = ((TranslucentCircuit) circuit).getRegeneratorsNodesIndexList().get(i);
 			}
@@ -590,6 +607,7 @@ public class TranslucentControlPlane extends ControlPlane {
 			Link link = sourceNode.getOxc().linkTo(destinationNode.getOxc());
 
 			List<int[]> merge = link.getCore(circuit.getIndexCore()).getFreeSpectrumBands(circuit.getGuardBand());
+
 			for (int n = sourceNodeIndex; n < destinationNodeIndex; n++) {
 				sourceNode = route.getNode(n);
 				destinationNode = route.getNode(n + 1);
@@ -599,16 +617,19 @@ public class TranslucentControlPlane extends ControlPlane {
 			}
 
 			int totalFree = 0;
+
 			for (int[] band : merge) {
 				totalFree += (band[1] - band[0] + 1);
 			}
 
 			Modulation mod = circuit.getModulationByLink(link);
+
 			if (mod == null) {
 				mod = getMesh().getAvaliableModulations().get(0);
 			}
 
 			int numSlotsRequired = mod.requiredSlots(circuit.getRequiredBitRate());
+
 			if (totalFree > numSlotsRequired) {
 				return true;
 			}
@@ -616,7 +637,7 @@ public class TranslucentControlPlane extends ControlPlane {
 			sourceNodeIndex = destinationNodeIndex;
 		}
 
-        return false;
+		return false;
 	}
 
 	/**
@@ -630,6 +651,7 @@ public class TranslucentControlPlane extends ControlPlane {
 		List<Modulation> modList = new ArrayList<>();
 
 		HashMap<Link, Modulation> modLink = ((TranslucentCircuit)circuit).getModulationByLink();
+
 		for(Link link : modLink.keySet()){
 			modList.add(((TranslucentCircuit)circuit).getModulationByLink(link));
 		}

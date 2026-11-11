@@ -59,13 +59,13 @@ public class XtAwareGreedyAlgorithm implements CoreAndSpectrumAssignmentAlgorith
 
 		circuit.setSpectrumAssigned(policy(numberOfSlots, null, circuit, cp));
 
-        circuit.setIndexCore(circuitBestCandidate.getIndexCore());
+		circuit.setIndexCore(circuitBestCandidate.getIndexCore());
 
-        if (circuit.getSpectrumAssigned() == null) {
- 	       return false;
- 		}
+		if (circuit.getSpectrumAssigned() == null) {
+		   return false;
+		}
 
-        return true;
+		return true;
 	}
 
 	/**
@@ -76,6 +76,7 @@ public class XtAwareGreedyAlgorithm implements CoreAndSpectrumAssignmentAlgorith
 	public int coreAssignment() {
 		int temp = this.coreOfTheTime;
 		this.coreOfTheTime++;
+
 		return temp;
 	}
 
@@ -96,55 +97,60 @@ public class XtAwareGreedyAlgorithm implements CoreAndSpectrumAssignmentAlgorith
 			List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), coreOfTheTime);
 
 			int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-	        if(numberOfSlots> maxAmplitude) return null;
+
+			if(numberOfSlots> maxAmplitude) return null;
 
 			for (int[] band : composition) {
 
 				for (int i = band[0]; i <= band[1]; i++) {
 					int chosen[] = null;
-		            if (band[1] - i + 1 >= numberOfSlots) {
-		                chosen = band.clone();
-		                chosen[0] = i;
-		                chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
 
-		                //circuitCandidate = circuit;
+					if (band[1] - i + 1 >= numberOfSlots) {
+						chosen = band.clone();
+						chosen[0] = i;
+						chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
 
-		                circuitCandidate.setPair(circuit.getPair());
-		                circuitCandidate.setRequests(circuit.getRequests());
-		                circuitCandidate.setRoute(circuit.getRoute());
-		        		circuitCandidate.setModulation(circuit.getModulation());
-		        		circuitCandidate.setGuardBand(circuit.getGuardBand());
+						//circuitCandidate = circuit;
 
-		                circuitCandidate.setSpectrumAssigned(chosen);
-		                circuitCandidate.setIndexCore(coreOfTheTime);
-		                circuitCandidate.setXt(cp.getMesh().getPhysicalLayer().getCrosstalk().calculateCrosstalk(circuitCandidate, null, false));
+						circuitCandidate.setPair(circuit.getPair());
+						circuitCandidate.setRequests(circuit.getRequests());
+						circuitCandidate.setRoute(circuit.getRoute());
+						circuitCandidate.setModulation(circuit.getModulation());
+						circuitCandidate.setGuardBand(circuit.getGuardBand());
 
-		                circuitCandidate.setQoT(true);
-		                circuitCandidate.setQoTForOther(true);
-		                circuitCandidate.setSNR(PhysicalLayer.maxOSNR);
+						circuitCandidate.setSpectrumAssigned(chosen);
+						circuitCandidate.setIndexCore(coreOfTheTime);
+						circuitCandidate.setXt(cp.getMesh().getPhysicalLayer().getCrosstalk().calculateCrosstalk(circuitCandidate, null, false));
 
-		                if(isAdmissibleQualityOfTransmission(circuitCandidate, cp.getMesh())) { //QOTN QOTO
-			                if (circuitCandidate.getXt() != Crosstalk.lowestXT) {
-			                	if(circuitCandidate.getXt() <= circuitCandidate.getModulation().getXTthreshold()) {//XTN
-			                		if(cp.getMesh().getPhysicalLayer().getCrosstalk().isAdmissibleInOthers(circuitCandidate)) {
+						circuitCandidate.setQoT(true);
+						circuitCandidate.setQoTForOther(true);
+						circuitCandidate.setOSNR(PhysicalLayer.maxOSNR);
 
-			                			deltaXtCandidate = circuitCandidate.getModulation().getXTthreshold() - circuitCandidate.getXt();
-			                			if(deltaXtCandidate > deltaXtBestCandidate) {
-			                				circuitBestCandidate.setSpectrumAssigned(circuitCandidate.getSpectrumAssigned());
-			                				circuitBestCandidate.setIndexCore(coreOfTheTime);
-			                				deltaXtBestCandidate = deltaXtCandidate;
-			                			}
-			                		}
-			                	}
-			                }else {
-			                	circuitBestCandidate.setSpectrumAssigned(circuitCandidate.getSpectrumAssigned());
-			                	circuitBestCandidate.setIndexCore(coreOfTheTime);
-			                	return circuitBestCandidate.getSpectrumAssigned();
-			                }
-		                }
-		            }
+						if(isAdmissibleQualityOfTransmission(circuitCandidate, cp.getMesh())) { //QOTN QOTO
+							if (circuitCandidate.getXt() != Crosstalk.lowestXT) {
+								if(circuitCandidate.getXt() <= circuitCandidate.getModulation().getXTthreshold()) {//XTN
+									if(cp.getMesh().getPhysicalLayer().getCrosstalk().isAdmissibleInOthers(circuitCandidate)) {
+
+										deltaXtCandidate = circuitCandidate.getModulation().getXTthreshold() - circuitCandidate.getXt();
+
+										if(deltaXtCandidate > deltaXtBestCandidate) {
+											circuitBestCandidate.setSpectrumAssigned(circuitCandidate.getSpectrumAssigned());
+											circuitBestCandidate.setIndexCore(coreOfTheTime);
+											deltaXtBestCandidate = deltaXtCandidate;
+										}
+									}
+								}
+
+							}else {
+								circuitBestCandidate.setSpectrumAssigned(circuitCandidate.getSpectrumAssigned());
+								circuitBestCandidate.setIndexCore(coreOfTheTime);
+
+								return circuitBestCandidate.getSpectrumAssigned();
+							}
+						}
+					}
 				}
-	        }
+			}
 
 			coreAssignment();
 		}
@@ -169,6 +175,7 @@ public class XtAwareGreedyAlgorithm implements CoreAndSpectrumAssignmentAlgorith
 	//
 	// Added the QoTN and QoTO check method. It is not part of the original article, but it was added to provide a fair comparison
 	//
+
 	/**
 	 * Checks whether admissible quality of transmission.
 	 * @param circuit the circuit.
@@ -177,32 +184,32 @@ public class XtAwareGreedyAlgorithm implements CoreAndSpectrumAssignmentAlgorith
 	 */
 	protected boolean isAdmissibleQualityOfTransmission(Circuit circuit, Mesh mesh) {
 
-    	// Check if it is to test the QoT
-    	//if(mesh.getPhysicalLayer().isActiveQoT()){
+		// Check if it is to test the QoT
+		//if(mesh.getPhysicalLayer().isActiveQoT()){
 
-    		// Verifies the QoT of the current circuit
-    		if(computeQualityOfTransmission(circuit, null, false, mesh)){
-    			boolean QoTForOther = true;
+			// Verifies the QoT of the current circuit
+			if(computeQualityOfTransmission(circuit, null, false, mesh)){
+				boolean QoTForOther = true;
 
-    			// Check if it is to test the QoT of other already active circuits
-    			//if(mesh.getPhysicalLayer().isActiveQoTForOther()){
+				// Check if it is to test the QoT of other already active circuits
+				//if(mesh.getPhysicalLayer().isActiveQoTForOther()){
 
-    				// Calculates the QoT of the other circuits
-    			QoTForOther = computeQoTForOther(circuit, mesh);
-    			circuit.setQoTForOther(QoTForOther);
-    			//}
+					// Calculates the QoT of the other circuits
+				QoTForOther = computeQoTForOther(circuit, mesh);
+				circuit.setQoTForOther(QoTForOther);
+				//}
 
-    			return QoTForOther;
-    		}
+				return QoTForOther;
+			}
 
-    		return false; // Circuit can not be established
-    	//}
+			return false; // Circuit can not be established
+		//}
 
 		// If it does not check the QoT then it returns acceptable
 		//return true;
-    }
+	}
 
-    /**
+	/**
      * Computes the quality of transmission.
      * @param circuit the circuit.
      * @param testCircuit the testCircuit.
@@ -210,80 +217,82 @@ public class XtAwareGreedyAlgorithm implements CoreAndSpectrumAssignmentAlgorith
      * @param mesh the mesh.
      * @return true if the condition is met; false otherwise.
      */
-    public boolean computeQualityOfTransmission(Circuit circuit, Circuit testCircuit, boolean addTestCircuit, Mesh mesh){
-    	//double sigma = 1.0;
-    	double SNR = mesh.getPhysicalLayer().computeSNRSegment(circuit, circuit.getRoute(), 0, circuit.getRoute().getNodeList().size() - 1, circuit.getModulation(), circuit.getIndexCore(), circuit.getSpectrumAssigned(), testCircuit, addTestCircuit);
-    	boolean QoT = mesh.getPhysicalLayer().isAdmissible(circuit.getModulation(), SNR);
+	public boolean computeQualityOfTransmission(Circuit circuit, Circuit testCircuit, boolean addTestCircuit, Mesh mesh){
+		//double sigma = 1.0;
+		double OSNR = mesh.getPhysicalLayer().computeOSNRSegment(circuit, circuit.getRoute(), 0, circuit.getRoute().getNodeList().size() - 1, circuit.getModulation(), circuit.getIndexCore(), circuit.getSpectrumAssigned(), testCircuit, addTestCircuit);
+		boolean QoT = mesh.getPhysicalLayer().isAdmissible(circuit.getModulation(), OSNR);
 
-		circuit.setSNRlinear(SNR);
+		circuit.setOSNRlinear(OSNR);
 		circuit.setQoT(QoT);
 
 		return QoT;
-    }
+	}
 
-    /**
+	/**
      * Computes the qo t for other.
      * @param circuit the circuit.
      * @param mesh the mesh.
      * @return true if the condition is met; false otherwise.
      */
-    public boolean computeQoTForOther(Circuit circuit, Mesh mesh){
-    	HashSet<Circuit> circuits = new HashSet<Circuit>(); // Circuit list for test
-    	HashMap<Circuit, Double> circuitsSNR = new HashMap<Circuit, Double>(); // To guard the SNR of the test list circuits
-    	HashMap<Circuit, Boolean> circuitsQoT = new HashMap<Circuit, Boolean>(); // To guard the QoT of the test list circuits
+	public boolean computeQoTForOther(Circuit circuit, Mesh mesh){
+		HashSet<Circuit> circuits = new HashSet<Circuit>(); // Circuit list for test
+		HashMap<Circuit, Double> circuitsOSNR = new HashMap<Circuit, Double>(); // To guard the OSNR of the test list circuits
+		HashMap<Circuit, Boolean> circuitsQoT = new HashMap<Circuit, Boolean>(); // To guard the QoT of the test list circuits
 
-    	// Search for all circuits that have links in common with the circuit under evaluation
+		// Search for all circuits that have links in common with the circuit under evaluation
 		Route route = circuit.getRoute();
+
 		for (Link link : route.getLinkList()) {
 
 			// Picks up the active circuits that use the link
 			HashSet<Circuit> circuitsTemp = link.getCore(circuit.getIndexCore()).getCircuitList();
-            for (Circuit circuitTemp : circuitsTemp) {
 
-            	// If the circuit is different from the circuit under evaluation and is not in the circuit list for test
-                if (!circuit.equals(circuitTemp) && !circuits.contains(circuitTemp)) {
-                    circuits.add(circuitTemp);
-                }
-            }
+			for (Circuit circuitTemp : circuitsTemp) {
+
+				// If the circuit is different from the circuit under evaluation and is not in the circuit list for test
+				if (!circuit.equals(circuitTemp) && !circuits.contains(circuitTemp)) {
+					circuits.add(circuitTemp);
+				}
+			}
 		}
 
 		// Tests the QoT of circuits
-        for (Circuit circuitTemp : circuits) {
+		for (Circuit circuitTemp : circuits) {
 
-        	// Stores the SNR and QoT values
-        	circuitsSNR.put(circuitTemp, circuitTemp.getSNR());
-            circuitsQoT.put(circuitTemp, circuitTemp.isQoT());
+			// Stores the OSNR and QoT values
+			circuitsOSNR.put(circuitTemp, circuitTemp.getOSNR());
+			circuitsQoT.put(circuitTemp, circuitTemp.isQoT());
 
-        	// Recalculates the QoT and SNR of the circuit
-            //boolean QoT = computeQualityOfTransmission(circuitTemp, null, true, mesh);
+			// Recalculates the QoT and OSNR of the circuit
+			//boolean QoT = computeQualityOfTransmission(circuitTemp, null, true, mesh);
 
-            boolean QoT = computeQualityOfTransmission(circuitTemp, circuit, true, mesh);
+			boolean QoT = computeQualityOfTransmission(circuitTemp, circuit, true, mesh);
 
-            // Returns the SNR and QoT values of circuits before the establishment of the circuit in evaluation
-        	//for (Circuit circuitAux : circuitsSNR.keySet()) {
-        		//circuitAux.setSNR(circuitsSNR.get(circuitAux));
-        		//circuitAux.setQoT(circuitsQoT.get(circuitAux));
-        	//}
+			// Returns the OSNR and QoT values of circuits before the establishment of the circuit in evaluation
+			//for (Circuit circuitAux : circuitsOSNR.keySet()) {
+				//circuitAux.setOSNR(circuitsOSNR.get(circuitAux));
+				//circuitAux.setQoT(circuitsQoT.get(circuitAux));
+			//}
 
-            if (!QoT) {
+			if (!QoT) {
 
-            	// Returns the SNR and QoT values of circuits before the establishment of the circuit in evaluation
-            	for (Circuit circuitAux : circuitsSNR.keySet()) {
-            		circuitAux.setSNR(circuitsSNR.get(circuitAux));
-            		circuitAux.setQoT(circuitsQoT.get(circuitAux));
-            	}
+				// Returns the OSNR and QoT values of circuits before the establishment of the circuit in evaluation
+				for (Circuit circuitAux : circuitsOSNR.keySet()) {
+					circuitAux.setOSNR(circuitsOSNR.get(circuitAux));
+					circuitAux.setQoT(circuitsQoT.get(circuitAux));
+				}
 
-                return false;
-            }
-        }
+				return false;
+			}
+		}
 
-        // Returns the SNR and QoT values of circuits before the establishment of the circuit in evaluation
-    	for (Circuit circuitAux : circuitsSNR.keySet()) {
-    		circuitAux.setSNR(circuitsSNR.get(circuitAux));
-    		circuitAux.setQoT(circuitsQoT.get(circuitAux));
-    	}
+		// Returns the OSNR and QoT values of circuits before the establishment of the circuit in evaluation
+		for (Circuit circuitAux : circuitsOSNR.keySet()) {
+			circuitAux.setOSNR(circuitsOSNR.get(circuitAux));
+			circuitAux.setQoT(circuitsQoT.get(circuitAux));
+		}
 
 		return true;
-    }
+	}
 
 }

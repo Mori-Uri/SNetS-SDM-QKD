@@ -33,7 +33,7 @@ public class ModulationSelector {
 
 		List<Modulation> avaliableModulations = new ArrayList<>();
 
-		// String name, double maxRange, double M, double SNRthreshold, double rateFEC, double freqSlot, double p, double XTthreshold
+		// String name, double maxRange, double M, double OSNRthreshold, double rateFEC, double freqSlot, double p, double XTthreshold
 		avaliableModulations.add(new Modulation("BPSK", 10000.0, 2.0, 5.5, rateFEC, freqSlot, p, -14.0));
 		avaliableModulations.add(new Modulation("QPSK", 5000.0, 4.0, 8.5, rateFEC, freqSlot, p, -18.5));
 		avaliableModulations.add(new Modulation("8QAM", 2500.0, 8.0, 12.5, rateFEC, freqSlot, p, -21.0));

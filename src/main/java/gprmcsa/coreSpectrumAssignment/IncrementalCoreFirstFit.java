@@ -19,7 +19,6 @@ public class IncrementalCoreFirstFit implements CoreAndSpectrumAssignmentAlgorit
 		this.coreOfTheTime = 0;
 	}
 
-
 	/**
 	 * Returns the assign core and spectrum.
 	 * @param numberOfSlots the numberOfSlots.
@@ -30,20 +29,20 @@ public class IncrementalCoreFirstFit implements CoreAndSpectrumAssignmentAlgorit
 	@Override
 	public boolean assignCoreAndSpectrum(int numberOfSlots, Circuit circuit, ControlPlane cp) {
 		int chosenCore = coreAssignment();
-    	List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), chosenCore);
+		List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), chosenCore);
 
-        int chosen[] = policy(numberOfSlots, composition, circuit, cp);
-        circuit.setSpectrumAssigned(chosen);
-        circuit.setIndexCore(chosenCore);
+		int chosen[] = policy(numberOfSlots, composition, circuit, cp);
+		circuit.setSpectrumAssigned(chosen);
+		circuit.setIndexCore(chosenCore);
 
-       // System.out.println("test1");
+	   // System.out.println("test1");
 
-       // test(circuit, chosen, chosenCore);
+	   // test(circuit, chosen, chosenCore);
 
-        if (chosen == null)
-        	return false;
+		if (chosen == null)
+			return false;
 
-        return true;
+		return true;
 	}
 
 	/**
@@ -53,15 +52,16 @@ public class IncrementalCoreFirstFit implements CoreAndSpectrumAssignmentAlgorit
 	@Override
 	public int coreAssignment() {
 		if (coreOfTheTime == 6) {
-    		coreOfTheTime = 0;
-    		return 6;
-    	}else {
-    		int temp = coreOfTheTime;
-    		coreOfTheTime++;
-    		return temp;
-    	}
-	}
+			coreOfTheTime = 0;
 
+			return 6;
+		}else {
+			int temp = coreOfTheTime;
+			coreOfTheTime++;
+
+			return temp;
+		}
+	}
 
 	/**
 	 * Returns the policy.
@@ -74,21 +74,22 @@ public class IncrementalCoreFirstFit implements CoreAndSpectrumAssignmentAlgorit
 	@Override
 	public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
-        if(numberOfSlots> maxAmplitude) return null;
-    	int chosen[] = null;
 
-        for (int[] band : freeSpectrumBands) {
+		if(numberOfSlots> maxAmplitude) return null;
+		int chosen[] = null;
 
-            if (band[1] - band[0] + 1 >= numberOfSlots) {
-                chosen = band.clone();
-                chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
-                break;
-            }
-        }
+		for (int[] band : freeSpectrumBands) {
 
-       // System.out.println("test2");
+			if (band[1] - band[0] + 1 >= numberOfSlots) {
+				chosen = band.clone();
+				chosen[1] = chosen[0] + numberOfSlots - 1;//It is not necessary to allocate the entire band, just the amount of slots required
+				break;
+			}
+		}
 
-        return chosen;
+	   // System.out.println("test2");
+
+		return chosen;
 	}
 
 }

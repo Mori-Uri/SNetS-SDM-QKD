@@ -31,7 +31,6 @@
     </button>
     <button class="btn ghost" id="btnJar" title="Compila o código-fonte do projeto e gera o JAR do simulador">Gerar JAR</button>
     <button class="btn ghost" id="btnSettings">Configurações</button>
-    <button class="btn ghost" id="btnQuit" title="Encerrar o launcher (e as simulações) ou deixá-lo na bandeja">Encerrar…</button>
   </div>
 </header>
 
@@ -88,7 +87,7 @@
 
 <dialog id="modal" class="modal">
   <form method="dialog" id="modalForm">
-    <div class="modal-head"><h2 id="modalTitle"></h2><button class="btn ghost icon modal-x" value="cancel" formnovalidate title="Fechar (Esc)" aria-label="Fechar">✕</button></div>
+    <h2 id="modalTitle"></h2>
     <div id="modalBody"></div>
     <div class="modal-error" id="modalError" hidden></div>
     <div class="modal-actions">
@@ -116,7 +115,6 @@
 <script src="js/presets.js"></script>
 <script src="js/figrender.js"></script>
 <script src="js/figures.js"></script>
-<script src="js/animation.js"></script>
 <script src="js/netedit.js"></script>
 <script src="js/qkdcase.js"></script>
 <script src="js/bulk.js"></script>

@@ -46,9 +46,9 @@ public class Amplifier implements Serializable {
 		this.A1 = A1;
 		this.A2 = A2;
 
-        this.gainLinear = PhysicalLayer.ratioOfDB(gain);
-        this.noiseFigureLinear = PhysicalLayer.ratioOfDB(noiseFigure);
-        this.saturationPowerLinear = PhysicalLayer.dBm_to_W(saturationPower); //Converting to Watts
+		this.gainLinear = PhysicalLayer.ratioOfDB(gain);
+		this.noiseFigureLinear = PhysicalLayer.ratioOfDB(noiseFigure);
+		this.saturationPowerLinear = PhysicalLayer.dBm_to_W(saturationPower); //Converting to Watts
 	}
 
 	/**
@@ -171,9 +171,9 @@ public class Amplifier implements Serializable {
 	 */
 	public double getAseBySaturation(double pinTotal){
 		double gainSaturated = getGainSaturated(pinTotal);
-		double famp = getFamp(pinTotal);
-		double ase = 0.5 * h * frequency * famp * gainSaturated;
-		return ase;
+		Famp = Amplifier.noiseFactor(noiseFigureLinear, pinTotal, A1, A2, true);
+
+		return Amplifier.asePsd(frequency, Famp, gainSaturated, h);
 	}
 
 	/**
@@ -185,8 +185,7 @@ public class Amplifier implements Serializable {
 	 * @return double - ASE linear
 	 */
 	public double getAse(){
-		double ase = h * frequency * noiseFigureLinear * (gainLinear - 1.0);
-		return ase;
+		return Amplifier.asePsd(frequency, noiseFigureLinear, gainLinear, h);
 	}
 
 	/**
@@ -197,7 +196,8 @@ public class Amplifier implements Serializable {
 	 * @return double - linear
 	 */
 	public double getFamp(double pin){
-		Famp = noiseFigureLinear * (1.0 + A1 - (A1 / (1.0 + (pin / A2))));
+		Famp = Amplifier.noiseFactor(noiseFigureLinear, pin, A1, A2, true);
+
 		return Famp;
 	}
 
@@ -210,12 +210,7 @@ public class Amplifier implements Serializable {
 	 * @return double - Saturated gain, linear value
 	 */
 	public double getGainSaturated(double pinTotal){
-		double Pout = gainLinear * pinTotal;
-		double g = gainLinear / (1.0 + (Pout / saturationPowerLinear));
-		if(g < 1.0){
-			g = 1.0;
-		}
-		return g;
+		return Amplifier.gain(gainLinear, pinTotal, saturationPowerLinear, true);
 	}
 
 	/**
@@ -258,11 +253,31 @@ public class Amplifier implements Serializable {
 		if(typeOfAmplifierGain == PhysicalLayer.AMP_GAIN_FIXED){ // Fixed gain of the amplifier
 			gain = this.getGainLinear();
 
-		} else { // Saturated gain of the amplifier
-			gain = this.getSaturatedGainByPsat(pinTotal);
+		} else if (typeOfAmplifierGain == PhysicalLayer.AMP_GAIN_SATURATED) {
+			gain = this.getGainSaturated(pinTotal);
+		} else {
+			throw new IllegalArgumentException("invalid typeOfAmplifierGain (expected 0=ideal, 1=saturated)");
 		}
 
 		return gain;
+	}
+
+	/**
+     * Explicit bridge to the QKD longitudinal EDFA snapshot. Use this method
+     * in QoT calculations when the optical path shares the same physical
+     * amplifier chain. No gain or ASE is recalculated from a proxy load.
+     */
+	public double getGainFromOperatingPoint(qkd.multiband.AmplifierOperatingPoint point) {
+		if (point == null) throw new IllegalArgumentException("null amplifier state");
+
+		return point.getGainLinear();
+	}
+
+	/** Output ASE spectral density in W/Hz from that exact shared state. */
+	public double getAseFromOperatingPoint(qkd.multiband.AmplifierOperatingPoint point) {
+		if (point == null) throw new IllegalArgumentException("null amplifier state");
+
+		return point.getAsePsdWHz();
 	}
 
 	/**
@@ -273,15 +288,11 @@ public class Amplifier implements Serializable {
 	 * @return double - ASE
 	 */
 	public double getAseByGain(double pinTotal, double gain){
-		double aseNoise = 0.0;
+		final boolean saturated = gain != gainLinear;
+		Famp = Amplifier.noiseFactor(noiseFigureLinear,
+				pinTotal, A1, A2, saturated);
 
-		if(gain == gainLinear){
-			aseNoise = this.getAse();
-		}else{
-			aseNoise = this.getAseBySaturation(pinTotal);
-		}
-
-		return aseNoise;
+		return Amplifier.asePsd(frequency, Famp, gain, h);
 	}
 
 	/**
@@ -336,5 +347,89 @@ public class Amplifier implements Serializable {
 	 */
 	public void setFamp(double famp) {
 		Famp = famp;
+	}
+
+	/** Shared stateless, reproducible amplifier/ASE laws previously in Amplifier. */
+
+public static double gain(double smallSignalGain, double totalInputW,
+			double saturationOutputW, boolean saturated) {
+		if (!Double.isFinite(smallSignalGain) || smallSignalGain < 1.0 ||
+				!Double.isFinite(totalInputW) || totalInputW < 0.0 ||
+				!(saturationOutputW > 0.0))
+			throw new IllegalArgumentException("invalid amplifier gain parameters");
+
+		if (!saturated) return smallSignalGain;
+
+		return Math.max(1.0, smallSignalGain /
+				(1.0 + smallSignalGain * totalInputW / saturationOutputW));
+	}
+
+	/** Output ASE power spectral density in W/Hz (both polarizations,
+     * with NF = 2*n_sp for the high-gain approximation). */
+	public static double asePsd(double frequencyHz, double noiseFigureLinear,
+			double gain, double planckJs) {
+		if (!(frequencyHz > 0.0) || !(noiseFigureLinear >= 1.0) ||
+				!(gain >= 1.0) || !(planckJs > 0.0))
+			throw new IllegalArgumentException("invalid ASE parameters");
+
+		return planckJs * frequencyHz * noiseFigureLinear * (gain - 1.0);
+	}
+
+	/** Common gain compression for the aggregate unsaturated C/L-band output. */
+	public static double sharedCompression(double unsaturatedOutputW,
+			double saturationOutputW, boolean saturated) {
+		if (!Double.isFinite(unsaturatedOutputW) || unsaturatedOutputW < 0.0
+				|| !Double.isFinite(saturationOutputW) || saturationOutputW <= 0.0) {
+			throw new IllegalArgumentException("invalid shared EDFA saturation parameters");
+		}
+
+		return saturated ? 1.0 / (1.0 + unsaturatedOutputW / saturationOutputW) : 1.0;
+	}
+
+	/** Apply common C/L-band gain compression to an individual optical band. */
+	public static double gainFromCompression(double smallSignalGain, double compression) {
+		if (!Double.isFinite(smallSignalGain) || smallSignalGain < 1.0
+				|| !Double.isFinite(compression) || compression < 0.0
+				|| compression > 1.0) {
+			throw new IllegalArgumentException("invalid EDFA compression state");
+		}
+
+		return Math.max(1.0, smallSignalGain * compression);
+	}
+
+	/**
+     * Unified EDFA noise-factor law. A1 is dimensionless and A2 is in watts.
+     * The correction is applied only to saturated amplifiers. A2 <= 0
+     * disables the empirical dependence for backward compatibility.
+     *
+     * F(Pin) = F0 [1 + A1 - A1 / (1 + Pin/A2)].
+     */
+	public static double noiseFactor(double nominalNoiseFactor,
+			double inputPowerW, double a1, double a2, boolean saturated) {
+		if (!Double.isFinite(nominalNoiseFactor) || nominalNoiseFactor < 1.0
+				|| !Double.isFinite(inputPowerW) || inputPowerW < 0.0
+				|| !Double.isFinite(a1) || !Double.isFinite(a2)) {
+			throw new IllegalArgumentException("invalid amplifier noise-factor parameters");
+		}
+
+		if (!saturated || a2 <= 0.0) return nominalNoiseFactor;
+
+		final double adjusted = nominalNoiseFactor *
+				(1.0 + a1 - a1 / (1.0 + inputPowerW / a2));
+
+		if (!Double.isFinite(adjusted) || adjusted < 1.0) {
+			throw new IllegalArgumentException("invalid saturation-dependent noise factor");
+		}
+
+		return adjusted;
+	}
+
+	/** ASE at an actual operating point, including saturation-dependent NF. */
+	public static double asePsd(double frequencyHz, double nominalNoiseFactor,
+			double gain, double planckJs, double inputPowerW,
+			double a1, double a2, boolean saturated) {
+		return asePsd(frequencyHz,
+				noiseFactor(nominalNoiseFactor, inputPowerW, a1, a2, saturated),
+				gain, planckJs);
 	}
 }

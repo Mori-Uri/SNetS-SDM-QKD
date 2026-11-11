@@ -1,0 +1,23 @@
+{
+  "multiband": {
+    "enabled": true,
+    "architecture": "MBSDM",
+    "ramanModel": "fisico",
+    "qchCenterNm": 1381.0,
+    "hostCoreId": 1,
+    "intercoreRaman": true,
+    "classicalBandStartThz": 191.3,
+    "attenuationModel": "g652d",
+    "longitudinalRamanEnabled": true,
+    "longitudinalNliEnabled": true,
+    "nliModel": "gn",
+    "amplifierSpacingKm": 80.0,
+    "amplifierGainDb": 16.0,
+    "amplifierModel": "saturated",
+    "amplifierSaturationPowerDbm": 16.0,
+    "amplifierReferenceLaunchPowerDbm": 0.0,
+    "amplifierNoiseFigureDb": 5.0,
+    "amplifierAseToQchEnabled": false,
+    "amplifierAseLeakageDb": 100.0
+  }
+}

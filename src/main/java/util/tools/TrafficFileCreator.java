@@ -17,72 +17,72 @@ public class TrafficFileCreator {
 	public static void main(String[] args) throws Exception {
 
 		Scanner sc = new Scanner(System.in);
-        System.out.println("=== Create the traffic file ===");
+		System.out.println("=== Create the traffic file ===");
 
-        while (true) {
-            System.out.println("\nEscolha a topologia:");
-            System.out.println("1) NSFNet");
-            System.out.println("2) Cost239");
-            System.out.println("3) USA");
-            System.out.println("4) Japan");
-            System.out.println("5) N8E13");
-            System.out.println("0) Sair");
-            System.out.print("Option: ");
+		while (true) {
+			System.out.println("\nEscolha a topologia:");
+			System.out.println("1) NSFNet");
+			System.out.println("2) Cost239");
+			System.out.println("3) USA");
+			System.out.println("4) Japan");
+			System.out.println("5) N8E13");
+			System.out.println("0) Sair");
+			System.out.print("Option: ");
 
-            int opcao = sc.nextInt();
+			int opcao = sc.nextInt();
 
-            if (opcao == 0) {
-                System.out.println("Encerrando o programa...");
-                break;
-            }
+			if (opcao == 0) {
+				System.out.println("Encerrando o programa...");
+				break;
+			}
 
-            switch (opcao) {
-                case 1:
-                    System.out.println("Topologia NSFNet");
-                    createNSFNetTrafficFile();
-                    esperarTecla(sc);
-                    break;
+			switch (opcao) {
+				case 1:
+					System.out.println("Topologia NSFNet");
+					createNSFNetTrafficFile();
+					esperarTecla(sc);
+					break;
 
-                case 2:
-                	System.out.println("Topologia Cost239");
-                	createCost239TrafficFile();
-                    esperarTecla(sc);
-                    break;
+				case 2:
+					System.out.println("Topologia Cost239");
+					createCost239TrafficFile();
+					esperarTecla(sc);
+					break;
 
-                case 3:
-                	System.out.println("Topologia USA");
-                	createUSATrafficFile();
-                    esperarTecla(sc);
-                    break;
+				case 3:
+					System.out.println("Topologia USA");
+					createUSATrafficFile();
+					esperarTecla(sc);
+					break;
 
-                case 4:
-                	System.out.println("Topologia Japan");
-                	createJapanTrafficFile();
-                    esperarTecla(sc);
-                    break;
+				case 4:
+					System.out.println("Topologia Japan");
+					createJapanTrafficFile();
+					esperarTecla(sc);
+					break;
 
-                case 5:
-                	System.out.println("Topologia N8E13");
-                	createN8E13TrafficFile();
-                    esperarTecla(sc);
-                    break;
+				case 5:
+					System.out.println("Topologia N8E13");
+					createN8E13TrafficFile();
+					esperarTecla(sc);
+					break;
 
-                default:
-                    System.out.println("Invalid option!");
-            }
-        }
+				default:
+					System.out.println("Invalid option!");
+			}
+		}
 
-        sc.close();
+		sc.close();
 	}
 
 	/**
      * Waits for the user to press Enter to continue.
      */
-    public static void esperarTecla(Scanner sc) {
-        System.out.print("\nPress ENTER to continue...");
-        sc.nextLine(); // consome o Enter pendente anterior
-        sc.nextLine(); // Wait for the next Enter key press
-    }
+	public static void esperarTecla(Scanner sc) {
+		System.out.print("\nPress ENTER to continue...");
+		sc.nextLine(); // consome o Enter pendente anterior
+		sc.nextLine(); // Wait for the next Enter key press
+	}
 
 	/**
 	 * Creates the nsf net traffic file.
@@ -215,6 +215,7 @@ public class TrafficFileCreator {
 		double quantTaxas = taxas.length; //Number of bit-rate values
 
 		double sumPropor = 0.0;
+
 		for(int i = 0; i < quantTaxas; i++) {
 			sumPropor += proporcoes[i];
 		}
@@ -223,6 +224,7 @@ public class TrafficFileCreator {
 		double lambdaPorTaxaTotal = lambdaPorPar / sumPropor;
 
 		double lambdaPorTaxaPropor[] = new double[(int)quantTaxas];
+
 		for(int i = 0; i < quantTaxas; i++) {
 			lambdaPorTaxaPropor[i] = lambdaPorTaxaTotal * proporcoes[i];
 		}
@@ -231,6 +233,7 @@ public class TrafficFileCreator {
 		double incPorTaxaTotal = incPorPar / sumPropor;
 
 		double incPorTaxaPropor[] = new double[(int)quantTaxas];
+
 		for(int i = 0; i < quantTaxas; i++) {
 			incPorTaxaPropor[i] = incPorTaxaTotal * proporcoes[i];
 		}
@@ -243,21 +246,26 @@ public class TrafficFileCreator {
 			sbaux.append("{\"requestGenerators\":[\n");
 
 			int cont = 0;
+
 			for(int i = 1; i <= quantNodes; i++){
 				StringBuilder sb = new StringBuilder();
+
 				for(int j = 1; j <= quantNodes; j++){
 					if(i != j){
 						for(int t = 0; t < quantTaxas; t++) {
 							sb.append("{\"source\":\"" + i + "\",\"destination\":\"" + j + "\",\"arrivalRate\":" + lambdaPorTaxaPropor[t] + ",\"arrivalRateIncrease\":" + incPorTaxaPropor[t] + ",\"holdRate\":" + mu + ",\"bitRate\":" + taxas[t] + "}");
+
 							if(cont < ((quantPares * quantTaxas) - 1)){
 								sb.append(",\n");
 							}else{
 								sb.append("\n");
 							}
+
 							cont++;
 						}
 					}
 				}
+
 				sbaux.append(sb.toString());
 			}
 

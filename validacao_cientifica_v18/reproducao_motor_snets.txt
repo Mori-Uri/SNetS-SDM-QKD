@@ -1,0 +1,9 @@
+SNetS engine Eq3.22: channels=15, B=32.000 GHz, PSD=2.01119256e-17, normalized=28.086036330 dB
+spans,engine_egn_normalized_db
+1,28.086036330
+2,31.096336286
+5,35.075736373
+10,38.086036330
+20,41.096336286
+50,45.075736373
+PASS QKDThesisSNetSPhysicalLayerVerification

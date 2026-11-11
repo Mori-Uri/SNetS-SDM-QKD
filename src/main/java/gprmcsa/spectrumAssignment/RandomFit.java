@@ -16,7 +16,7 @@ import util.IntersectionFreeSpectrum;
  */
 public class RandomFit implements SpectrumAssignmentAlgorithmInterface {
 
-    /**
+	/**
      * Returns the assign spectrum.
      * @param numberOfSlots the numberOfSlots.
      * @param circuit the circuit.
@@ -24,20 +24,20 @@ public class RandomFit implements SpectrumAssignmentAlgorithmInterface {
      * @param indexCore the indexCore.
      * @return true if the condition is met; false otherwise.
      */
-    @Override
-    public boolean assignSpectrum(int numberOfSlots, Circuit circuit, ControlPlane cp, int indexCore) {
-    	List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), indexCore);
+	@Override
+	public boolean assignSpectrum(int numberOfSlots, Circuit circuit, ControlPlane cp, int indexCore) {
+		List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), indexCore);
 
-        int chosen[] = policy(numberOfSlots, composition, circuit, cp);
-        circuit.setSpectrumAssigned(chosen);
+		int chosen[] = policy(numberOfSlots, composition, circuit, cp);
+		circuit.setSpectrumAssigned(chosen);
 
-        if (chosen == null)
-        	return false;
+		if (chosen == null)
+			return false;
 
-        return true;
-    }
+		return true;
+	}
 
-    /**
+	/**
      * Returns the policy.
      * @param numberOfSlots the numberOfSlots.
      * @param freeSpectrumBands the freeSpectrumBands.
@@ -45,11 +45,12 @@ public class RandomFit implements SpectrumAssignmentAlgorithmInterface {
      * @param cp the cp.
      * @return the result of the operation.
      */
-    @Override
-    public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp){
+	@Override
+	public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp){
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
+
 		if(numberOfSlots > maxAmplitude) return null;
-    	int chosen[] = null;
+		int chosen[] = null;
 		ArrayList<int[]> bandList = new ArrayList<int[]>();
 
 		for (int[] band : freeSpectrumBands) { //checks and guard the free bands that can establish the requisition

@@ -121,6 +121,7 @@ public class FastSwitching_Alfa_v1 implements ReallocationAlgorithmInterface {
 
 		// populate the list of non-adjacent cores
 		ArrayList<Core> coreList = requisicao.getRoute().getLinkList().get(0).getCores();
+
 		for (Core c : coreList) {
 			if (!coresAdjacents.contains(c) && c.getId() != requisicao.getIndexCore()) {
 				this.coresNoAdjacents.add(c);
@@ -150,6 +151,7 @@ public class FastSwitching_Alfa_v1 implements ReallocationAlgorithmInterface {
 						// acceptable XT, try to serve the request that is about to be blocked
 						if (xt) {
 							cp.allocateCircuit(requisicao);
+
 							return true;
 						}
 

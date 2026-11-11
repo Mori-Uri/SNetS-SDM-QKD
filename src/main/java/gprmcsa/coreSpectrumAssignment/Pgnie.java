@@ -19,18 +19,18 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	ArrayList<Integer> group1;
 	ArrayList<Integer> group2;
 	ArrayList<Integer> group3;
-	
+
 	/**
 	 * Creates a new Pgnie instance.
 	 */
 	public Pgnie() {
 		this.numberOfCores = -1;
-		
+
 		group1 = new ArrayList<Integer>();
 		group2 = new ArrayList<Integer>();
 		group3 = new ArrayList<Integer>();
 	}
-	
+
 	/**
 	 * Executes the assignCoreAndSpectrum operation.
 	 * @param numberOfslots the numberOfslots.
@@ -41,7 +41,7 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	public boolean assignCoreAndSpectrum(int numberOfSlots, Circuit circuit, ControlPlane cp) {
 		if (numberOfCores == -1) {
 			numberOfCores = cp.getMesh().getLinkList().get(0).getNumberOfCores();
-			
+
 			if (numberOfCores == 7) {
 				group1.add(1);
 				group1.add(3);
@@ -52,7 +52,7 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 				group2.add(6);
 
 				group3.add(0);
-				
+
 			}else if(numberOfCores == 12) {
 				group1.add(0);
 				group1.add(3);
@@ -68,7 +68,7 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 				group3.add(5);
 				group3.add(8);
 				group3.add(11);
-				
+
 			}else if(numberOfCores == 19) {
 				group1.add(0);
 				group1.add(5);
@@ -93,24 +93,24 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 				group3.add(17);
 			}
 		}
-	  
+
 		this.tentativa = 1;
-	  
+
 		int chosenCore = coreAssignment(numberOfSlots, circuit);
 		int[] chosen = null;
 		List<int[]> composition = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), chosenCore);
-	
+
 		for (int i = 0; i < 2; ) {
 			if(group1.contains(chosenCore)) {
 				chosen = policy(numberOfSlots, composition, circuit, cp);
-				
+
 			}else if(group2.contains(chosenCore)) {
 				chosen = policy2(numberOfSlots, composition, circuit, cp);
-				
+
 			}else if(group3.contains(chosenCore)) {
 				chosen = policy3(numberOfSlots, composition, circuit, cp);
 			}
-			
+
 			if (chosen == null) {
 				this.tentativa = 2;
 				chosenCore = coreAssignment(numberOfSlots, circuit);
@@ -120,16 +120,16 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 				break;
 			}
 		}
-		
+
 		circuit.setIndexCore(chosenCore);
 		circuit.setSpectrumAssigned(chosen);
-		
+
 		if (chosen == null)
 			return false;
-    
+
 		return true;
 	}
-  
+
 	/**
 	 * Executes the coreAssignment operation.
 	 * @param numberOfslots the numberOfslots.
@@ -159,6 +159,7 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	 */
 	public int coreAssignment7(int numberOfSlots, Circuit circuit) {
 		int[] cores = new int[numberOfCores];
+
 		if (this.cont == 4)
 			this.cont = 1;
 
@@ -190,49 +191,58 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 			cores[5] = 6;
 			cores[6] = 0;
 			break;
-		} 
+		}
+
 		this.cont = this.cont + 1;
 
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
+
 		if (numberOfSlots > maxAmplitude)
 			return 0;
-		
+
 		byte b;
 		int i, arrayOfInt1[];
+
 		for (i = (arrayOfInt1 = cores).length, b = 0; b < i; ) {
 			int core = arrayOfInt1[b];
 			List<int[]> freeSpectrumBands = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), core);
+
 			for (int[] band : freeSpectrumBands) {
 				if(group1.contains(core)) {
 					if (this.tentativa == 1) {
 						if (band[0] + numberOfSlots - 1 < this.limite1 && band[1] - band[0] + 1 >= numberOfSlots)
-							return core; 
+							return core;
 						continue;
-					} 
+					}
+
 					if (band[0] >= this.limite1 && band[1] - band[0] + 1 >= numberOfSlots)
 						return core;
-					
+
 				}else if(group2.contains(core)) {
 					if (this.tentativa == 1) {
 						if (band[0] > this.limite1 && band[0] + numberOfSlots - 1 < this.limite2 && band[1] - band[0] + 1 >= numberOfSlots)
 							return core;
 						continue;
 					}
+
 					if ((band[0] + numberOfSlots - 1 < this.limite1 || band[0] >= this.limite2) && band[1] - band[0] + 1 >= numberOfSlots)
 						return core;
-					
+
 				}else if(group3.contains(core)) {
 					if (this.tentativa == 1) {
 						if (band[0] >= this.limite2 && band[1] - band[0] + 1 >= numberOfSlots)
-							return core; 
+							return core;
 						continue;
-					} 
+					}
+
 					if (band[0] + numberOfSlots - 1 < this.limite2 && band[1] - band[0] + 1 >= numberOfSlots)
 						return core;
 				}
 			}
+
 			b++;
-		} 
+		}
+
 		return 0;
 	}
 
@@ -244,8 +254,10 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	 */
 	public int coreAssignment12(int numberOfSlots, Circuit circuit) {
 		int[] cores = new int[numberOfCores];
+
 		if (this.cont == 4)
-			this.cont = 1; 
+			this.cont = 1;
+
 		switch (this.cont) {
 		case 1:
 			cores[0] = 0;
@@ -289,49 +301,57 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 			cores[10] = 2;
 			cores[11] = 5;
 			break;
-		} 
+		}
 
 		this.cont = this.cont + 1;
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
+
 		if (numberOfSlots > maxAmplitude)
-			return 0; 
+			return 0;
 
 		byte b;
 		int i, arrayOfInt1[];
+
 		for (i = (arrayOfInt1 = cores).length, b = 0; b < i; ) {
 			int core = arrayOfInt1[b];
 			List<int[]> freeSpectrumBands = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), core);
+
 			for (int[] band : freeSpectrumBands) {
 				if(group1.contains(core)) {
 					if (this.tentativa == 1) {
 						if (band[0] + numberOfSlots - 1 < this.limite1 && band[1] - band[0] + 1 >= numberOfSlots)
-							return core; 
+							return core;
 						continue;
-					} 
+					}
+
 					if (band[0] >= this.limite1 && band[1] - band[0] + 1 >= numberOfSlots)
-						return core; 
-					
+						return core;
+
 				}else if(group2.contains(core)) {
 					if (this.tentativa == 1) {
 						if (band[0] > this.limite1 && band[0] + numberOfSlots - 1 < this.limite2 && band[1] - band[0] + 1 >= numberOfSlots)
 							return core;
 						continue;
 					}
+
 					if ((band[0] + numberOfSlots - 1 < this.limite1 || band[0] >= this.limite2) && band[1] - band[0] + 1 >= numberOfSlots)
 						return core;
-					
+
 				}else if(group3.contains(core)) {
 					if (this.tentativa == 1) {
 						if (band[0] >= this.limite2 && band[1] - band[0] + 1 >= numberOfSlots)
-							return core; 
+							return core;
 						continue;
-					} 
+					}
+
 					if (band[0] + numberOfSlots - 1 < this.limite2 && band[1] - band[0] + 1 >= numberOfSlots)
 						return core;
 				}
-			} 
+			}
+
 			b++;
-		} 
+		}
+
 		return 0;
 	}
 
@@ -343,8 +363,10 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	 */
 	public int coreAssignment19(int numberOfSlots, Circuit circuit) {
 		int[] cores = new int[numberOfCores];
+
 		if (this.cont == 4)
-			this.cont = 1; 
+			this.cont = 1;
+
 		switch (this.cont) {
 		case 1:
 			cores[0] = 0;
@@ -361,7 +383,7 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 			cores[11] = 16;
 			cores[12] = 18;
 			cores[13] = 2;
-			cores[14] = 4; 
+			cores[14] = 4;
 			cores[15] = 7;
 			cores[16] = 9;
 			cores[17] = 12;
@@ -409,52 +431,60 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 			cores[17] = 2;
 			cores[18] = 4;
 			break;
-		} 
+		}
 
 		this.cont = this.cont + 1;
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
+
 		if (numberOfSlots > maxAmplitude)
 			return 0;
 
 		byte b;
 		int i, arrayOfInt1[];
+
 		for (i = (arrayOfInt1 = cores).length, b = 0; b < i; ) {
 			int core = arrayOfInt1[b];
 			List<int[]> freeSpectrumBands = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), core);
+
 			for (int[] band : freeSpectrumBands) {
 				if(group1.contains(core)) {
 					if (this.tentativa == 1) {
 						if (band[0] + numberOfSlots - 1 < this.limite1 && band[1] - band[0] + 1 >= numberOfSlots)
-							return core; 
+							return core;
 						continue;
-					} 
+					}
+
 					if (band[0] >= this.limite1 && band[1] - band[0] + 1 >= numberOfSlots)
 						return core;
-					
+
 				}else if(group2.contains(core)) {
 					if (this.tentativa == 1) {
 						if (band[0] > this.limite1 && band[0] + numberOfSlots - 1 < this.limite2 && band[1] - band[0] + 1 >= numberOfSlots)
 							return core;
 						continue;
 					}
+
 					if ((band[0] + numberOfSlots - 1 < this.limite1 || band[0] >= this.limite2) && band[1] - band[0] + 1 >= numberOfSlots)
 						return core;
-					
+
 				}else if(group3.contains(core)) {
 					if (this.tentativa == 1) {
 						if (band[0] >= this.limite2 && band[1] - band[0] + 1 >= numberOfSlots)
-							return core; 
+							return core;
 						continue;
-					} 
+					}
+
 					if (band[0] + numberOfSlots - 1 < this.limite2 && band[1] - band[0] + 1 >= numberOfSlots)
 						return core;
-				} 
-			} 
+				}
+			}
+
 			b++;
-		} 
+		}
+
 		return 0;
 	}
-	
+
 	/**
 	 * Executes the policy operation.
 	 * @param numberOfslots the numberOfslots.
@@ -465,28 +495,34 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	 */
 	public int[] policy(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
+
 		if (numberOfSlots > maxAmplitude)
-			return null; 
+			return null;
 		int[] chosen = null;
+
 		if (this.tentativa == 1) {
 			for (int[] band : freeSpectrumBands) {
 				if (band[0] + numberOfSlots - 1 < this.limite1 && band[1] - band[0] + 1 >= numberOfSlots) {
 					chosen = (int[])band.clone();
 					chosen[1] = chosen[0] + numberOfSlots - 1;
 					break;
-				} 
-			} 
+				}
+			}
+
 		} else {
 			int[] band = null;
+
 			for (int i = freeSpectrumBands.size() - 1; i >= 0; i--) {
 				band = freeSpectrumBands.get(i);
+
 				if (band[0] >= this.limite1 && band[1] - band[0] + 1 >= numberOfSlots) {
 					chosen = (int[])band.clone();
 					chosen[0] = chosen[1] - numberOfSlots + 1;
 					break;
-				} 
-			} 
-		} 
+				}
+			}
+		}
+
 		return chosen;
 	}
 
@@ -500,33 +536,39 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	 */
 	public int[] policy2(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
+
 		if (numberOfSlots > maxAmplitude)
-			return null; 
+			return null;
 		int[] chosen = null;
+
 		if (this.tentativa == 1) {
 			for (int[] band : freeSpectrumBands) {
-				if (band[0] > this.limite1 && band[0] + numberOfSlots - 1 < this.limite2 && 
+				if (band[0] > this.limite1 && band[0] + numberOfSlots - 1 < this.limite2 &&
 						band[1] - band[0] + 1 >= numberOfSlots) {
 					chosen = (int[])band.clone();
 					chosen[1] = chosen[0] + numberOfSlots - 1;
 					break;
-				} 
-			} 
+				}
+			}
+
 		} else {
 			int[] band = null;
+
 			for (int i = freeSpectrumBands.size() - 1; i >= 0; i--) {
 				band = freeSpectrumBands.get(i);
-				if ((band[0] + numberOfSlots - 1 < this.limite1 || band[0] >= this.limite2) && 
+
+				if ((band[0] + numberOfSlots - 1 < this.limite1 || band[0] >= this.limite2) &&
 						band[1] - band[0] + 1 >= numberOfSlots) {
 					chosen = (int[])band.clone();
 					chosen[0] = chosen[1] - numberOfSlots + 1;
 					break;
-				} 
-			} 
-		} 
+				}
+			}
+		}
+
 		return chosen;
 	}
-	
+
 	/**
 	 * Executes the policy3 operation.
 	 * @param numberOfslots the numberOfslots.
@@ -537,28 +579,34 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	 */
 	public int[] policy3(int numberOfSlots, List<int[]> freeSpectrumBands, Circuit circuit, ControlPlane cp) {
 		int maxAmplitude = circuit.getPair().getSource().getTxs().getMaxSpectralAmplitude();
+
 		if (numberOfSlots > maxAmplitude)
-			return null; 
+			return null;
 		int[] chosen = null;
+
 		if (this.tentativa == 1) {
 			for (int[] band : freeSpectrumBands) {
 				if (band[0] >= this.limite2 && band[1] - band[0] + 1 >= numberOfSlots) {
 					chosen = (int[])band.clone();
 					chosen[1] = chosen[0] + numberOfSlots - 1;
 					break;
-				} 
-			} 
+				}
+			}
+
 		} else {
 			int[] band = null;
+
 			for (int i = freeSpectrumBands.size() - 1; i >= 0; i--) {
 				band = freeSpectrumBands.get(i);
+
 				if (band[0] + numberOfSlots - 1 < this.limite2 && band[1] - band[0] + 1 >= numberOfSlots) {
 					chosen = (int[])band.clone();
 					chosen[0] = chosen[1] - numberOfSlots + 1;
 					break;
-				} 
-			} 
-		} 
+				}
+			}
+		}
+
 		return chosen;
 	}
 
@@ -568,4 +616,3 @@ public class Pgnie implements CoreAndSpectrumAssignmentAlgorithmInterface {
 	}
 
 }
-

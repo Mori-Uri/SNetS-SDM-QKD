@@ -20,157 +20,124 @@ import qkd.traffic.RequestProtectionType;
  */
 public class RequestForConnection implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    protected Pair pair;
-    protected double timeOfRequestHours;
-    protected double timeOfFinalizeHours;
-    protected double requiredBitRate;
-    protected RequestGenerator rg;
-    protected List<Circuit> circuit;
+	protected Pair pair;
+	protected double timeOfRequestHours;
+	protected double timeOfFinalizeHours;
+	protected double requiredBitRate;
+	protected RequestGenerator rg;
+	protected List<Circuit> circuit;
 
-    /** CLASSICAL for legacy requests, QKD_PROTECTED for the selected fraction. */
-    protected RequestProtectionType protectionType;
+	/** CLASSICAL for legacy requests, QKD_PROTECTED for the selected fraction. */
+	protected RequestProtectionType protectionType;
 
-    /**
+	/**
      * Key-consumption requirement of a QKD-protected request.
      * Classical requests keep this field null.
      */
-    protected QKDKeyDemand qkdKeyDemand;
+	protected QKDKeyDemand qkdKeyDemand;
 
-    /** Parte 54: stamp of the last GroomingStatistics observation that counted this request (distinct count). */
-    private transient int countStamp;
+	public RequestForConnection() {
+		circuit = new ArrayList<Circuit>();
+		protectionType = RequestProtectionType.CLASSICAL;
+		qkdKeyDemand = null;
+	}
 
-    /** Parte 54: true the first time this request is seen with {@code stamp}. */
-    public boolean markCounted(int stamp) {
-        if (countStamp == stamp) {
-            return false;
-        }
-        countStamp = stamp;
-        return true;
-    }
+	public Pair getPair() {
+		return pair;
+	}
 
-    public RequestForConnection() {
-        circuit = new ArrayList<Circuit>();
-        protectionType = RequestProtectionType.CLASSICAL;
-        qkdKeyDemand = null;
-    }
+	public void setPair(Pair pair) {
+		this.pair = pair;
+	}
 
-    public Pair getPair() {
-        return pair;
-    }
+	public double getTimeOfRequestHours() {
+		return timeOfRequestHours;
+	}
 
-    public void setPair(Pair pair) {
-        this.pair = pair;
-    }
+	public void setTimeOfRequestHours(double timeOfRequestHours) {
+		this.timeOfRequestHours = timeOfRequestHours;
+	}
 
-    public double getTimeOfRequestHours() {
-        return timeOfRequestHours;
-    }
+	public double getTimeOfFinalizeHours() {
+		return timeOfFinalizeHours;
+	}
 
-    public void setTimeOfRequestHours(double timeOfRequestHours) {
-        this.timeOfRequestHours = timeOfRequestHours;
-    }
+	public void setTimeOfFinalizeHours(double timeOfFinalizeHours) {
+		this.timeOfFinalizeHours = timeOfFinalizeHours;
+	}
 
-    public double getTimeOfFinalizeHours() {
-        return timeOfFinalizeHours;
-    }
+	public double getRequiredBitRate() {
+		return requiredBitRate;
+	}
 
-    public void setTimeOfFinalizeHours(double timeOfFinalizeHours) {
-        this.timeOfFinalizeHours = timeOfFinalizeHours;
-    }
+	public void setRequiredBitRate(double requiredBitRate) {
+		this.requiredBitRate = requiredBitRate;
+	}
 
-    public double getRequiredBitRate() {
-        return requiredBitRate;
-    }
+	public List<Circuit> getCircuits() {
+		return circuit;
+	}
 
-    /**
-     * Parte 57 (desempenho): number of calls of {@link #setRequiredBitRate} in this JVM. A circuit keeps the sum of
-     * the bit rates of its requests only while this counter and its list of requests do not change (see
-     * {@code Circuit.getRequiredBitRate}). The bit rate is set when a request is created, before it joins a circuit,
-     * so the sum is kept for the whole life of the circuit in practice.
-     */
-    private static final java.util.concurrent.atomic.AtomicLong BIT_RATE_CHANGES = new java.util.concurrent.atomic.AtomicLong();
+	public void setCircuit(List<Circuit> circuit) {
+		this.circuit = circuit;
+	}
 
-    /**
-     * Parte 59: true once this request joined the list of requests of a circuit (TrackedRequestList). Only then a new
-     * bit rate can change the sum kept by a circuit. The generators set the bit rate of a new request before it
-     * joins a circuit, so those calls no longer invalidate the sums of all circuits.
-     */
-    private boolean inTrackedList;
+	public RequestGenerator getRequestGenerator() {
+		return rg;
+	}
 
-    /** Parte 59: called by TrackedRequestList when this request joins a circuit. */
-    public void markInTrackedList() {
-        inTrackedList = true;
-    }
+	public void setRequestGenerator(RequestGenerator rg) {
+		this.rg = rg;
+	}
 
-    /** Parte 57: see {@link #BIT_RATE_CHANGES}. */
-    public static long bitRateChanges() {
-        return BIT_RATE_CHANGES.get();
-    }
+	public RequestProtectionType getProtectionType() {
+		return protectionType;
+	}
 
-    public void setRequiredBitRate(double requiredBitRate) {
-        if (inTrackedList) BIT_RATE_CHANGES.incrementAndGet(); // Parte 57/59: invalidates the bit rate kept by the circuits
-        this.requiredBitRate = requiredBitRate;
-    }
+	public void setProtectionType(RequestProtectionType protectionType) {
+		this.protectionType = protectionType == null
+				? RequestProtectionType.CLASSICAL
+				: protectionType;
 
-    public List<Circuit> getCircuits() {
-        return circuit;
-    }
+		if (this.protectionType == RequestProtectionType.CLASSICAL) {
+			this.qkdKeyDemand = null;
+		}
+	}
 
-    public void setCircuit(List<Circuit> circuit) {
-        this.circuit = circuit;
-    }
+	/** Convenience method for later ControlPlane integration. */
+	public boolean isQkdProtected() {
+		return protectionType == RequestProtectionType.QKD_PROTECTED
+				|| protectionType == RequestProtectionType.QKD_ONLY;
+	}
 
-    public RequestGenerator getRequestGenerator() {
-        return rg;
-    }
+	public QKDKeyDemand getQkdKeyDemand() {
+		return qkdKeyDemand;
+	}
 
-    public void setRequestGenerator(RequestGenerator rg) {
-        this.rg = rg;
-    }
+	public void setQkdKeyDemand(QKDKeyDemand qkdKeyDemand) {
+		if (qkdKeyDemand == null) {
+			this.qkdKeyDemand = null;
 
-    public RequestProtectionType getProtectionType() {
-        return protectionType;
-    }
+			return;
+		}
 
-    public void setProtectionType(RequestProtectionType protectionType) {
-        this.protectionType = protectionType == null
-                ? RequestProtectionType.CLASSICAL
-                : protectionType;
-        if (this.protectionType == RequestProtectionType.CLASSICAL) {
-            this.qkdKeyDemand = null;
-        }
-    }
+		if (!isQkdProtected()) {
+			throw new IllegalStateException(
+					"QKD key demand can only be assigned to QKD-protected requests");
+		}
 
-    /** Convenience method for later ControlPlane integration. */
-    public boolean isQkdProtected() {
-        return protectionType == RequestProtectionType.QKD_PROTECTED;
-    }
+		this.qkdKeyDemand = qkdKeyDemand;
+	}
 
-    public QKDKeyDemand getQkdKeyDemand() {
-        return qkdKeyDemand;
-    }
+	public double getRequiredQkdKeyRateBps() {
+		return qkdKeyDemand == null ? 0.0
+				: qkdKeyDemand.getRequiredKeyRateBps();
+	}
 
-    public void setQkdKeyDemand(QKDKeyDemand qkdKeyDemand) {
-        if (qkdKeyDemand == null) {
-            this.qkdKeyDemand = null;
-            return;
-        }
-        if (!isQkdProtected()) {
-            throw new IllegalStateException(
-                    "QKD key demand can only be assigned to QKD-protected requests");
-        }
-        this.qkdKeyDemand = qkdKeyDemand;
-    }
-
-    public double getRequiredQkdKeyRateBps() {
-        return qkdKeyDemand == null ? 0.0
-                : qkdKeyDemand.getRequiredKeyRateBps();
-    }
-
-    public double getRequiredQkdKeyRateMbps() {
-        return qkdKeyDemand == null ? 0.0
-                : qkdKeyDemand.getRequiredKeyRateMbps();
-    }
+	public double getRequiredQkdKeyRateMbps() {
+		return qkdKeyDemand == null ? 0.0
+				: qkdKeyDemand.getRequiredKeyRateMbps();
+	}
 }

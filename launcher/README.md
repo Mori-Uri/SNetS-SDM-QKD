@@ -1,3 +1,9 @@
+> **Atualização 1.24.1:** veja [README_SELETIVA_1_24.md](README_SELETIVA_1_24.md) para seletor de pastas, intervalos legados e flags A/B.
+
+> **Atualização 1.23.0:** ver [README_LAUNCHER_1_23.md](README_LAUNCHER_1_23.md) para o fallback híbrido EGN e as limitações do EGN rigoroso de referência.
+
+> **Atualização 1.22.0:** veja [README_LAUNCHER_1_22.md](README_LAUNCHER_1_22.md) para os novos campos físicos e as correções da interface.
+
 # SNetS Launcher
 
 Interface web local para configurar, executar e visualizar simulações do SNetS-SDM.
@@ -372,3 +378,15 @@ Estúdio de gráficos:
 
 - Aba Rede, tabela de enlaces: caixa **Bidirecional** (marcada por padrão). Mudar um campo de um enlace a→b (ex.:
   size de 50 para 100) muda o mesmo campo do enlace b→a.
+
+## Atualização QKD (maxskr / anti-Stokes / caches e admissão)
+
+- **QCh (Rede → QKD):** `qchSlotPolicy=maxskr`, exclusivamente com `qchGranularity=route`, ordena todas as faixas livres pela **SKR mínima dos trechos** da rota. Mantém a avaliação física dos DChs e PIChs e os critérios de QBER/SKR; pode ser mais lento que firstfit/abne.
+- **Raman (Camada física QKD → Multibanda):** `multiband.antiStokesCorrection=nenhuma` (padrão compatível) ou `medida` (correção empírica por deslocamento espectral, medida em fibra SMF-28). Aplicar `medida` somente em estudos de sensibilidade ou fibras compatíveis.
+- **QBER:** `network.qkd.qberThresholdEnabled=false` por padrão. A QBER continua contabilizada na SKR. Com `true`, `maximumQber` fornece limite adicional e independente (11% é exemplo teórico BB84, não uma regra Moghaddam/Dibaj).
+- **PICh:** `pichOsnrCheckEnabled=true` por padrão; verificação independente de potência recebida continua opcional. O PICh tem efeito físico de interferente nas arquiteturas pertinentes; configurações `pichLongitudinalReuse` e `longitudinalXtEnabled` ficam visíveis na aba QKD.
+- **Demandas de chaves:** escolher `profile=moghaddam2021` (64/128/256 **ms**) ou `profile=dibaj2024` (64/128/256 **µs**). Para não usar valor fixo no gerador `traffic.keyRateMbps`, desativar `preferGeneratorFixedRate`.
+- **Johannisson NLI:** flags SCI e XCI por integral independentes. Padrão logarítmico com fallback de integral em casos matematicamente inválidos; Habibi possui modelo EGN próprio.
+- **Caches seguros:** a v1 já mantém cache de kernels GN e QoT de enlaces com chave sensível a fontes ópticas (inclusive PICh). Acrescentado cache transitório de faixas livres do `Spectrum` inspirado na v2, invalidado em uso/liberação. Para comparação A/B use `-Dsnets.noPerfCache=true`; com cache ativo, `-Dsnets.verifyPerf=true` verifica cada acerto contra cálculo independente. Essas opções podem ser informadas em **Executar → Argumentos da JVM**. Não substituímos o cache físico de fontes da v1 por uma versão baseada apenas em contadores de alteração, porque não garante invalidação equivalente para todas as transições de PICh e DCh.
+
+**Nota:** o launcher apenas edita os JSON. Para utilizar esses recursos é necessário compilar o simulador correspondente ao código atualizado e selecionar o novo JAR no launcher. O JAR de versões antigas não interpreta `maxskr` ou `antiStokesCorrection`.

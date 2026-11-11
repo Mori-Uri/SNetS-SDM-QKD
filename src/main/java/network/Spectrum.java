@@ -17,6 +17,22 @@ public class Spectrum implements Serializable {
 	private TreeSet<int[]> freeSpectrumBands; // Represents the free slots bands
 	private int numOfSlots;
 	private int usedSlots;
+	/** One-snapshot memoization (adapted from v2); never serialized. */
+	private transient int freeBandsVersion;
+	private transient int cachedFreeBandsVersion = -1;
+	private transient int cachedGuardBand = Integer.MIN_VALUE;
+	private transient int[][] cachedGuardedBands;
+	private transient long guardedBandsCacheHits, guardedBandsCacheMisses;
+
+	private void invalidateGuardedBands() {
+		freeBandsVersion++;
+		cachedGuardedBands = null;
+	}
+
+	/** Counters for profiling; disabling -Dsnets.noPerfCache also disables this cache. */
+	public long getGuardedBandsCacheHits() { return guardedBandsCacheHits; }
+	public long getGuardedBandsCacheMisses() { return guardedBandsCacheMisses; }
+
 	private double slotSpectrumBand;
 
 	private HashMap<Integer, int[]> downGuardBandList;
@@ -46,6 +62,7 @@ public class Spectrum implements Serializable {
 	}
 
 	private class MyComparator implements Comparator<int[]>, Serializable{
+
 		/**
 		 * Returns the compare.
 		 * @param o1 the o1.
@@ -57,6 +74,7 @@ public class Spectrum implements Serializable {
 			Integer i1, i2;
 			i1 = o1[0];
 			i2 = o2[0];
+
 			return i1.compareTo(i2);
 		}
 	}
@@ -68,7 +86,7 @@ public class Spectrum implements Serializable {
 	 * @return boolean
 	 */
 	public boolean useSpectrum(int spectrumBand[], int guardBand) throws Exception {
-		freeBandsVersion++; // Parte 54: invalidates the cache of getFreeSpectrumBands
+		invalidateGuardedBands();
 
 		if (spectrumBand[0] > spectrumBand[1]){
 			throw new Exception("Invalid spectrum band");
@@ -87,6 +105,7 @@ public class Spectrum implements Serializable {
 
 				// Create new free bands
 				int newSpecBand[];
+
 				if(spectrumBand[0] - freeSpecBand[0] != 0){ // Create band of what's left behind
 					newSpecBand = new int[2];
 					newSpecBand[0] = freeSpecBand[0];
@@ -132,7 +151,7 @@ public class Spectrum implements Serializable {
 	 * @param spectrumBand int[]
 	 */
 	public void freeSpectrum(int spectrumBand[], int guardBand) throws Exception {
-		freeBandsVersion++; // Parte 54: invalidates the cache of getFreeSpectrumBands
+		invalidateGuardedBands();
 
 		if(spectrumBand[0] > spectrumBand[1]){
 			throw new Exception("Invalid spectrum band");
@@ -169,6 +188,7 @@ public class Spectrum implements Serializable {
 
 		// Second merge with posterior free spectrum
 		int after[] = this.freeSpectrumBands.higher(spectrumBand);
+
 		if(after != null && (after[0] - 1) == spectrumBand[1]){// It is necessary to merge
 			merge = new int[2];
 			merge[0] = spectrumBand[0];
@@ -188,10 +208,13 @@ public class Spectrum implements Serializable {
 	private void addGuardBands(int spectrumBand[], int guardBand) {
 
 		int downGB = guardBand;
+
 		if(spectrumBand[0] == 1) { // Check if the band starts on the first slot
 			downGB = 0;
 		}
+
 		int upperGB = guardBand;
+
 		if(spectrumBand[1] == numOfSlots) { // Check if the band ends on the last slot
 			upperGB = 0;
 		}
@@ -230,10 +253,13 @@ public class Spectrum implements Serializable {
 	private void removeGuardBands(int spectrumBand[], int guardBand) {
 
 		int downGB = guardBand;
+
 		if(spectrumBand[0] == 1) { // Check if the band starts on the first slot
 			downGB = 0;
 		}
+
 		int upperGB = guardBand;
+
 		if(spectrumBand[1] == numOfSlots) { // Check if the band ends on the last slot
 			upperGB = 0;
 		}
@@ -276,7 +302,7 @@ public class Spectrum implements Serializable {
 			gb = downGuardBandList.get(slotNumber);
 
 			if ((gb[0] >= spectrumBand[0] && gb[0] <= spectrumBand[1]) || (gb[1] >= spectrumBand[0] && gb[1] <= spectrumBand[1]) ||
-			    (gb[0] <= spectrumBand[0] && gb[1] >= spectrumBand[0]) || (gb[0] <= spectrumBand[1] && gb[1] >= spectrumBand[1])) {
+				(gb[0] <= spectrumBand[0] && gb[1] >= spectrumBand[0]) || (gb[0] <= spectrumBand[1] && gb[1] >= spectrumBand[1])) {
 				return true;
 			}
 		}
@@ -285,7 +311,7 @@ public class Spectrum implements Serializable {
 			gb = upperGuardBandList.get(slotNumber);
 
 			if ((gb[0] >= spectrumBand[0] && gb[0] <= spectrumBand[1]) || (gb[1] >= spectrumBand[0] && gb[1] <= spectrumBand[1]) ||
-			    (gb[0] <= spectrumBand[0] && gb[1] >= spectrumBand[0]) || (gb[0] <= spectrumBand[1] && gb[1] >= spectrumBand[1])) {
+				(gb[0] <= spectrumBand[0] && gb[1] >= spectrumBand[0]) || (gb[0] <= spectrumBand[1] && gb[1] >= spectrumBand[1])) {
 				return true;
 			}
 		}
@@ -314,50 +340,35 @@ public class Spectrum implements Serializable {
 	 * @param guardBand
 	 * @return List<int[]>
 	 */
-	/*
-	 * Parte 54 (desempenho): the free bands of a spectrum are asked many times between two changes (RMSA, QoT,
-	 * metrics). The last result is kept, with the version of the spectrum and the guard band it was computed for, and
-	 * a copy is returned while nothing changed. useSpectrum and freeSpectrum change the version. The copy has new
-	 * arrays, as before, so callers can still change the list they receive.
-	 */
-	private transient int freeBandsVersion;
-	private transient int cachedBandsVersion;
-	private transient int cachedBandsGuardBand;
-	private transient int[][] cachedBands;
-
 	public List<int[]> getFreeSpectrumBands(int guardBand){
-		if (!simulator.PerfChecks.ENABLED) {
-			return computeFreeSpectrumBands(guardBand);
-		}
-		if (cachedBands != null && cachedBandsVersion == freeBandsVersion && cachedBandsGuardBand == guardBand) {
-			if (simulator.PerfChecks.STATS) simulator.PerfChecks.count(simulator.PerfChecks.BANDS_HIT);
-			final ArrayList<int[]> copy = new ArrayList<>(cachedBands.length);
-			for (int[] b : cachedBands) {
-				copy.add(new int[] {b[0], b[1]});
-			}
-			if (simulator.PerfChecks.VERIFY) {
-				final List<int[]> fresh = computeFreeSpectrumBands(guardBand);
-				boolean same = fresh.size() == copy.size();
-				for (int k = 0; same && k < fresh.size(); k++) {
-					same = fresh.get(k)[0] == copy.get(k)[0] && fresh.get(k)[1] == copy.get(k)[1];
+		if (Boolean.getBoolean("snets.noPerfCache")) return computeFreeSpectrumBands(guardBand);
+		if (cachedGuardedBands != null && cachedFreeBandsVersion == freeBandsVersion
+				&& cachedGuardBand == guardBand) {
+			guardedBandsCacheHits++;
+			simulator.PerfChecks.count(simulator.PerfChecks.BANDS_HIT);
+			List<int[]> result = new ArrayList<int[]>(cachedGuardedBands.length);
+			for (int[] band : cachedGuardedBands) result.add(band.clone());
+			if (Boolean.getBoolean("snets.verifyPerf")) {
+				List<int[]> actual = computeFreeSpectrumBands(guardBand);
+				if (actual.size() != result.size()) throw new IllegalStateException("spectrum cache mismatch: count");
+				for (int i = 0; i < actual.size(); i++) {
+					if (!java.util.Arrays.equals(actual.get(i), result.get(i)))
+						throw new IllegalStateException("spectrum cache mismatch: bands");
 				}
-				if (!same) throw new IllegalStateException("snets.verifyPerf: cache de faixas livres difere");
 			}
-			return copy;
+			return result;
 		}
-		if (simulator.PerfChecks.STATS) simulator.PerfChecks.count(simulator.PerfChecks.BANDS_MISS);
-		final List<int[]> computed = computeFreeSpectrumBands(guardBand);
-		final int[][] c = new int[computed.size()][];
-		for (int k = 0; k < c.length; k++) {
-			c[k] = new int[] {computed.get(k)[0], computed.get(k)[1]};
-		}
-		cachedBands = c;
-		cachedBandsVersion = freeBandsVersion;
-		cachedBandsGuardBand = guardBand;
-		return computed;
+		guardedBandsCacheMisses++;
+		simulator.PerfChecks.count(simulator.PerfChecks.BANDS_MISS);
+		List<int[]> fresh = computeFreeSpectrumBands(guardBand);
+		cachedGuardedBands = new int[fresh.size()][];
+		for (int i = 0; i < fresh.size(); i++) cachedGuardedBands[i] = fresh.get(i).clone();
+		cachedFreeBandsVersion = freeBandsVersion;
+		cachedGuardBand = guardBand;
+		return fresh;
 	}
 
-	/** The original getFreeSpectrumBands(guardBand) (Parte 54: called through the cache above). */
+	/** Original algorithm; no cache and no mutation of cached results. */
 	private List<int[]> computeFreeSpectrumBands(int guardBand){
 		ArrayList<int[]> res = new ArrayList<>();
 
