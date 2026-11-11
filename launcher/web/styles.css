@@ -670,3 +670,6 @@ tr.bulk-tpl td { background: var(--accent-soft); }
 .fig-group-main { flex-wrap: nowrap; }
 .fig-group-main select { flex: 0 1 180px; min-width: 80px; }
 .fig-toolbar { row-gap: 8px; column-gap: 10px; }
+
+/* Parte 63: linha de pasta na lista de vários casos */
+tr.folder-row td { background: var(--surface-2); border-top: 1px solid var(--border); }

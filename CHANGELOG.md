@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [63](#parte-63) | Parte 63 — launcher 1.22.1: lista de JARs atualizada e seleção de casos por pasta |
 | [62](#parte-62) | Parte 62 — launcher 1.22.0: tema da interface (azul, cinza, preto e claro) e casos de conferência antes do merge |
 | [61](#parte-61) | Parte 61 — launcher 1.21.2: uma só barra de rolagem nas janelas, "Salvar como…" na mesma linha e ícone do aplicativo na bandeja e no atalho |
 | [60](#parte-60) | Parte 60 — launcher 1.21.1: escolher pastas no explorador, X nas janelas, janela que se adapta ao tamanho e barra do estúdio reorganizada |
@@ -44,6 +45,16 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
 
 ---
+
+<a id="parte-63"></a>
+## Parte 63 — launcher 1.22.1: lista de JARs atualizada e seleção de casos por pasta
+
+- **Lista de JARs atualizada:** a lista lia os JARs só ao abrir o launcher, e um JAR gerado depois aparecia com a data e o
+  tamanho antigos. Agora ela é lida de novo do disco ao terminar o "Gerar JAR" e sempre que a caixa de JAR é aberta
+  (`run.js`).
+- **Vários casos:** a lista de casos ganhou uma linha por pasta, com uma caixa que marca ou desmarca todos os casos
+  dela (respeitando o filtro) e a contagem "n de m"; abaixo da lista aparece quantos casos estão selecionados. A lista
+  não volta mais ao topo a cada clique (`run.js`, `styles.css`).
 
 <a id="parte-62"></a>
 ## Parte 62 — launcher 1.22.0: tema da interface (azul, cinza, preto e claro) e casos de conferência antes do merge
