@@ -240,6 +240,14 @@ tools/regressao/referencias/*/csv/
 launcher/EDICAO_EXPERIMENTAL
 launcher/figure-styles.json
 launcher/figures/
+# Parte 59: configuracoes locais do launcher (podem ter o token do GitHub) e atualizacao baixada
+launcher/launcher-settings.properties
+launcher/.update/
+# Parte 61: icone e atalho criados pelo launcher ao abrir (Windows)
+launcher/snets-launcher.ico
+launcher/*.lnk
+# Parte 62: casos da conferencia main x experimental antes do merge (locais)
+/simulations/Regressao_Parte62/
 
 # Gerado na raiz quando as verificações do "Gerar JAR" rodam a partir da pasta do projeto
 /routesByPar.txt

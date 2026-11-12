@@ -195,6 +195,17 @@ public class Core implements Serializable {
      */
     private transient TreeSet<Circuit> sortedCircuits;
 
+    /**
+     * Parte 59: the last copy of sortedCircuits with a test circuit added or removed (PhysicalLayer.getCircuitList),
+     * with what it was built from. Read only, like sortedCircuits.
+     */
+    transient TreeSet<Circuit> derivedList;
+    transient TreeSet<Circuit> derivedBase;
+    transient long derivedMemberships;
+    transient int derivedBaseSize;
+    transient Circuit derivedTest;
+    transient boolean derivedAdd;
+
     /** Parte 54: the circuits of this core in id order (read only; the same order as new TreeSet(getCircuitList())). */
     public TreeSet<Circuit> getSortedCircuitList() {
         if (sortedCircuits == null || !simulator.PerfChecks.ENABLED) {

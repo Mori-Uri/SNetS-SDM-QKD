@@ -33,14 +33,36 @@ public class TrackedRequestList extends ArrayList<RequestForConnection> {
         owners.add(circuit);
     }
 
+    /** Parte 57: changes made through the methods below (ArrayList.set does not move modCount). */
+    private int changes;
+
+    /**
+     * Parte 57: a number that changes whenever the content or the order of the list may have changed: the changes
+     * made through this class, plus ArrayList's modCount (which also covers sort and the iterator's remove).
+     */
+    long stamp() {
+        return ((long) changes << 32) ^ (modCount & 0xffffffffL);
+    }
+
     private void changed() {
+        changes++;
         for (int i = 0; i < owners.size(); i++) {
             owners.get(i).physicalChange();
         }
     }
 
+    /** Parte 59: marks the requests that join this list (see RequestForConnection.markInTrackedList). */
+    private static void mark(RequestForConnection e) {
+        if (e != null) e.markInTrackedList();
+    }
+
+    private static void markAll(Collection<? extends RequestForConnection> c) {
+        for (RequestForConnection e : c) mark(e);
+    }
+
     @Override
     public boolean add(RequestForConnection e) {
+        mark(e);
         final boolean r = super.add(e);
         changed();
         return r;
@@ -48,12 +70,14 @@ public class TrackedRequestList extends ArrayList<RequestForConnection> {
 
     @Override
     public void add(int index, RequestForConnection e) {
+        mark(e);
         super.add(index, e);
         changed();
     }
 
     @Override
     public boolean addAll(Collection<? extends RequestForConnection> c) {
+        markAll(c);
         final boolean r = super.addAll(c);
         changed();
         return r;
@@ -61,6 +85,7 @@ public class TrackedRequestList extends ArrayList<RequestForConnection> {
 
     @Override
     public boolean addAll(int index, Collection<? extends RequestForConnection> c) {
+        markAll(c);
         final boolean r = super.addAll(index, c);
         changed();
         return r;
@@ -68,6 +93,7 @@ public class TrackedRequestList extends ArrayList<RequestForConnection> {
 
     @Override
     public RequestForConnection set(int index, RequestForConnection e) {
+        mark(e);
         final RequestForConnection r = super.set(index, e);
         changed();
         return r;
@@ -111,6 +137,7 @@ public class TrackedRequestList extends ArrayList<RequestForConnection> {
     @Override
     public void replaceAll(UnaryOperator<RequestForConnection> operator) {
         super.replaceAll(operator);
+        markAll(this);
         changed();
     }
 

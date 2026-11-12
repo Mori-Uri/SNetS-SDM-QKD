@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SNetS Launcher</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23155e75'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23fff'/%3E%3Ccircle cx='16' cy='8.5' r='3' fill='%23a5f3fc'/%3E%3Ccircle cx='16' cy='23.5' r='3' fill='%23a5f3fc'/%3E%3Ccircle cx='9.5' cy='12.2' r='3' fill='%23a5f3fc'/%3E%3Ccircle cx='22.5' cy='12.2' r='3' fill='%23a5f3fc'/%3E%3Ccircle cx='9.5' cy='19.8' r='3' fill='%23a5f3fc'/%3E%3Ccircle cx='22.5' cy='19.8' r='3' fill='%23a5f3fc'/%3E%3C/svg%3E">
+<script>
+  // Parte 62: tema da interface (Configurações > Aparência); a cópia local evita piscar o tema errado ao abrir
+  (function () { var t = 'blue'; try { t = localStorage.getItem('snets.theme') || 'blue'; } catch (e) { /* sem armazenamento */ }
+    document.documentElement.setAttribute('data-theme', /^(blue|gray|black|light)$/.test(t) ? t : 'blue'); })();
+</script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -31,6 +36,7 @@
     </button>
     <button class="btn ghost" id="btnJar" title="Compila o código-fonte do projeto e gera o JAR do simulador">Gerar JAR</button>
     <button class="btn ghost" id="btnSettings">Configurações</button>
+    <button class="btn ghost" id="btnQuit" title="Encerrar o launcher (e as simulações) ou deixá-lo na bandeja">Encerrar…</button>
   </div>
 </header>
 
@@ -91,7 +97,7 @@
 
 <dialog id="modal" class="modal">
   <form method="dialog" id="modalForm">
-    <h2 id="modalTitle"></h2>
+    <div class="modal-head"><h2 id="modalTitle"></h2><button class="btn ghost icon modal-x" value="cancel" formnovalidate title="Fechar (Esc)" aria-label="Fechar">✕</button></div>
     <div id="modalBody"></div>
     <div class="modal-error" id="modalError" hidden></div>
     <div class="modal-actions">
@@ -119,6 +125,7 @@
 <script src="js/presets.js"></script>
 <script src="js/figrender.js"></script>
 <script src="js/figures.js"></script>
+<script src="js/animation.js"></script>
 <script src="js/netedit.js"></script>
 <script src="js/qkdcase.js"></script>
 <script src="js/bulk.js"></script>

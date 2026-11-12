@@ -856,28 +856,72 @@
     }, 'Gerar JAR');
   }
 
+  /** Parte 62: aplica o tema da interface e guarda uma cópia local (lida pelo index.html antes do primeiro desenho). */
+  function applyTheme(t) {
+    const v = /^(blue|gray|black|light)$/.test(t || '') ? t : 'blue';
+    document.documentElement.setAttribute('data-theme', v);
+    try { localStorage.setItem('snets.theme', v); } catch (e) { /* sem armazenamento */ }
+  }
+  App.applyTheme = applyTheme;
+
   function settingsDialog() {
     const s = st.info.settings;
+    const themeSel = el('select.input', [['blue', 'Azul (padrão)'], ['gray', 'Cinza escuro'], ['black', 'Preto (AMOLED)'], ['light', 'Claro']]
+      .map(([v, t]) => el('option', { value: v }, t)));
+    themeSel.value = s.theme || 'blue';
+    themeSel.addEventListener('change', () => applyTheme(themeSel.value)); // prévia na hora
+    let themeSaved = false;
+    document.getElementById('modal').addEventListener('close', () => { if (!themeSaved) applyTheme(s.theme); }, { once: true });
     const proj = el('input.input.mono', { type: 'text', value: s.projectRootSetting, placeholder: s.projectRoot });
     const sims = el('input.input.mono', { type: 'text', value: s.simulationsDirSetting, placeholder: s.simulationsDir });
     const java = el('input.input.mono', { type: 'text', value: s.javaCommandSetting, placeholder: s.javaCommand });
     const javac = el('input.input.mono', { type: 'text', value: s.javacCommandSetting || '', placeholder: 'automático (JDK do launcher, JAVA_HOME ou PATH)' });
     const jvm = el('input.input.mono', { type: 'text', value: s.jvmArgs, placeholder: 'ex.: -Xmx8g' });
+    const imgs = el('input.input.mono', { type: 'text', value: s.imagesDirSetting || '', placeholder: s.imagesDir || 'launcher/figures' }); // Parte 60
     const jar = el('select.input', el('option', { value: '' }, '(automático: SNetS-SDM-QKD.jar, se existir)'),
       (st.info.jars || []).map((j) => el('option', { value: j.path }, j.name + ' · ' + j.location)));
     jar.value = s.defaultJar || '';
     const consoleCb = el('input', { type: 'checkbox', checked: !!s.runConsole, disabled: !s.consoleSupported });
+    // Parte 59: aplicativo
+    const appWin = el('input', { type: 'checkbox', checked: s.appWindow !== false });
+    const trayCb = el('input', { type: 'checkbox', checked: s.tray !== false });
+    const closeSel = el('select.input', [['tray', 'Continuar na bandeja do sistema (as simulações seguem rodando)'],
+      ['exitWhenDone', 'Encerrar quando as simulações terminarem'], ['exit', 'Encerrar tudo (as simulações gravam o estado e param)']]
+      .map(([v, t]) => el('option', { value: v }, t)));
+    closeSel.value = s.closePolicy || 'tray';
+    const updCb = el('input', { type: 'checkbox', checked: s.updateCheck !== false });
+    const repo = el('input.input.mono', { type: 'text', value: s.updateRepo || '', placeholder: 'dono/repositório' });
+    const token = el('input.input.mono', { type: 'password', value: '', placeholder: s.updateTokenSet ? '(definido; deixe vazio para manter)' : 'só para repositório privado' });
+    const clearToken = el('input', { type: 'checkbox' });
     App.modal('Configurações', el('div.form-grid',
-      el('div.field', el('div.flabel', 'Pasta do projeto SNetS'), proj, el('div.help', 'Vazio = pasta acima do launcher. Usada para achar o código-fonte (catálogo de algoritmos) e target/.')),
-      el('div.field', el('div.flabel', 'Pasta simulations'), sims, el('div.help', 'Vazio = <projeto>/simulations.')),
+      el('div.field', el('div.flabel', 'Pasta do projeto SNetS'), App.browseField(proj, 'folder', 'Pasta do projeto SNetS'), el('div.help', 'Vazio = pasta acima do launcher. Usada para achar o código-fonte (catálogo de algoritmos) e target/.')),
+      el('div.field', el('div.flabel', 'Pasta simulations'), App.browseField(sims, 'folder', 'Pasta simulations'), el('div.help', 'Vazio = <projeto>/simulations.')),
+      el('div.field', el('div.flabel', 'Pasta das imagens e animações'), App.browseField(imgs, 'folder', 'Pasta das imagens e animações'), el('div.help', 'Onde "Gravar imagens na pasta" e a animação gravam os arquivos. Vazio = launcher/figures.')),
       el('div.field', el('div.flabel', 'JAR padrão'), jar),
-      el('div.field', el('div.flabel', 'Comando java'), java, el('div.help', 'Vazio = o mesmo Java que está rodando o launcher (' + st.info.javaVersion + ').')),
+      el('div.field', el('div.flabel', 'Comando java'), App.browseField(java, 'file', 'java.exe'), el('div.help', 'Vazio = o mesmo Java que está rodando o launcher (' + st.info.javaVersion + ').')),
       el('div.field', el('div.flabel', 'Argumentos da JVM padrão'), jvm),
-      el('div.field', el('div.flabel', 'Comando javac (para Gerar JAR)'), javac, el('div.help', 'Ex.: C:\\Program Files\\Eclipse Adoptium\\jdk-21\\bin\\javac.exe. Vazio = procurar sozinho.')),
+      el('div.field', el('div.flabel', 'Comando javac (para Gerar JAR)'), App.browseField(javac, 'file', 'javac.exe'), el('div.help', 'Ex.: C:\\Program Files\\Eclipse Adoptium\\jdk-21\\bin\\javac.exe. Vazio = procurar sozinho.')),
       el('label.check', consoleCb, ' Abrir uma janela de console para cada execução (fechar a janela cancela a execução)'),
       !s.consoleSupported ? el('div.help', 'Janelas de console por execução só existem no Windows.') : null,
+      el('h3', { style: { margin: '10px 0 0', fontSize: '14px' } }, 'Aparência'),
+      el('div.field', el('div.flabel', 'Tema da interface'), themeSel, el('div.help', 'A mudança aparece na hora; Cancelar volta ao tema anterior. Os gráficos exportados não mudam.')),
+      el('h3', { style: { margin: '10px 0 0', fontSize: '14px' } }, 'Aplicativo'),
+      el('label.check', appWin, ' Abrir em janela própria (Edge ou Chrome sem abas); desligado = navegador padrão'),
+      el('label.check', trayCb, ' Ícone na bandeja do sistema (vale ao reabrir o launcher)'),
+      el('div.field', el('div.flabel', 'Ao fechar a janela do launcher'), closeSel,
+        el('div.help', 'Sem a bandeja do sistema, "continuar" deixa o launcher rodando sem janela; reabra pelo atalho.')),
+      el('label.check', updCb, ' Procurar atualizações no GitHub ao abrir'),
+      el('div.field', el('div.flabel', 'Repositório das atualizações'), repo),
+      el('div.field', el('div.flabel', 'Token do GitHub'), token, s.updateTokenSet ? el('label.check', clearToken, ' Remover o token') : null,
+        el('div.help', 'Só é preciso se o repositório for privado (token com leitura de conteúdo). Fica em launcher-settings.properties, fora do git.')),
+      el('div', el('button.btn.small', { type: 'button', on: { click: () => App.checkUpdate(true) } }, 'Procurar atualização agora')),
       el('p.muted.small', { style: { margin: 0 } }, 'Salvo em ', el('code', s.launcherDir + (s.launcherDir.includes('\\') ? '\\' : '/') + 'launcher-settings.properties'))), async () => {
-      await App.api.saveSettings({ projectRoot: proj.value, simulationsDir: sims.value, javaCommand: java.value, jvmArgs: jvm.value, defaultJar: jar.value, runConsole: consoleCb.checked ? 'true' : 'false', javacCommand: javac.value });
+      const extra = { theme: themeSel.value, imagesDir: imgs.value, appWindow: appWin.checked ? 'true' : 'false', tray: trayCb.checked ? 'true' : 'false', closePolicy: closeSel.value,
+        updateCheck: updCb.checked ? 'true' : 'false', updateRepo: repo.value };
+      if (token.value.trim()) extra.updateToken = token.value.trim();
+      else if (clearToken.checked) extra.updateToken = '';
+      await App.api.saveSettings(Object.assign({ projectRoot: proj.value, simulationsDir: sims.value, javaCommand: java.value, jvmArgs: jvm.value, defaultJar: jar.value, runConsole: consoleCb.checked ? 'true' : 'false', javacCommand: javac.value }, extra));
+      themeSaved = true;
       await init(true);
       App.toast('Configurações salvas', 'ok');
     }, 'Salvar');
@@ -926,6 +970,7 @@
     try {
       const [info, catalog] = await Promise.all([App.api.info(), App.api.catalog()]);
       st.info = info; st.catalog = catalog;
+      applyTheme(info.settings && info.settings.theme); // Parte 62
     } catch (e) {
       App.toast(e.message, 'err');
       return;
@@ -963,6 +1008,66 @@
   document.getElementById('btnRefreshTree').addEventListener('click', () => App.loadTree());
   document.getElementById('treeFilter').addEventListener('input', App.debounce(drawTree, 120));
   document.getElementById('btnSettings').addEventListener('click', settingsDialog);
+
+  // ================================================================== Parte 59: aplicativo
+
+  // heartbeat: the launcher knows when every window of the interface was closed (close policy in Configurações)
+  (function heartbeat() {
+    const page = Math.random().toString(36).slice(2, 10);
+    const ping = () => { fetch('/api/app/ping?page=' + page, { method: 'POST', keepalive: true }).catch(() => { /* server closed */ }); };
+    ping();
+    setInterval(ping, 5000);
+    window.addEventListener('pagehide', () => { try { navigator.sendBeacon('/api/app/bye?page=' + page, ''); } catch (e) { /* ignore */ } });
+  })();
+
+  function closedScreen(text) {
+    document.body.appendChild(el('div.app-closed', el('div.app-closed-box', el('h2', 'SNetS Launcher'), el('p', text),
+      el('p.muted.small', 'Para abrir de novo, use o atalho SNetS-Launcher.'))));
+  }
+
+  document.getElementById('btnQuit').addEventListener('click', async () => {
+    let active = 0;
+    try { active = (await App.api.runs()).filter((r) => r.state === 'running' || r.state === 'queued').length; } catch (e) { /* ignore */ }
+    const body = el('div.form-grid',
+      el('p', { style: { margin: 0 } }, active ? active + ' simulação(ões) em execução ou na fila.' : 'Nenhuma simulação em execução.'),
+      el('div.quit-options',
+        el('button.btn.primary', { type: 'button', on: { click: async () => {
+          try { await App.api.appExit('now'); } catch (e) { /* closing */ }
+          document.querySelector('dialog[open]') && document.querySelector('dialog[open]').close();
+          closedScreen(active ? 'Launcher encerrado. As simulações gravaram o estado e pararam; "Continuar execução" retoma de onde pararam.' : 'Launcher encerrado. Pode fechar esta janela.');
+        } } }, 'Encerrar tudo agora'),
+        active ? el('button.btn', { type: 'button', on: { click: async () => {
+          try { await App.api.appExit('whenDone'); App.toast('O launcher será encerrado quando as simulações terminarem.', 'ok'); } catch (e) { App.toast(e.message, 'err'); }
+          document.querySelector('dialog[open]') && document.querySelector('dialog[open]').close();
+        } } }, 'Encerrar quando as simulações terminarem') : null,
+        el('button.btn', { type: 'button', on: { click: () => {
+          document.querySelector('dialog[open]') && document.querySelector('dialog[open]').close();
+          window.close();
+          setTimeout(() => App.toast('O navegador não deixou fechar a janela: feche-a pelo X. O launcher continua rodando' + (st.info && st.info.settings && st.info.settings.closePolicy === 'exit' ? ' até a janela ser fechada.' : ' na bandeja.'), 'ok', 8000), 300);
+        } } }, 'Só fechar a janela (o launcher continua)')),
+      el('p.help.muted.small', { style: { margin: 0 } }, 'Encerrar grava o estado das simulações em andamento (como o botão Cancelar).'));
+    App.modal('Encerrar o launcher', body, null, null);
+  });
+
+  /** Looks for a newer release on GitHub (Configurações › Aplicativo). */
+  App.checkUpdate = async function (manual) {
+    let u;
+    try { u = await App.api.updateCheck(); } catch (e) { if (manual) App.toast(e.message, 'err'); return; }
+    if (!u.newer) { if (manual) App.toast(u.latest ? 'O launcher está atualizado (' + u.current + ').' : 'Nenhuma versão publicada no GitHub para esta edição.', 'ok'); return; }
+    const notes = el('pre.small', { style: { whiteSpace: 'pre-wrap', maxHeight: '240px', overflow: 'auto' } }, u.notes || '');
+    const body = el('div.form-grid',
+      el('p', { style: { margin: 0 } }, 'Versão ' + u.latest + ' disponível (esta é a ' + u.current + ').'), notes,
+      u.gitClone ? el('div.notice.info', 'Esta pasta é um clone do git: atualize pelo GitHub Desktop (Fetch origin, depois Pull).')
+        : u.pending ? el('div.notice.info', 'Já há uma atualização baixada: feche e abra o launcher para aplicá-la.')
+          : el('div.notice.info', 'Baixar grava a atualização em launcher/.update; ela é aplicada na próxima vez que o launcher abrir. A pasta simulations não é mexida.'),
+      u.url ? el('a', { href: u.url, target: '_blank', rel: 'noopener' }, 'Ver a versão no GitHub') : null);
+    const canDownload = !u.gitClone && !u.pending && u.asset;
+    App.modal('Atualização do launcher', body, canDownload ? async () => {
+      await App.api.updateDownload(u.asset);
+      App.toast('Atualização baixada. Feche e abra o launcher para aplicá-la.', 'ok', 8000);
+    } : null, canDownload ? 'Baixar' : null);
+  };
+  setTimeout(() => { if (st.info && st.info.settings && st.info.settings.updateCheck !== false) App.checkUpdate(false); }, 4000);
   document.getElementById('btnJar').addEventListener('click', () => jarDialog().catch((e) => App.toast(e.message, 'err')));
   document.getElementById('btnRuns').addEventListener('click', App.run.openDrawer);
   function leaveCase() {

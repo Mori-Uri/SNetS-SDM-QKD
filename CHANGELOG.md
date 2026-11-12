@@ -5,7 +5,13 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [63](#parte-63) | Parte 63 — launcher 1.22.1: lista de JARs atualizada e seleção de casos por pasta |
+| [62](#parte-62) | Parte 62 — launcher 1.22.0: tema da interface (azul, cinza, preto e claro) e casos de conferência antes do merge |
+| [61](#parte-61) | Parte 61 — launcher 1.21.2: uma só barra de rolagem nas janelas, "Salvar como…" na mesma linha e ícone do aplicativo na bandeja e no atalho |
+| [60](#parte-60) | Parte 60 — launcher 1.21.1: escolher pastas no explorador, X nas janelas, janela que se adapta ao tamanho e barra do estúdio reorganizada |
+| [59](#parte-59) | Parte 59 — desempenho etapa 2 (multibanda e C+L), animação dos gráficos e launcher como aplicativo (1.21.0) |
 | [58](#parte-58) | Parte 58 — casos multibanda: cargas menores, cenário da multinúcleo, trechos longos, fibra bidirecional e NLI |
+| [57](#parte-57) | Parte 57 — otimizações de desempenho, etapa 1: crosstalk, taxa do circuito, energia e utilização do espectro |
 | [56](#parte-56) | Parte 56 — launcher 1.20.8: cabeçalho do caso em uma linha, atalhos das seções, resumo das opções e chaves liga/desliga |
 | [55](#parte-55) | Parte 55 — launcher 1.20.7: padrão de aparência por tipo de gráfico, botões de topo/fim, edição automática do launcher |
 | [54](#parte-54) | Parte 54 — otimizações de desempenho sem mudança nos resultados (clássico e QKD) |
@@ -42,6 +48,142 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 ---
 
+<a id="parte-63"></a>
+## Parte 63 — launcher 1.22.1: lista de JARs atualizada e seleção de casos por pasta
+
+- **Lista de JARs atualizada:** a lista lia os JARs só ao abrir o launcher, e um JAR gerado depois aparecia com a data e o
+  tamanho antigos. Agora ela é lida de novo do disco ao terminar o "Gerar JAR" e sempre que a caixa de JAR é aberta
+  (`run.js`).
+- **Vários casos:** a lista de casos ganhou uma linha por pasta, com uma caixa que marca ou desmarca todos os casos
+  dela (respeitando o filtro) e a contagem "n de m"; abaixo da lista aparece quantos casos estão selecionados. A lista
+  não volta mais ao topo a cada clique (`run.js`, `styles.css`).
+
+<a id="parte-62"></a>
+## Parte 62 — launcher 1.22.0: tema da interface (azul, cinza, preto e claro) e casos de conferência antes do merge
+
+- **Tema da interface** em Configurações > Aparência: Azul (padrão, o escuro de antes), Cinza escuro, Preto (AMOLED) e
+  Claro. A mudança aparece na hora e Cancelar volta ao tema anterior. Fica em `launcher-settings.properties` (`theme`),
+  com uma cópia local no navegador para a janela já abrir com o tema certo. Antes o launcher seguia o tema do sistema;
+  agora usa sempre o escolhido (`styles.css`, `index.html`, `app.js`, `Settings.java`, `LauncherServer.java`).
+- **Casos de conferência** `simulations/Regressao_Parte62` (11 casos reduzidos, iguais na main e na experimental):
+  multinúcleo (Test9 e Test10), multibanda 1381 e 1310 nm, MB-SDM, enlace de 200 km, C+L com ISRS e fibra única com
+  NLI. Servem para conferir que os simuladores das duas branches dão os mesmos resultados antes do merge. São locais
+  (`.gitignore`).
+
+<a id="parte-61"></a>
+## Parte 61 — launcher 1.21.2: uma só barra de rolagem nas janelas, "Salvar como…" na mesma linha e ícone do aplicativo na bandeja e no atalho
+
+Ajustes pedidos depois de testar a Parte 60 (branch experimental).
+
+- **Uma só barra de rolagem nas janelas de diálogo:** a janela (Configurações etc.) não rola mais por fora; só o conteúdo rola, com o título, o X e os botões sempre à vista (`launcher/web/styles.css`).
+- **Estúdio de gráficos:** o primeiro grupo (Nova, figura salva, Salvar, Salvar como…) fica sempre numa linha; a lista de figuras encolhe quando falta espaço (`figures.js`, `styles.css`).
+- **Ícone do aplicativo:** o ícone da bandeja do sistema passa a ser o mesmo da janela da interface (disco azul-petróleo com sete pontos). A janela do "Procurar…" usa o mesmo ícone (`AppShell.java`, `Picker.java`).
+- **Atalho com ícone:** um `.bat` não pode ter ícone próprio; por isso, ao abrir no Windows, o launcher grava `launcher/snets-launcher.ico` e, se ainda não existir, cria em `launcher/` o atalho `SNetS Launcher.lnk` (`SNetS Launcher (experimental).lnk` nesta edição), que roda `SNetS-Launcher.bat` minimizado. O atalho pode ser copiado para a Área de Trabalho ou fixado na barra de tarefas. Para recriá-lo, apague-o e abra o launcher; `-Dsnets.shortcut=false` desliga. O ícone e o atalho são locais (`.gitignore`).
+
+<a id="parte-60"></a>
+
+## Parte 60 — launcher 1.21.1: escolher pastas no explorador, X nas janelas, janela que se adapta ao tamanho e barra do estúdio reorganizada
+
+Só na branch `experimental`. Só o launcher muda.
+
+- **Escolher no explorador de arquivos:** os campos de pasta e de programa têm um botão "Procurar…", que abre o explorador do Windows (`/api/pick`, `launcher/src/launcher/Picker.java`). Em Configurações: pasta do projeto, pasta simulations, pasta das imagens e animações, java e javac.
+- **Pasta das imagens e animações** (nova, em Configurações): onde "Gravar imagens na pasta" e a animação gravam os arquivos. O padrão continua `launcher/figures`. Também dá para escolher pelo botão "Escolher pasta…" do estúdio e pelo destino da animação. As figuras salvas (`.json`) continuam em `launcher/figures`.
+- **X para fechar** no topo de todas as janelas de diálogo (Configurações, Salvar figura etc.). Uma janela mais alta que a tela rola por dentro, com o X e os botões sempre à vista.
+- **Janela de qualquer tamanho:**
+  - a barra do topo quebra em duas linhas em vez de sobrepor o nome e os botões, e o caminho da pasta encolhe com reticências;
+  - as abas do caso quebram em linhas em vez da barra de rolagem;
+  - em janelas baixas (até 640 px), o cabeçalho do caso rola junto com a página;
+  - sem rolagem horizontal da página inteira.
+- **Barra do estúdio de gráficos**, em grupos que quebram juntos:
+  - figura (Nova, figuras salvas, Salvar, Salvar como…);
+  - **Imagem** (PNG 1× a 4×, .SVG, .PNG, Gravar imagens na pasta, Dados (CSV));
+  - **Animação** (Gerar animação);
+  - à direita, Abrir pasta, Escolher pasta… e Zerar numeração.
+
+### Arquivos
+
+- `launcher/src/launcher/Picker.java` (novo), `LauncherServer.java`, `Settings.java` e `Figures.java`.
+- `launcher/web/index.html`, `styles.css`, `js/app.js`, `js/api.js`, `js/util.js`, `js/figures.js` e `js/animation.js`.
+- `launcher/snets-launcher.jar`.
+
+---
+
+<a id="parte-59"></a>
+
+## Parte 59 — desempenho etapa 2 (multibanda e C+L), animação dos gráficos e launcher como aplicativo (1.21.0)
+
+Só na branch `experimental`. Os algoritmos não foram alterados. Os resultados não mudam: cada valor reaproveitado é o mesmo que o código original calcularia, e as somas seguem a mesma ordem.
+
+### Simulador: desempenho, etapa 2
+
+- **Raman espontâneo do QCh** (`qkd/physical/QKDPhysicalLayer`):
+  - a seção de Raman e o comprimento efetivo de cada circuito clássico dependem só dos slots dele, do λ e da perda do QCh, do comprimento do trecho e do tipo de termo (direto, contrapropagante, entre núcleos); ficam guardados por essas entradas, em vez de recalcular `expm1` e o espectro de Raman a cada avaliação;
+  - a soma por circuito, antes num `TreeMap<Integer, Double>`, usa vetores ordenados pelo id, com as mesmas somas na mesma ordem.
+- **Modelo GN com QoT por banda (C+L)** (`network/GnPairCache`, `PhysicalLayer.getGnli2`): os dois termos que um circuito j soma ao NLI de um circuito i ficam guardados no circuito i enquanto nenhum dos dois muda de frequência, largura ou modulação. Só vale com a QoT clássica por banda: na banda C sozinha, a memória de `arcsinh` da Parte 54 já atende quase todas as chamadas.
+- **ISRS** (`PhysicalLayer.aseBand`): as bordas da banda e a potência total do enlace são lidas uma vez para as duas perdas de ISRS de cada enlace.
+- **Lista de circuitos com o circuito em teste** (`PhysicalLayer.getCircuitList`, `Core`): a cópia do conjunto do núcleo com o circuito em teste é guardada no núcleo e reaproveitada por todos os circuitos já ativos, enquanto nenhum circuito entra ou sai.
+- **Taxa do circuito** (correção da Parte 57): a soma guardada só é descartada quando muda a taxa de uma requisição que já está num circuito (`RequestForConnection.markInTrackedList`). Antes, cada requisição nova gerada invalidava as somas de todos os circuitos.
+- Os interruptores de sempre valem: `-Dsnets.noPerfCache=true` (caminho original) e `-Dsnets.verifyPerf=true` (compara cada valor reaproveitado com o cálculo original).
+
+**Tempo, JAR da Parte 57 × Parte 59, 1 thread, mesma máquina:**
+
+| Caso | Parte 57 | Parte 59 | Redução |
+|---|---|---|---|
+| Teste_EX reduzido (clássico, banda C) | 92 s | 82 s | −11 % |
+| Teste_Ex_QKD reduzido (QKD, banda C) | 79 s | 72 s | −9 % |
+| Losango, fibra comum, 1381 nm (D2 da Parte 58, curto) | 19,9 s | 14,2 s | −29 % |
+| Losango, MCF-7, MB-SDM, 7× a carga (E2 da Parte 58, curto) | 82 s | 41 s | −50 % |
+| Losango, C+L com QoT por banda e ISRS (B4 da Parte 49, curto) | 61 s | 29 s | −53 % |
+
+Os casos "curtos" têm 4 000 a 20 000 requisições e 1 carga. Na banda C o tempo varia uns 5 % de uma execução para outra.
+
+**Verificação:**
+
+- **CSV a CSV, 1 thread:** C01, C02, Q01, Q07, Q09, M02 e M03 idênticos byte a byte ao JAR da Parte 57.
+- **Casos de tempo:** D2 e E2 idênticos, com só a ordem das linhas "por par" mudando, como na Parte 57. No B4 o bloqueio total é o mesmo; só a divisão entre as causas e a fragmentação externa mudam. É o sorteio sem semente do `spcsav2`: o próprio JAR da Parte 57 rodado duas vezes muda os mesmos três CSVs.
+- **Modo `-Dsnets.verifyPerf=true`:** nenhuma diferença nos 17 casos de regressão e nos casos de C+L (B4) e MB-SDM (E2).
+- **Regressão dos 17 casos contra a referência gerada com o JAR anterior à Parte 57:** todos idênticos ou equivalentes. Só o último dígito do `ConsumedEnergy.csv` muda, como já acontece com várias threads.
+
+### Launcher: animação dos gráficos
+
+- Botão **"Animação…"** no estúdio de gráficos (e na aba Resultados), para qualquer tipo de gráfico. Cada quadro é a figura aberta, com as mesmas configurações, num ponto de carga.
+  - **Modo acumulado** (gráficos com a carga no eixo x: linhas × carga e dispersão "um ponto por carga"): cada quadro acrescenta a próxima carga. **Modo instantâneo**: só a carga do quadro.
+  - **Eixos fixos** (limites de todos os quadros; nos mapas, a mesma escala de cores) ou **adaptáveis**. Limites definidos à mão valem nos dois modos.
+  - **Título da carga:** "Carga 3", "1.200 E", os dois ou um texto livre com `{n}` e `{erl}`, acima, abaixo ou num canto do gráfico, com tamanho próprio.
+  - **Pontos de carga** escolhidos, **tempo por quadro** (0,25 a 5 s ou outro valor), último quadro mais longo e repetição em ciclo.
+  - **Prévia** com reproduzir, pausar e quadro a quadro.
+  - **Salvar** em GIF (codificador próprio, sem internet), MP4 ou WebM (gravados pelo navegador, em tempo real), na resolução 1×, 2× ou 3×, com os quadros separados em PNG e/ou SVG se quiser. Destino: download ou `launcher/figures`.
+  - As escolhas ficam guardadas na figura (`anim`).
+- O servidor aceita GIF, MP4 e WebM em `/api/figure/image` (até 200 MB).
+
+### Launcher: aplicativo
+
+- **`SNetS-Launcher.bat`** abre o launcher sem janela de console (`javaw`), com ícone na **bandeja do sistema** e a interface numa **janela própria** (Edge ou Chrome em modo aplicativo, sem abas). As mensagens vão para `launcher/launcher.log`. O jeito antigo, com console, ficou em `SNetS-Launcher-console.bat`.
+- **Ícone na bandeja:** abrir a janela, simulações em execução, "Encerrar quando as simulações terminarem" e "Encerrar tudo" (as simulações gravam o estado e param, como no Cancelar). Avisa quando uma simulação termina.
+- **Ao fechar a janela** (Configurações › Aplicativo): continuar na bandeja com as simulações rodando (padrão), encerrar quando as simulações terminarem, ou encerrar tudo.
+- **Botão "Encerrar…"** no topo: encerrar tudo agora, encerrar quando as simulações terminarem, ou só fechar a janela.
+- **Uma instância só:** abrir o launcher de novo, com ele já rodando, só abre a janela.
+- **Atualizações pelo GitHub:**
+  - o launcher procura a Release mais nova da sua edição (tags `main-v<versão>` e `exp-v<versão>`) ao abrir e em Configurações › Aplicativo;
+  - numa pasta que é clone do git, avisa para atualizar pelo GitHub Desktop;
+  - fora do git, baixa o zip para `launcher/.update/`, e o `.bat` o aplica na próxima abertura;
+  - repositório privado: token em Configurações, guardado só em `launcher-settings.properties`;
+  - `.github/workflows/release.yml` gera o zip ao enviar uma tag.
+- `.gitignore`: `launcher/launcher-settings.properties` e `launcher/.update/` (o `launcher.log` já entrava em `*.log`).
+
+### Arquivos
+
+- **Simulador** (`src/main/java`):
+  - novo: `network/GnPairCache.java`;
+  - alterados: `network/PhysicalLayer.java`, `Core.java`, `Circuit.java` e `TrackedRequestList.java`;
+  - alterados: `request/RequestForConnection.java` e `qkd/physical/QKDPhysicalLayer.java`.
+- **Launcher:**
+  - novos: `src/launcher/AppShell.java`, `src/launcher/AppUpdate.java`, `web/js/animation.js` e `SNetS-Launcher-console.bat`;
+  - alterados: `LauncherServer.java`, `Settings.java`, `Figures.java`, `web/index.html`, `web/styles.css`, `web/js/app.js`, `web/js/api.js`, `web/js/figures.js`, `web/js/figrender.js`, `SNetS-Launcher.bat` e `snets-launcher.jar`.
+- **Outros:** `.github/workflows/release.yml`, `.gitignore` e `docs/ANALISE_DESEMPENHO_PARTE57.md` (seção 10).
+
+---
+
 <a id="parte-58"></a>
 
 ## Parte 58 — casos multibanda: cargas menores, cenário da multinúcleo, trechos longos, fibra bidirecional e NLI
@@ -57,6 +199,46 @@ Só na `main`. Só casos de simulação e o script que os gera; o simulador não
 - `tools/casos/gerar_casos_parte58.py`: gera os casos.
 - `.gitignore`: os resultados, os `*.txt` e os save states da pasta nova ficam fora do git, como nas Partes 43 e 49; `docs/IDEIAS_FUTURAS.md` também fica só local.
 - **Conferência:** cada caso rodou num teste curto (800 requisições, 1 carga) sem erro, com o código da main.
+
+---
+
+<a id="parte-57"></a>
+
+## Parte 57 — otimizações de desempenho, etapa 1: crosstalk, taxa do circuito, energia e utilização do espectro
+
+Só na branch `experimental`. Os algoritmos não foram alterados (nem `GPRMCSA.java`, nem `CSBASDM.java`, nem os demais): as mudanças ficam na camada física, no circuito e nas métricas, que todos os algoritmos usam. Cada valor reaproveitado é o mesmo que o código original calcularia, e as somas em ponto flutuante seguem a mesma ordem, então os resultados não mudam bit a bit. A análise que levou a estas mudanças está em `docs/ANALISE_DESEMPENHO_PARTE57.md`.
+
+### Simulador
+
+- `Crosstalk.isIntersection`: duas faixas de slots se cruzam quando `max(inícios) ≤ min(fins)`. Antes, cada chamada montava uma lista com os slots de uma faixa e procurava os da outra.
+- `Circuit.getRequiredBitRate`: a soma das taxas das requisições fica guardada no circuito enquanto a lista de requisições e as taxas não mudam. Um contador em `RequestForConnection.setRequiredBitRate` e outro em `TrackedRequestList` avisam as mudanças.
+- `EnergyConsumption.computeTransponderPowerConsumption`: o consumo do transponder fica guardado no circuito com a rota, a modulação e os slots de que depende.
+- Modelo GN (`PhysicalLayer.getGnli2`): a tabela de `arcsinh` da thread é lida uma vez por laço, não uma vez por chamada.
+- `SpectrumUtilization`: durante a simulação, as somas ficam em vetores indexados pelo enlace e pelo núcleo, sem montar o nome do enlace nem usar `HashMap` a cada requisição. Os mapas recebem os valores quando são lidos, com as chaves na mesma ordem de antes.
+- Os mesmos interruptores da Parte 54 valem para estas mudanças: `-Dsnets.noPerfCache=true` usa o caminho original e `-Dsnets.verifyPerf=true` compara cada valor com o cálculo original.
+
+### Verificação
+
+- **Com 1 thread, JAR antigo × novo, CSV a CSV:** C01, C02, Q01, Q07, Q09 e M02 com todos os CSVs idênticos byte a byte.
+- **Teste_EX e Teste_Ex_QKD reduzidos:** mesmos valores. Só a ordem das linhas "por par" muda em 3 CSVs, porque essas tabelas são impressas a partir de um `HashMap` (diferença já conhecida e aceita pela regressão).
+- **Regressão dos 17 casos (com as threads de cada caso), contra uma referência nova gerada com o JAR antigo:** só `ConsumedEnergy.csv` difere, no último dígito. Isso já acontece entre duas execuções do JAR antigo: com várias threads, a ordem de criação dos circuitos muda a ordem da soma. Com 1 thread, esse CSV é idêntico. No M01, numa das execuções, a média de OSNR do `PhysicalLayerStatistics.csv` também mudou: é o sorteio sem semente do núcleo de um circuito bloqueado no `spcsav2` (o mesmo motivo dos CSVs que o M01 já ignora). Repetido duas vezes com o JAR novo, o valor voltou a ser o da referência.
+- **Modo `-Dsnets.verifyPerf=true` nos 17 casos:** nenhuma diferença entre os valores reaproveitados e o cálculo original.
+
+### Tempo
+
+| Caso | Parte 54 | Parte 57 | Redução |
+|---|---|---|---|
+| Teste_EX reduzido | 143 s | 100 s | −30 % |
+| Teste_Ex_QKD reduzido | 103 s | 83 s | −19 % |
+
+Antes da Parte 54 eram 258 s e 202 s.
+
+### Arquivos
+
+- Alterados:
+  - `network/Crosstalk.java`, `network/Circuit.java`, `network/TrackedRequestList.java`, `network/EnergyConsumption.java` e `network/PhysicalLayer.java`;
+  - `request/RequestForConnection.java` e `measurement/SpectrumUtilization.java`.
+- Documentação: `docs/ANALISE_DESEMPENHO_PARTE57.md`.
 
 ---
 
@@ -83,6 +265,8 @@ Só na `main`. Só o launcher muda; o simulador, os arquivos dos casos e os resu
   - o campo `enabled` deixa de aparecer dentro do grupo; o botão da seção na sub-barra mostra "· off" quando o grupo está desligado.
   - O bloco `qkd` da aba Rede continua com o seletor Clássica/QKD do cabeçalho.
 - Campos booleanos viram chaves liga/desliga, com o texto "ativado/desativado" acompanhando o estado.
+
+---
 
 <a id="parte-55"></a>
 

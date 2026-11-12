@@ -608,12 +608,13 @@
     const pts = series.flatMap((s) => s.points.filter((p) => Number.isFinite(p.mean)));
     const showErr = st.errorBars !== 'none';
     const yvals = pts.flatMap((p) => showErr && Number.isFinite(p.ci) ? [p.mean - p.ci, p.mean + p.ci] : [p.mean])
-      .concat(refLinesOf(st, 'y').map((r) => App.parseNumber(String(r.value))));
+      .concat(refLinesOf(st, 'y').map((r) => App.parseNumber(String(r.value))))
+      .concat(model.yDomain || []); // Parte 59: animation with fixed axes
     const ySpec = yScaleSpec(yvals, st);
 
     // x axis
     let xSpec;
-    const xsAll = [...new Set(pts.map((p) => p.x))].sort((a, b) => a - b);
+    const xsAll = [...new Set(pts.map((p) => p.x).concat(model.xDomain || []))].sort((a, b) => a - b); // Parte 59: xDomain (animation)
     const catMode = st.xAsCategories && xsAll.length <= 40 && !model.xNumericOnly;
     if (catMode) {
       const labels = xsAll.map((v) => (model.xLabel ? model.xLabel(v) : fmtNumber(v, st.xFormat, Number(st.xDigits), st.decimal)));
@@ -723,7 +724,7 @@
     } else {
       yvals = series.flatMap((s) => cats.map((c) => val(s, c)).filter(Boolean).map((v) => (showErr && Number.isFinite(v.ci) ? v.mean + v.ci : v.mean)));
     }
-    yvals = yvals.concat(refLinesOf(st, 'y').map((r) => App.parseNumber(String(r.value))));
+    yvals = yvals.concat(refLinesOf(st, 'y').map((r) => App.parseNumber(String(r.value)))).concat(model.yDomain || []); // Parte 59
     const stLocal = model.normalize && st.yFormat === 'auto' ? Object.assign({}, st, { yFormat: 'percent', yDigits: 0 }) : st;
     const ySpec = yScaleSpec(yvals, stLocal, model.normalize ? { forceMax: 1 } : {});
     const xSpec = { type: 'band', labels: cats.map((c) => c.label) };

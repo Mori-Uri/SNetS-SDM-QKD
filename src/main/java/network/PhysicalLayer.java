@@ -192,6 +192,33 @@ public class PhysicalLayer implements Serializable {
 	 * Parte 49: extra span loss (dB, &gt;= or &lt; 0) of the circuit at fi caused by ISRS on this link, for a span of
 	 * spanKm. The WDM band is taken from the edges of the circuits in the fibre; the power is their total launch power.
 	 */
+	/** Parte 59: band edges and total launch power of the circuits of the link, as read by isrsLossDb. */
+	private double[] isrsBand(Circuit circuit, int[] spectrumAssigned, Link link, TreeSet<Circuit> circuitList) {
+		double fMin = Double.POSITIVE_INFINITY, fMax = Double.NEGATIVE_INFINITY, total = 0.0;
+		for (Circuit c : circuitList) {
+			int[] sa = c.equals(circuit) ? spectrumAssigned : c.getSpectrumAssignedByLink(link);
+			if (sa == null) {
+				continue;
+			}
+			fMin = Math.min(fMin, lowerFrequency + slotBandwidth * (sa[0] - 1.0));
+			fMax = Math.max(fMax, lowerFrequency + slotBandwidth * sa[1]);
+			total += getCircuitLaunchPower(c, c.getModulation());
+		}
+		return new double[] { fMin, fMax, total };
+	}
+
+	/** Parte 59: isrsLossDb with the band already read by isrsBand. */
+	private double isrsLossDbWith(double[] band, ClassicalMultiBand.Params p, double fi, TreeSet<Circuit> circuitList, double spanKm) {
+		if (multiBand == null || !multiBand.isIsrs() || circuitList == null || spanKm <= 0.0) {
+			return 0.0;
+		}
+		if (!(band[1] > band[0])) {
+			return 0.0;
+		}
+		double rho = multiBand.isrsRatio(fi, band[0], band[1], band[2], p.alphaLinear, spanKm);
+		return -10.0 * Math.log10(rho);
+	}
+
 	private double isrsLossDb(ClassicalMultiBand.Params p, double fi, Circuit circuit, int[] spectrumAssigned, Link link, TreeSet<Circuit> circuitList, double spanKm) {
 		if (multiBand == null || !multiBand.isIsrs() || circuitList == null || spanKm <= 0.0) {
 			return 0.0;
@@ -222,8 +249,20 @@ public class PhysicalLayer implements Serializable {
 				lineAmp.getGain(), lineAmp.getNoiseFigure(), lineAmp.getFrequency(),
 				preAmp.getNoiseFigure(), preAmp.getFrequency() };
 		try {
-			lineAmp.setGain(p.alphaDbPerKm * L + isrsLossDb(p, fi, circuit, spectrumAssigned, link, circuitList, L));
-			preAmp.setGain(p.alphaDbPerKm * lastFiberSegment + isrsLossDb(p, fi, circuit, spectrumAssigned, link, circuitList, lastFiberSegment));
+			// Parte 59 (desempenho): the two ISRS losses below read the same band edges and total power of the
+			// circuits of the link; they are read once (isrsBand) and used by both, with the same formula.
+			final double[] band = simulator.PerfChecks.ENABLED && multiBand != null && multiBand.isIsrs() && circuitList != null
+					? isrsBand(circuit, spectrumAssigned, link, circuitList) : null;
+			final double lossL = band != null ? isrsLossDbWith(band, p, fi, circuitList, L)
+					: isrsLossDb(p, fi, circuit, spectrumAssigned, link, circuitList, L);
+			final double lossLast = band != null ? isrsLossDbWith(band, p, fi, circuitList, lastFiberSegment)
+					: isrsLossDb(p, fi, circuit, spectrumAssigned, link, circuitList, lastFiberSegment);
+			if (band != null && simulator.PerfChecks.VERIFY) {
+				simulator.PerfChecks.same(lossL, isrsLossDb(p, fi, circuit, spectrumAssigned, link, circuitList, L), "ISRS do vao");
+				simulator.PerfChecks.same(lossLast, isrsLossDb(p, fi, circuit, spectrumAssigned, link, circuitList, lastFiberSegment), "ISRS do ultimo vao");
+			}
+			lineAmp.setGain(p.alphaDbPerKm * L + lossL);
+			preAmp.setGain(p.alphaDbPerKm * lastFiberSegment + lossLast);
 			boosterAmp.setNoiseFigure(p.noiseFigureDb);
 			lineAmp.setNoiseFigure(p.noiseFigureDb);
 			preAmp.setNoiseFigure(p.noiseFigureDb);
@@ -1005,6 +1044,26 @@ public class PhysicalLayer implements Serializable {
 			return base;
 		}
 
+		// Parte 59 (desempenho): with a test circuit on this link, every circuit already in the core gets the same
+		// copy (the core's set plus or minus the test circuit). The copy is kept in the core and reused while the
+		// set of the core (same object, no circuit added or removed in this thread) and the test circuit are the same.
+		final Core coreObj = link.getCore(core);
+		final boolean derivable = simulator.PerfChecks.ENABLED && !PhysicalStateChanges.isUntracked()
+				&& testCircuit != null && base.contains(circuit) && testCircuit.getRoute().containThisLink(link);
+		if (derivable && coreObj.derivedList != null && coreObj.derivedBase == base
+				&& coreObj.derivedMemberships == PhysicalStateChanges.memberships()
+				&& coreObj.derivedBaseSize == base.size() && coreObj.derivedTest == testCircuit
+				&& coreObj.derivedAdd == addTestCircuit) {
+			if (simulator.PerfChecks.VERIFY) {
+				final TreeSet<Circuit> fresh = new TreeSet<Circuit>(base);
+				if (addTestCircuit) fresh.add(testCircuit); else fresh.remove(testCircuit);
+				if (!fresh.equals(coreObj.derivedList) || fresh.size() != coreObj.derivedList.size()) {
+					throw new IllegalStateException("snets.verifyPerf: copia da lista de circuitos do nucleo difere");
+				}
+			}
+			return coreObj.derivedList;
+		}
+
 		TreeSet<Circuit> circuitList = new TreeSet<Circuit>(base);
 
 		if(!circuitList.contains(circuit)){
@@ -1020,6 +1079,15 @@ public class PhysicalLayer implements Serializable {
 			if(circuitList.contains(testCircuit) && !addTestCircuit) {
 				circuitList.remove(testCircuit);
 			}
+		}
+
+		if (derivable) { // Parte 59
+			coreObj.derivedList = circuitList;
+			coreObj.derivedBase = base;
+			coreObj.derivedMemberships = PhysicalStateChanges.memberships();
+			coreObj.derivedBaseSize = base.size();
+			coreObj.derivedTest = testCircuit;
+			coreObj.derivedAdd = addTestCircuit;
 		}
 
 		return circuitList;
@@ -1164,7 +1232,8 @@ public class PhysicalLayer implements Serializable {
 
 		//Paper: Impairment-Aware Manycast Routing, Modulation Level, and Spectrum Assignment in Elastic Optical Networks (2019)
 		double ro = (((Math.PI * Math.PI) / 2.0) * beta21 * BsI * BsI) / (2.0 * alfaCampo);
-		double ro2 = E * arcsinh(ro);
+		final ArcsinhMemo memo = arcsinhMemo(); // Parte 57
+		double ro2 = E * arcsinh(ro, memo);
 		double gsci = Gi * Gi * Gi * ro2;
 		double gxci = 0.0;
 
@@ -1187,6 +1256,11 @@ public class PhysicalLayer implements Serializable {
 		double powerJ = powerI; // Power of the circuit j
 		double Gj = Gi; // Power spectral density of the circuit j
 
+		// Parte 59: only with the per-band QoT (C+L), where the arguments of arcsinh rarely repeat and its table
+		// misses; in the C band alone that table already serves almost every call. Only circuits already in the
+		// network keep a table (a candidate changes slots at every test).
+		final GnPairCache pairs = simulator.PerfChecks.ENABLED && multiBand != null && circuitI.isInNetwork()
+				? GnPairCache.of(circuitI, fI, BsI, beta21, alfaCampo, E, Ls) : null;
 		for(Circuit circuitJ : circuitList){
 
 			if(!circuitI.equals(circuitJ)){
@@ -1206,6 +1280,38 @@ public class PhysicalLayer implements Serializable {
 					Gj = powerJ / Bsj; // Power spectral density of the circuit j calculated according to the required bandwidth
 				}
 
+				if (pairs != null && circuitJ.getId() != null) {
+					// Parte 59 (desempenho): pnm and the correction coefficient of the pair (i, j) come from the table
+					// of circuit i while j keeps its frequency, bandwidth and modulation (see GnPairCache). The sums
+					// below are the same as in the original lines, in the same order.
+					final Modulation modJ = circuitJ.getModulation();
+					final int idJ = circuitJ.getId().intValue();
+					final int hit = pairs.find(idJ, fJ, Bsj, modJ);
+					double pnmPair, wPair;
+					if (hit >= 0 && !simulator.PerfChecks.VERIFY) {
+						pnmPair = pairs.pnm(hit);
+						wPair = pairs.w(hit);
+					} else {
+						final double dF = Math.abs(fI - fJ);
+						final double e1 = dF + (Bsj / 2.0);
+						final double e2 = dF - (Bsj / 2.0);
+						final double m1 = (Math.PI * Math.PI * beta21 * BsI * e1) / (2.0 * alfaCampo);
+						final double m2 = (Math.PI * Math.PI * beta21 * BsI * e2) / (2.0 * alfaCampo);
+						pnmPair = E * (arcsinh(m1, memo) - arcsinh(m2, memo));
+						final double PhijPair = getValueOfModulationConstant(modJ);
+						wPair = (E * (5.0 * PhijPair * Bsj) / (6.0 * alfaCampo * Ls * dF));
+						if (hit >= 0) {
+							simulator.PerfChecks.same(pairs.pnm(hit), pnmPair, "termo pnm do par no modelo GN");
+							simulator.PerfChecks.same(pairs.w(hit), wPair, "correcao do par no modelo GN");
+						} else {
+							pairs.store(idJ, fJ, Bsj, modJ, pnmPair, wPair);
+						}
+					}
+					gxci += Gi * Gj * Gj * pnmPair;
+					Wnm += Gi * Gj * Gj * wPair;
+					continue;
+				}
+
 				deltaFij = Math.abs(fI - fJ);
 
 				d1 = deltaFij + (Bsj / 2.0);
@@ -1213,7 +1319,7 @@ public class PhysicalLayer implements Serializable {
 
 				double nm1 = (Math.PI * Math.PI * beta21 * BsI * d1) / (2.0 * alfaCampo);
 				double nm2 = (Math.PI * Math.PI * beta21 * BsI * d2) / (2.0 * alfaCampo);
-				double pnm =  E * (arcsinh(nm1) - arcsinh(nm2));
+				double pnm =  E * (arcsinh(nm1, memo) - arcsinh(nm2, memo)); // Parte 57: same arcsinh, table read once
 				gxci += Gi * Gj * Gj * pnm;
 
 				//Paper: Impairment-Aware Manycast Routing, Modulation Level, and Spectrum Assignment in Elastic Optical Networks (2019)
@@ -1276,7 +1382,17 @@ public class PhysicalLayer implements Serializable {
 		// Parte 54 (desempenho): the arguments of arcsinh in the GN model depend only on the bandwidths of two circuits
 		// and on the distance between them, so the same values come back millions of times. They are kept in a small
 		// table per thread, keyed by the exact bits of x. Same function, same input: the same result, bit for bit.
-		final ArcsinhMemo m = ARCSINH_MEMO.get();
+		return arcsinh(x, ARCSINH_MEMO.get());
+	}
+
+	/** Parte 57: the table of the current thread, read once by the GN loop instead of once per arcsinh. */
+	private static ArcsinhMemo arcsinhMemo() {
+		return simulator.PerfChecks.ENABLED ? ARCSINH_MEMO.get() : null;
+	}
+
+	/** Parte 57: arcsinh with the table of the current thread already in hand (null: caches off). */
+	private static double arcsinh(double x, ArcsinhMemo m){
+		if (m == null) return arcsinhCompute(x);
 		final long bits = Double.doubleToRawLongBits(x);
 		int h = (int) (bits ^ (bits >>> 32));
 		h ^= (h >>> 16);

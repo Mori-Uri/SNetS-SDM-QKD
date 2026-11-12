@@ -104,6 +104,33 @@ public class EnergyConsumption {
 	 * @return double - (W)
 	 */
 	public static double computeTransponderPowerConsumption(Circuit circuit){
+		if (simulator.PerfChecks.ENABLED) {
+			// Parte 57 (desempenho): the value depends only on the route (slot width of its first link), the
+			// modulation and the first and last slots. It is kept in the circuit with these inputs and computed again,
+			// by the original code below, when one of them changes. The slot width of a link does not change during a
+			// simulation.
+			final int[] sa = circuit.getSpectrumAssigned();
+			final Object route = circuit.getRoute();
+			final Object modulation = circuit.getModulation();
+			if (circuit.powerCacheValid && circuit.powerCacheRoute == route && circuit.powerCacheModulation == modulation
+					&& circuit.powerCacheSa0 == sa[0] && circuit.powerCacheSa1 == sa[1]) {
+				if (simulator.PerfChecks.VERIFY) simulator.PerfChecks.same(circuit.powerCacheValue, transponderPowerOriginal(circuit), "consumo do transponder");
+				return circuit.powerCacheValue;
+			}
+			final double v = transponderPowerOriginal(circuit);
+			circuit.powerCacheRoute = route;
+			circuit.powerCacheModulation = modulation;
+			circuit.powerCacheSa0 = sa[0];
+			circuit.powerCacheSa1 = sa[1];
+			circuit.powerCacheValue = v;
+			circuit.powerCacheValid = true;
+			return v;
+		}
+		return transponderPowerOriginal(circuit);
+	}
+
+	/** The original computation of computeTransponderPowerConsumption (Parte 57). */
+	private static double transponderPowerOriginal(Circuit circuit){
 
 		double fs = circuit.getRoute().getLinkList().firstElement().getCore(0).getSlotSpectrumBand(); //Hz, slot frequency
 		double tr = (fs * PhysicalLayer.log2(circuit.getModulation().getM())) / 1.0E+9; //Gbps, rate of transmission of a slot using the modulated format

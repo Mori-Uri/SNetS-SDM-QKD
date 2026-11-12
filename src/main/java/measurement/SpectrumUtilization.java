@@ -94,6 +94,185 @@ public class SpectrumUtilization extends Measurement {
      * Observation of the use of the spectrum resource of the network
      */
     private void newObsUtilization() {
+        // Parte 57 (desempenho): the sums are kept in arrays indexed by the position of the link in the mesh and by
+        // the core id, and copied to the maps only when they are read (syncMaps). The arithmetic is the same, in the
+        // same order, so the values are the same bit for bit. The maps get their keys in the same order as before, at
+        // the first observation. With -Dsnets.verifyPerf=true both paths run and are compared at every observation.
+        if (simulator.PerfChecks.ENABLED && fastReady()) {
+            if (simulator.PerfChecks.VERIFY) {
+                newObsUtilizationOriginal();
+                newObsUtilizationFast(false);
+                verifyFast();
+                return;
+            }
+            newObsUtilizationFast(true);
+            return;
+        }
+        newObsUtilizationOriginal();
+    }
+
+    // ---------------------------------------------------------------- Parte 57: arrays of the sums
+
+    /** Sum of the link utilization (average of its cores) per link, in the order of mesh.getLinkList(). */
+    private double[] fastLink;
+    /** Sum of the core utilization per link and core id. */
+    private double[][] fastLinkCore;
+    /** Sum of the core utilization divided by the number of links, per core id. */
+    private double[] fastCore;
+    /** Core ids of each link, in the order of link.getCores(). */
+    private int[][] fastCoreIds;
+    /** Name of each link (key of the maps). */
+    private String[] fastLinkName;
+    /** 0 = not prepared, 1 = arrays in use, -1 = the network does not fit the arrays (original path). */
+    private int fastState;
+    /** The maps are behind the arrays. */
+    private boolean mapsStale;
+
+    /** Prepares the arrays at the first observation; false when the original path must be used. */
+    private boolean fastReady() {
+        if (fastState != 0) {
+            return fastState > 0;
+        }
+        final List<Link> links = mesh.getLinkList();
+        final int n = links.size();
+        final java.util.HashSet<String> names = new java.util.HashSet<String>();
+        int maxCore = maxCoresByLinks;
+        fastCoreIds = new int[n][];
+        fastLinkName = new String[n];
+        for (int l = 0; l < n; l++) {
+            final Link link = links.get(l);
+            final String name = link.getSource().getName() + SEP + link.getDestination().getName();
+            if (!names.add(name)) {
+                fastState = -1; // two links with the same name share one entry of the maps
+                return false;
+            }
+            fastLinkName[l] = name;
+            final List<Core> cores = link.getCores();
+            fastCoreIds[l] = new int[cores.size()];
+            final java.util.HashSet<Integer> ids = new java.util.HashSet<Integer>();
+            for (int k = 0; k < cores.size(); k++) {
+                final int id = cores.get(k).getId();
+                if (id < 0 || !ids.add(id)) {
+                    fastState = -1;
+                    return false;
+                }
+                fastCoreIds[l][k] = id;
+                maxCore = Math.max(maxCore, id + 1);
+            }
+        }
+        if (n == 0) {
+            fastState = -1;
+            return false;
+        }
+        fastLink = new double[n];
+        fastLinkCore = new double[n][maxCore];
+        fastCore = new double[maxCore];
+        // keys of the maps in the same order as the original first observation
+        for (int l = 0; l < n; l++) {
+            final int[] ids = fastCoreIds[l];
+            for (int k = 0; k < ids.length; k++) {
+                if (!utilizationPerCore.containsKey(ids[k])) utilizationPerCore.put(ids[k], 0.0);
+                HashMap<Integer, Double> uplc = utilizationPerLinkCore.get(fastLinkName[l]);
+                if (uplc == null) {
+                    uplc = new HashMap<>();
+                    utilizationPerLinkCore.put(fastLinkName[l], uplc);
+                }
+                if (!uplc.containsKey(ids[k])) uplc.put(ids[k], 0.0);
+            }
+            if (!utilizationPerLink.containsKey(fastLinkName[l])) utilizationPerLink.put(fastLinkName[l], 0.0);
+        }
+        // a map may hold values already (save state of a run with the original path): continue from them
+        for (int l = 0; l < n; l++) {
+            fastLink[l] = utilizationPerLink.get(fastLinkName[l]);
+            final HashMap<Integer, Double> uplc = utilizationPerLinkCore.get(fastLinkName[l]);
+            for (int id : fastCoreIds[l]) fastLinkCore[l][id] = uplc.get(id);
+        }
+        for (int id = 0; id < maxCore; id++) {
+            final Double v = utilizationPerCore.get(id);
+            fastCore[id] = v == null ? 0.0 : v;
+        }
+        fastState = 1;
+        return true;
+    }
+
+    /** The loop of the original observation with the sums in the arrays. */
+    private void newObsUtilizationFast(boolean countObservation) {
+        final List<Link> links = mesh.getLinkList();
+        final int n = links.size();
+        double utGeral = 0.0;
+        for (int l = 0; l < n; l++) {
+            final Link link = links.get(l);
+            final List<Core> cores = link.getCores();
+            double utLinkAllCores = 0.0;
+            for (int k = 0; k < cores.size(); k++) {
+                final Core core = cores.get(k);
+                final int coreId = fastCoreIds[l][k];
+                final double coreUtilization = core.getUtilization();
+
+                utLinkAllCores += coreUtilization;
+
+                if (countObservation) {
+                    final List<int[]> classicalFree = core.getFreeSpectrumBands(0);
+                    for (int[] faixa : classicalFree) {
+                        incrementarDesUtFaixa(faixa);
+                    }
+                    int[] freeSlot = freeSlotsOf(l, link, coreId);
+                    if (freeSlot != null) {
+                        List<int[]> bands = core.isQkdReserved() ? core.getFreeSpectrumBandsForQKD(0)
+                                : core.isDisabled() ? core.getFreeSpectrumBandsIgnoringReservation(0) : classicalFree;
+                        for (int[] faixa : bands) {
+                            for (int i = faixa[0] - 1; i < faixa[1] && i < freeSlot.length; i++) freeSlot[i]++;
+                        }
+                    }
+                }
+
+                fastCore[coreId] += coreUtilization / (double) n;
+                fastLinkCore[l][coreId] += coreUtilization;
+            }
+            utLinkAllCores = utLinkAllCores / (double) cores.size();
+            utGeral += utLinkAllCores;
+            fastLink[l] += utLinkAllCores;
+        }
+        if (countObservation) {
+            utGeral = utGeral / (double) n;
+            this.utilizationGen += utGeral;
+            this.numberObservations++;
+        }
+        mapsStale = true;
+    }
+
+    /** -Dsnets.verifyPerf=true: the arrays must hold exactly the values of the maps of the original path. */
+    private void verifyFast() {
+        for (int l = 0; l < fastLink.length; l++) {
+            simulator.PerfChecks.same(fastLink[l], utilizationPerLink.get(fastLinkName[l]), "utilizacao do enlace");
+            final HashMap<Integer, Double> uplc = utilizationPerLinkCore.get(fastLinkName[l]);
+            for (int id : fastCoreIds[l]) simulator.PerfChecks.same(fastLinkCore[l][id], uplc.get(id), "utilizacao do nucleo no enlace");
+        }
+        for (int id = 0; id < fastCore.length; id++) {
+            final Double v = utilizationPerCore.get(id);
+            if (v != null) simulator.PerfChecks.same(fastCore[id], v, "utilizacao do nucleo");
+        }
+        mapsStale = false; // the maps are the original ones in this mode
+    }
+
+    /** Copies the sums of the arrays to the maps before they are read. */
+    private void syncMaps() {
+        if (!mapsStale || fastState <= 0) {
+            return;
+        }
+        mapsStale = false;
+        for (int l = 0; l < fastLink.length; l++) {
+            utilizationPerLink.put(fastLinkName[l], fastLink[l]);
+            final HashMap<Integer, Double> uplc = utilizationPerLinkCore.get(fastLinkName[l]);
+            for (int id : fastCoreIds[l]) uplc.put(id, fastLinkCore[l][id]);
+        }
+        for (int id = 0; id < fastCore.length; id++) {
+            if (utilizationPerCore.containsKey(id)) utilizationPerCore.put(id, fastCore[id]);
+        }
+    }
+
+    /** The original observation (Parte 57: kept for -Dsnets.noPerfCache and -Dsnets.verifyPerf). */
+    private void newObsUtilizationOriginal() {
         // General use and per link
         Double utGeral = 0.0;
         int linkIndex = -1;
@@ -230,6 +409,7 @@ public class SpectrumUtilization extends Measurement {
      * @return
      */
     public Set<String> getLinkSet() {
+        syncMaps(); // Parte 57
         return this.utilizationPerLink.keySet();
     }
 
@@ -249,6 +429,7 @@ public class SpectrumUtilization extends Measurement {
      * @return
      */
     public double getUtilizationPerLink(String link) {
+        syncMaps(); // Parte 57
         Double utLink = this.utilizationPerLink.get(link);
         if (utLink == null) {
         	return 0.0;
@@ -293,6 +474,7 @@ public class SpectrumUtilization extends Measurement {
      * @return double
      */
     public double getUtilizationPerCore(Integer core) {
+        syncMaps(); // Parte 57
         Double upc = this.utilizationPerCore.get(core);
         if(upc == null) {
         	return 0.0;
@@ -306,6 +488,7 @@ public class SpectrumUtilization extends Measurement {
      * @return double
      */
     public double getUtilizationForLinkAndCore(String link, Integer core) {
+        syncMaps(); // Parte 57
     	HashMap<Integer, Double> utLinkCore = utilizationPerLinkCore.get(link);
 
     	if(utLinkCore == null || utLinkCore.get(core) == null) { // No utilization for this link and core

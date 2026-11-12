@@ -14,11 +14,33 @@
       || jars.find((j) => j.location === 'simulations') || jars[0] || {}).path || '';
   }
 
+  const jarText = (j) => `${j.name}  ·  ${j.location}  ·  ${fmtBytes(j.size)}  ·  ${fmtDate(j.mtime)}`;
+
+  /** Parte 63: lista de JARs lida de novo do disco (um JAR gerado agora aparece com a data e o tamanho novos). */
+  async function refreshJars() {
+    try {
+      const info = await App.api.info();
+      const had = ((App.state.info && App.state.info.jars) || []).length;
+      if (App.state.info) { App.state.info.jars = info.jars; App.state.info.simulatorJar = info.simulatorJar; }
+      if (!had && (info.jars || []).length && App.state.tab === 'run') { App.renderTab(); return; } // o aviso "nenhum .jar" sai
+    } catch (e) { return; }
+    document.querySelectorAll('select[data-jar-select]').forEach(fillJarOptions);
+  }
+  App.refreshJars = refreshJars;
+
+  function fillJarOptions(sel) {
+    const jars = (App.state.info && App.state.info.jars) || [];
+    const keep = sel.value;
+    clear(sel);
+    for (const j of jars) sel.appendChild(el('option', { value: j.path }, jarText(j)));
+    sel.value = jars.some((j) => j.path === keep) ? keep : defaultJar();
+  }
+
   function jarSelect(value) {
     const jars = (App.state.info && App.state.info.jars) || [];
-    const sel = el('select.input', jars.map((j) => el('option', { value: j.path },
-      `${j.name}  ·  ${j.location}  ·  ${fmtBytes(j.size)}  ·  ${fmtDate(j.mtime)}`)));
+    const sel = el('select.input', { 'data-jar-select': '1' }, jars.map((j) => el('option', { value: j.path }, jarText(j))));
     sel.value = value || defaultJar();
+    sel.addEventListener('focus', () => { refreshJars(); });
     return sel;
   }
 
@@ -222,24 +244,45 @@
     let edited = false;
     preview.addEventListener('input', () => { edited = true; });
 
+    const parentOf = (p) => { const i = p.lastIndexOf('/'); return i > 0 ? p.slice(0, i) : '(raiz)'; };
     const drawList = () => {
+      const top = list.scrollTop; // Parte 63: a lista não volta ao topo a cada clique
       clear(list);
       const q = filter.value.trim().toLowerCase();
       const tbody = el('tbody');
+      let lastFolder = null;
       for (const c of cases) {
         if (q && !c.path.toLowerCase().includes(q)) continue;
+        const folder = parentOf(c.path);
+        if (folder !== lastFolder) {
+          // Parte 63: uma linha por pasta, com uma caixa que marca ou desmarca todos os casos dela (respeitando o filtro)
+          lastFolder = folder;
+          const inFolder = cases.filter((x) => parentOf(x.path) === folder && (!q || x.path.toLowerCase().includes(q)));
+          const nOn = inFolder.filter((x) => picked.has(x.path)).length;
+          const fcb = el('input', { type: 'checkbox', checked: nOn === inFolder.length, title: 'Selecionar todos os casos desta pasta' });
+          fcb.indeterminate = nOn > 0 && nOn < inFolder.length;
+          fcb.addEventListener('change', () => {
+            for (const x of inFolder) { if (fcb.checked) picked.add(x.path); else picked.delete(x.path); }
+            drawList(); updatePlan(); renameAuto(); regen();
+          });
+          tbody.appendChild(el('tr.folder-row', el('td', { style: { width: '1%' } }, el('label.check', { style: { padding: '4px 8px' } }, fcb)),
+            el('td', { style: { padding: '4px 8px' } }, el('span.mono', el('b', folder + '/')), el('span.muted.small', '  ' + nOn + ' de ' + inFolder.length))));
+        }
         const cb = el('input', { type: 'checkbox', checked: picked.has(c.path) });
         cb.addEventListener('change', () => {
           if (cb.checked) picked.add(c.path); else picked.delete(c.path);
-          updatePlan();
-          if (!name.dataset.touched) name.value = (picked.size === 1 ? 'run_' + App.caseNameOf([...picked][0]) : 'run_lote_' + new Date().toISOString().slice(0, 10)) + ext();
-          regen();
+          drawList(); updatePlan(); renameAuto(); regen();
         });
-        tbody.appendChild(el('tr', el('td', { style: { width: '1%' } }, el('label.check', { style: { padding: '4px 8px' } }, cb)), el('td', { style: { padding: '4px 8px' } }, el('span.mono', c.path))));
+        tbody.appendChild(el('tr', el('td', { style: { width: '1%' } }, el('label.check', { style: { padding: '4px 8px 4px 22px' } }, cb)), el('td', { style: { padding: '4px 8px' } }, el('span.mono', App.caseNameOf(c.path)))));
       }
       list.appendChild(el('table.grid', tbody));
+      list.scrollTop = top;
     };
     name.addEventListener('input', () => { name.dataset.touched = '1'; });
+    const renameAuto = () => {
+      if (!name.dataset.touched) name.value = (picked.size === 1 ? 'run_' + App.caseNameOf([...picked][0]) : 'run_lote_' + new Date().toISOString().slice(0, 10)) + ext();
+    };
+    const countBox = el('div.muted.small'); // Parte 63: quantos casos estão marcados
 
     const regen = () => {
       if (edited && !window.confirm('Descartar as edições manuais do script?')) return;
@@ -266,6 +309,7 @@
     const freshLbl = el('label.check', freshCb, ' Começar do zero os casos com execução interrompida (descarta o progresso salvo)');
     const updatePlan = () => {
       const n = picked.size;
+      countBox.textContent = (n === 1 ? '1 caso selecionado' : n + ' casos selecionados') + '. A ordem de execução segue a ordem da lista.';
       const nSaved = [...picked].filter((p) => App.savedInfo(p)).length;
       freshLbl.hidden = !nSaved;
       const par = mode.value === 'parallel';
@@ -323,7 +367,7 @@
             drawList(); updatePlan(); regen();
           }, () => { picked.clear(); drawList(); updatePlan(); regen(); }),
           list,
-          el('div.muted.small', 'A ordem de execução segue a ordem da lista.')),
+          countBox),
         el('div.form-grid',
           el('div.field', el('div.flabel', 'JAR'), jarSel),
           el('div.field', el('div.flabel', 'Argumentos da JVM'), jvm),
@@ -442,6 +486,7 @@
     const prev = R.prevRunning || new Set();
     for (const r of R.list) {
       if (prev.has(r.id) && r.state !== 'running') {
+        if (r.kind === 'tool') refreshJars(); // Parte 63: o JAR gerado entra na lista com a data nova
         if (r.kind !== 'tool') {
           App.toast(`${App.caseNameOf(r.case)}: ${runLabel(r)}`, r.state === 'finished' ? 'ok' : r.savedStop ? 'warn' : 'err', 6000);
           App.loadTree();
