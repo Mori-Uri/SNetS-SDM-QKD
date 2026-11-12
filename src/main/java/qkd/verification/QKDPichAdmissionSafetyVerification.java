@@ -33,7 +33,7 @@ public final class QKDPichAdmissionSafetyVerification {
 		List<CoreConfig> configs = new ArrayList<CoreConfig>();
 		configs.add(new CoreConfig(0, Arrays.asList(Integer.valueOf(1))));
 		configs.add(new CoreConfig(1, Arrays.asList(Integer.valueOf(0))));
-		Link link = new Link(new Oxc("A"), new Oxc("B"), 1, 12.5e9, 40.0, configs);
+		Link link = new Link(new Oxc("A"), new Oxc("B"), 2, 12.5e9, 40.0, configs);
 		link.getCore(1).setQkdReserved(true);
 		Route route = new Route();
 		route.setLinkList(new Vector<Link>(Collections.singletonList(link)));
@@ -41,15 +41,15 @@ public final class QKDPichAdmissionSafetyVerification {
 				new QKDLinkPlan("A", "B", 40.0, 20.0, Arrays.asList(
 						span(0, 0.0, 20.0), span(1, 20.0, 40.0)))));
 		QKDPichPool pool = new QKDPichPool(1, 1);
-		// Slot continuity at the internal trusted node: two independently
-		// emitted PIChs use the SAME contiguous band and one spectrum lease.
+		// Independent trusted-node spans: two distinct PICh optical sources
+		// can use different slots and must never double-book spectrum.
 		List<QKDPichPool.Channel> admitted = pool.acquire(route, plan, 0, null);
 		check(admitted != null && admitted.size() == 2,
-				"two QKDSpans must reuse the one contiguous slot without spectrum conversion");
-		check(admitted.get(0).band[0] == 1 && admitted.get(1).band[0] == 1,
-				"a trusted node cannot change the PICh slot band");
-		check(pool.getOpenChannels() == 2 && link.getCore(0).getUsedSlots() == 1,
-				"independent optical PIChs need one shared spectral lease");
+				"two QKDSpans must each get a physical PICh");
+		check(admitted.get(0).band[0] == 1 && admitted.get(1).band[0] == 2,
+				"independent trusted-node spans must use separate available slots");
+		check(pool.getOpenChannels() == 2 && link.getCore(0).getUsedSlots() == 2,
+				"independent optical PIChs require distinct spectrum leases");
 		pool.release(admitted);
 		check(pool.getOpenChannels() == 0, "PICh release must close both optical carriers");
 		check(link.getCore(0).getUsedSlots() == 0,

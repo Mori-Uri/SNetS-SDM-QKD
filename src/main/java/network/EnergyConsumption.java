@@ -106,17 +106,41 @@ public class EnergyConsumption {
 	 * @return double - (W)
 	 */
 	public static double computeTransponderPowerConsumption(Circuit circuit){
+        if (!simulator.PerfChecks.ENABLED) return originalTransponderPower(circuit);
+        final int[] slots = circuit.getSpectrumAssigned();
+        final Object route = circuit.getRoute();
+        final Object modulation = circuit.getModulation();
+        final long mBits = Double.doubleToRawLongBits(circuit.getModulation().getM());
+        final long widthBits = Double.doubleToRawLongBits(
+                circuit.getRoute().getLinkList().firstElement().getCore(0).getSlotSpectrumBand());
+        if (circuit.powerCacheValid && circuit.powerCacheRoute == route
+                && circuit.powerCacheModulation == modulation && circuit.powerCacheModulationMBits == mBits
+                && circuit.powerCacheSlotWidthBits == widthBits && circuit.powerCacheStart == slots[0]
+                && circuit.powerCacheEnd == slots[1]) {
+            simulator.PerfChecks.count(simulator.PerfChecks.ENERGY_HIT);
+            if (simulator.PerfChecks.VERIFY)
+                simulator.PerfChecks.same(circuit.powerCacheValue, originalTransponderPower(circuit), "consumo transponder");
+            return circuit.powerCacheValue;
+        }
+        double value = originalTransponderPower(circuit);
+        circuit.powerCacheValid = true;
+        circuit.powerCacheRoute = route;
+        circuit.powerCacheModulation = modulation;
+        circuit.powerCacheModulationMBits = mBits;
+        circuit.powerCacheSlotWidthBits = widthBits;
+        circuit.powerCacheStart = slots[0]; circuit.powerCacheEnd = slots[1];
+        circuit.powerCacheValue = value;
+        simulator.PerfChecks.count(simulator.PerfChecks.ENERGY_MISS);
+        return value;
+    }
 
-		double fs = circuit.getRoute().getLinkList().firstElement().getCore(0).getSlotSpectrumBand(); //Hz, slot frequency
-		double tr = (fs * PhysicalLayer.log2(circuit.getModulation().getM())) / 1.0E+9; //Gbps, rate of transmission of a slot using the modulated format
-		double PCofdm = 1.683 * tr; //power consumption of a slot using the informed modulation format
-
-		int numSlots = circuit.getSpectrumAssigned()[1] - circuit.getSpectrumAssigned()[0] + 1; //number of slots required by the circuit
-		//numSlots = numSlots - circuit.getGuardBand(); //removing the guard band
-		double PCtran = numSlots * PCofdm + 91.333; //power consumption of a transponder using the modulation format reported for a certain number of slots
-
-		return PCtran;
-	}
+    private static double originalTransponderPower(Circuit circuit) {
+        double fs = circuit.getRoute().getLinkList().firstElement().getCore(0).getSlotSpectrumBand();
+        double tr = (fs * PhysicalLayer.log2(circuit.getModulation().getM())) / 1.0E+9;
+        double PCofdm = 1.683 * tr;
+        int numSlots = circuit.getSpectrumAssigned()[1] - circuit.getSpectrumAssigned()[0] + 1;
+        return numSlots * PCofdm + 91.333;
+    }
 
 	/**
 	 * This method calculates the energy consumption of OXCs

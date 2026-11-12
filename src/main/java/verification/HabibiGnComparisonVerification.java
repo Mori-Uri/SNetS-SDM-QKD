@@ -27,15 +27,22 @@ public final class HabibiGnComparisonVerification {
                 double raw=PhysicalLayer.legacySci(fiber,cut,1.0);
                 for(Poggiolini2017GnIntegral.Channel x:other)raw+=PhysicalLayer.legacyXci(fiber,cut,x,1.0);
                 PhysicalLayer.HabibiGnDecision enabled=PhysicalLayer.evaluate(fiber,cut,other,raw,25,true,20,8);
-                PhysicalLayer.HabibiGnDecision disabled=PhysicalLayer.evaluate(fiber,cut,other,raw,25,false,20,8);
-                check(relative(disabled.corrected,Math.max(0,raw))<1e-12,"legacy changed");
+                PhysicalLayer.HabibiGnDecision disabled=null;
+                if(raw<0) {
+                    try { PhysicalLayer.evaluate(fiber,cut,other,raw,25,false,20,8);
+                        throw new AssertionError("negative raw Habibi accepted");
+                    } catch (ArithmeticException expected) { }
+                } else {
+                    disabled=PhysicalLayer.evaluate(fiber,cut,other,raw,25,false,20,8);
+                    check(relative(disabled.corrected,raw)<1e-12,"legacy positive changed");
+                }
                 List<Poggiolini2017GnIntegral.Channel> all=new ArrayList<Poggiolini2017GnIntegral.Channel>();all.add(cut);all.addAll(other);
                 Poggiolini2017GnIntegral.GnResult gn=Poggiolini2017GnIntegral.evaluateGnIntegral(fiber,all,0,20,8);
                 check(Double.isFinite(gn.total())&&gn.total()>0,"GN result invalid");
                 check(Double.isFinite(enabled.corrected)&&enabled.corrected>=0,"hybrid invalid");
                 if(n==1 && bw<=25)check(relative(enabled.corrected,gn.sci)<1e-12,"GN SCI fallback mismatch");
                 out.printf(Locale.ROOT,"%.3f,%d,%.12e,%.12e,%.12e,%.12e,%.12e,%.12e,%.12e,%.8g%n",
-                        bw,n,raw,disabled.corrected,enabled.corrected,gn.total(),gn.sci,gn.xci,gn.mci,relative(enabled.corrected,gn.total()));
+                        bw,n,raw,disabled==null?Double.NaN:disabled.corrected,enabled.corrected,gn.total(),gn.sci,gn.xci,gn.mci,relative(enabled.corrected,gn.total()));
                 rows++;
             }
         }

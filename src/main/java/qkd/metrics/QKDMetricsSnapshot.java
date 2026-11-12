@@ -9,6 +9,11 @@ import java.io.Serializable;
  */
 public final class QKDMetricsSnapshot implements Serializable {
 	private static final long serialVersionUID = 1L;
+	/** Optional temporal key-stock metrics; mode=rate has no inventory. */
+	public String keyInventoryMode = "rate";
+	public double keyGeneratedBits, keyConsumedBits, keyDiscardedBits, keyRemainingBits, keyUnservedBits;
+	public long keyExhaustionEvents, keyStockRejected, keyServedRenewals, keyUnservedRenewals;
+	public long keyBatchedWindows, keyApproximatedRenewals;
 	public int loadPoint;
 	public int replication;
 	public long totalRequestAttempts, protectedAttempts, accepted, rejected, released;

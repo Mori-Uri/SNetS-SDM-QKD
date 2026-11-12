@@ -236,6 +236,7 @@ public final class LongitudinalClassicalGN {
                 if(NliIntegrationMode.INTEGRAL.equals(mode))
                     throw new IllegalArgumentException("GN integral unavailable for CUT");
                 PhysicalLayer.warnUnsupportedCut(victimPhi,victimBandwidthHz);
+                throw new ArithmeticException("[GN] longitudinal Habibi fallback unavailable for Phi="+victimPhi);
             }
         }
         return GnModelMath.nonnegative(result,"Habibi longitudinal + GN integral fallback");

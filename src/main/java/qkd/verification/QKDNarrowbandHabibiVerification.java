@@ -12,16 +12,16 @@ import simulationControl.parsers.*;
 import simulationControl.parsers.NetworkConfig.*;
 import request.RequestForConnection;
 
-/** Runs the production getGnli2() for a 12.5-GHz isolated QPSK signal. */
+/** Runs the production getGnli2() for 12.5-GHz isolated QPSK, 8-QAM, and 32-QAM. */
 public final class QKDNarrowbandHabibiVerification {
     private QKDNarrowbandHabibiVerification() {}
-    private static double run(boolean hybrid){
+    private static double run(boolean hybrid,double format){
         final double carrier=299792458.0/1550e-9;
         NetworkConfig nc=new NetworkConfig();
         nc.setNodes(Arrays.asList(new NodeConfig("A",4,4,0),new NodeConfig("B",4,4,0)));
         nc.setCores(Arrays.asList(new CoreConfig(0,Collections.<Integer>emptyList())));
         nc.setLinks(Arrays.asList(new LinkConfig("A","B",64,12.5e9,100)));
-        nc.setModulations(Arrays.asList(new ModulationConfig("QPSK",4.0,10000,-100,-10)));
+        nc.setModulations(Arrays.asList(new ModulationConfig("QAM"+(int)format,format,10000,-100,-10)));
         PhysicalLayerConfig p=new PhysicalLayerConfig();
         p.setPhysicalLayerModel(PhysicalLayer.MODEL_HABIBI);
         p.setHabibiNliMode(hybrid ? "adaptive" : "approximate");
@@ -54,12 +54,17 @@ public final class QKDNarrowbandHabibiVerification {
         TreeSet<Circuit> set=new TreeSet<Circuit>();set.add(cut);
         return mesh.getPhysicalLayer().getGnli2(cut,link,.001,bw,.001/bw,center,set,mod);
     }
-    public static void main(String[] args){
-        double original=run(false),corrected=run(true);
-        if(original!=0)throw new AssertionError("historical Habibi must clamp negative to 0: "+original);
-        if(!Double.isFinite(corrected)||corrected<=0)throw new AssertionError("numerical GN fallback SCI must be positive");
-        System.out.printf(java.util.Locale.ROOT,
-                "PASS production PhysicalLayer: isolated 12.5 GHz QPSK original=%e W/Hz, hybrid=%e W/Hz%n",
-                original,corrected);
+    public static void main(String[] args) {
+        for(double m : new double[]{4.0,8.0,32.0}) {
+            try { run(false,m); throw new AssertionError("negative analytical " + m + "QAM accepted"); }
+            catch(ArithmeticException expected) { }
+            double corrected=run(true,m);
+            if(!Double.isFinite(corrected)||corrected<=0)
+                throw new AssertionError("GN fallback SCI must be positive for "+m+"QAM");
+            System.out.printf(java.util.Locale.ROOT,
+                    "[OK] production %d-QAM: approximate rejected, adaptive=%e W/Hz%n",
+                    (int)m,corrected);
+        }
+        System.out.println("PASS QKDNarrowbandHabibiVerification");
     }
 }

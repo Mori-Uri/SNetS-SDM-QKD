@@ -20,10 +20,10 @@ import java.util.Arrays;
  *
  * <p>The object is immutable and thread-safe.</p>
  *
- * <p>Referências: [FERRARI20] A. Ferrari et al., JLT 38(16), 2020 (perda G.652.D de O a L, Fig. 2);
+ * <p>ReferÃªncias: [FERRARI20] A. Ferrari et al., JLT 38(16), 2020 (perda G.652.D de O a L, Fig. 2);
  * [MEHDI24] P. Mehdizadeh et al., IEEE Commun. Lett. 28(3), 2024 (alpha de 0,38 a 0,18 dB/km);
- * [DIBAJ25] M. R. Dibaj et al., JLT 43(1), 2025 (mesmos parâmetros). Forma Rayleigh + IR: modelo clássico de perdas
- * da sílica (constante de absorção IR 7,81e11 dB/km e 48,48 um).</p>
+ * [DIBAJ25] M. R. Dibaj et al., JLT 43(1), 2025 (mesmos parÃ¢metros). Forma Rayleigh + IR: modelo clÃ¡ssico de perdas
+ * da sÃ­lica (constante de absorÃ§Ã£o IR 7,81e11 dB/km e 48,48 um).</p>
  */
 public final class FiberAttenuationModel implements Serializable {
 

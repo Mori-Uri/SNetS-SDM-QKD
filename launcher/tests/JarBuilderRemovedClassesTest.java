@@ -25,13 +25,13 @@ public final class JarBuilderRemovedClassesTest {
             "verification/HabibiEgnComparisonVerification.class",
             "network/PhysicalLayer$HabibiEgnDecision.class",
             "network/PhysicalLayer$HabibiEgnCacheKey.class",
-            "network/TrackedRequestList.class",
             "qkd/multiband/ClassicalChannel$Direction.class"
         };
         String[] preserve={
             "network/PhysicalLayer.class",
             "network/PhysicalLayer$HabibiGnDecision.class",
             "network/Poggiolini2017GnIntegral.class",
+            "network/TrackedRequestList.class",
             "verification/HabibiGnComparisonVerification.class",
             "com/google/gson/Gson.class",
             "qkd/multiband/ClassicalChannel.class"
@@ -54,7 +54,7 @@ public final class JarBuilderRemovedClassesTest {
             Method pack=JarBuilder.class.getDeclaredMethod("pack",File.class,File.class,File.class,Set.class,Set.class);
             pack.setAccessible(true);
             Set<String> tops=new HashSet<String>(Arrays.asList(
-                "network/PhysicalLayer","network/Poggiolini2017GnIntegral",
+                "network/PhysicalLayer","network/Poggiolini2017GnIntegral","network/TrackedRequestList",
                 "verification/HabibiGnComparisonVerification", "qkd/multiband/ClassicalChannel"));
             Set<String> pkgs=new HashSet<String>(Arrays.asList("network","verification","qkd/multiband"));
             pack.invoke(null,base,classes,packed,tops,pkgs);

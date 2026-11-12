@@ -25,8 +25,8 @@ import qkd.network.QKDSpan;
 import simulationControl.parsers.NetworkConfig;
 
 /**
- * Checks the invariant that QKD trusted nodes do not perform spectrum
- * conversion, and a *real SNetS network node* may convert only when enabled.
+ * Checks independent QKD/PICh optical sections at trusted nodes, without
+ * relaxing the contiguous-spectrum requirement inside any single section.
  * No random traffic or external libraries are required by these PICh tests.
  */
 public final class QKDSlotContinuityVerification {
@@ -85,8 +85,8 @@ public final class QKDSlotContinuityVerification {
                 new NetworkConfig.NodeConfig("C", 4, 4, 0)));
         net.setCores(Arrays.asList(new NetworkConfig.CoreConfig(0, Arrays.asList(1)),
                 new NetworkConfig.CoreConfig(1, Arrays.asList(0))));
-        net.setLinks(Arrays.asList(new NetworkConfig.LinkConfig("A", "B", 2, 12.5e9, 40.0),
-                new NetworkConfig.LinkConfig("B", "C", 2, 12.5e9, 40.0)));
+        net.setLinks(Arrays.asList(new NetworkConfig.LinkConfig("A", "B", 4, 12.5e9, 40.0),
+                new NetworkConfig.LinkConfig("B", "C", 4, 12.5e9, 40.0)));
         net.setModulations(Collections.singletonList(new NetworkConfig.ModulationConfig(
                 "QPSK", 4.0, 1000.0, -100.0, -10.0)));
         NetworkConfig.QKDConfig qkd = new NetworkConfig.QKDConfig(true, 25.0, 1);
@@ -131,11 +131,11 @@ public final class QKDSlotContinuityVerification {
         Link ab = route.getLink(0), bc = route.getLink(1);
         ab.getCore(1).setQkdReserved(true);
         bc.getCore(1).setQkdReserved(true);
-        // With two slots in the quantum core, these bands are mutually
-        // exclusive: only a real SNetS node B can perform the conversion.
+        // Disjoint sets force route-level failure in strict mode, but permit
+        // two independent QKDSpans per link to choose their own bands.
         if (!strict || "route".equals(granularity)) {
-            ab.getCore(1).useSpectrumForQKD(new int[]{1,1}, 0);
-            bc.getCore(1).useSpectrumForQKD(new int[]{2,2}, 0);
+            ab.getCore(1).useSpectrumForQKD(new int[]{1,2}, 0);
+            bc.getCore(1).useSpectrumForQKD(new int[]{3,4}, 0);
         }
         QKDSharedResourceManager mgr = new QKDSharedResourceManager(mesh);
         QKDSharedAllocationResult result = mgr.allocate(route,
@@ -143,7 +143,7 @@ public final class QKDSlotContinuityVerification {
                 1e6, 1, 0, 1550.0);
         if (strict && "route".equals(granularity)) {
             check(!result.isSuccess(), "route-continuous QCh must reject lack of a common band");
-            check(ab.getCore(1).getUsedSlots()==1 && bc.getCore(1).getUsedSlots()==1,
+            check(ab.getCore(1).getUsedSlots()==2 && bc.getCore(1).getUsedSlots()==2,
                     "failed QCh admission must not leak spectrum");
         } else {
             check(result.isSuccess(), "QCh must be allocated: " + result.getFailureReason());
@@ -151,18 +151,20 @@ public final class QKDSlotContinuityVerification {
             check(allocations.size() == ("span".equals(granularity) ? 4 : 2),
                     "one QCh reservation per tested physical section");
             if ("span".equals(granularity)) {
-                int abSlot = strict ? 1 : 2;
+                // Distinct QKDSpans can share one physical lane longitudinally;
+                // each still has its own Q-TRx and key-generation capacity.
+                int[] expected = strict ? new int[]{1, 1, 1, 1} : new int[]{3, 3, 1, 1};
                 for (int k = 0; k < 4; k++)
-                    check(allocations.get(k).getSpectrumBand()[0] == (k < 2 ? abSlot : 1),
-                            "span-QCh may convert only at SNetS node B, not at QTND trusted nodes");
+                    check(allocations.get(k).getSpectrumBand()[0] == expected[k],
+                            "independent QKDSpans must be allowed different slot bands");
             } else {
-                int first = strict ? 1 : 2;
+                int first = strict ? 1 : 3;
                 check(allocations.get(0).getSpectrumBand()[0] == first
                         && allocations.get(1).getSpectrumBand()[0] == 1,
-                        "QCh may convert only at physical SNetS node B");
+                        "link-QCh may convert only at physical SNetS node B");
             }
             mgr.release(result.getSession());
-            int expectedOtherSlots = strict ? 0 : 1;
+            int expectedOtherSlots = (!strict || "route".equals(granularity)) ? 2 : 0;
             check(ab.getCore(1).getUsedSlots()==expectedOtherSlots
                         && bc.getCore(1).getUsedSlots()==expectedOtherSlots,
                         "QCh release must preserve external spectrum occupants and clear all lanes");
@@ -174,10 +176,11 @@ public final class QKDSlotContinuityVerification {
         QKDPichPool pool = strict.pool();
         List<QKDPichPool.Channel> got = pool.acquire(strict.route, strict.plan, 0, null);
         check(got != null && got.size()==4, "four independent PICh optical sources");
-        for (QKDPichPool.Channel c : got) check(c.band[0]==1 && c.band[1]==1 && c.coreId==0,
-                "same band on every QTND trusted span and SNetS link");
-        check(strict.ab.getCore(0).getUsedSlots()==1 && strict.bc.getCore(0).getUsedSlots()==1,
-                "same-band leases across disjoint QTND spans");
+        check(got.get(0).band[0]==1 && got.get(1).band[0]==2
+                        && got.get(2).band[0]==1 && got.get(3).band[0]==2,
+                "PICh may retune independently between QTND trusted spans");
+        check(strict.ab.getCore(0).getUsedSlots()==2 && strict.bc.getCore(0).getUsedSlots()==2,
+                "one optical allocation per independent PICh");
         pool.release(got);
         check(strict.ab.getCore(0).getUsedSlots()==0 && strict.bc.getCore(0).getUsedSlots()==0,
                 "release must clear shared-spectrum leases");
@@ -188,21 +191,21 @@ public final class QKDSlotContinuityVerification {
         pool = loose.pool();
         got = pool.acquire(loose.route, loose.plan, 0, null);
         check(got != null && got.size()==4, "network-node conversion must allow admission");
-        check(got.get(0).band[0]==2 && got.get(1).band[0]==2,
-                "no conversion at A-B trusted node");
-        check(got.get(2).band[0]==1 && got.get(3).band[0]==1,
-                "conversion allowed only at physical SNetS node B");
+        check(got.get(0).band[0]==2 && got.get(1).band[0]==3,
+                "A-B trusted node supports independent PICh bands");
+        check(got.get(2).band[0]==1 && got.get(3).band[0]==3,
+                "B-C trusted node supports independent PICh bands");
         pool.release(got);
         check(loose.ab.getCore(0).getUsedSlots()==1 && loose.bc.getCore(0).getUsedSlots()==1,
                 "release cannot remove external spectrum occupants");
 
         Fixture blocked = new Fixture(true);
         blocked.ab.getCore(0).useSpectrum(new int[]{1,1}, 0);
-        blocked.bc.getCore(0).useSpectrum(new int[]{2,2}, 0);
+        blocked.bc.getCore(0).useSpectrum(new int[]{1,8}, 0);
         pool = blocked.pool();
         got = pool.acquire(blocked.route, blocked.plan, 0, null);
-        check(got == null, "strict continuity must reject incompatible bands on B-C");
-        check(blocked.ab.getCore(0).getUsedSlots()==1 && blocked.bc.getCore(0).getUsedSlots()==1,
+        check(got == null, "full B-C spectrum must reject and rollback PIChs");
+        check(blocked.ab.getCore(0).getUsedSlots()==1 && blocked.bc.getCore(0).getUsedSlots()==8,
                 "strict failed admission must rollback all PICh reservations and auxiliary sources");
         check(blocked.ab.getCore(0).getAuxiliaryClassicalCircuitList().isEmpty()
                         && blocked.bc.getCore(0).getAuxiliaryClassicalCircuitList().isEmpty(),
@@ -213,6 +216,6 @@ public final class QKDSlotContinuityVerification {
         verifyQch(false, "span");
         verifyQch(true, "link");
         verifyQch(false, "link");
-        System.out.println("PASS QKDSlotContinuityVerification: strict, retuning at network node, trusted continuity, rollback");
+        System.out.println("PASS QKDSlotContinuityVerification: trusted-node retuning, continuous individual spans, rollback");
     }
 }

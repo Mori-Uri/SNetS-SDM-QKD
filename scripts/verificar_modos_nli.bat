@@ -9,6 +9,7 @@ if not exist "%JAR%" (
 )
 for %%T in (
   qkd.verification.QKDNliIntegrationModesVerification
+  qkd.verification.QKDStage2NliSafetyVerification
   qkd.verification.QKDNarrowbandHabibiVerification
   qkd.verification.QKDJohannissonModeVerification
   qkd.verification.QKDJohannissonSciModeVerification

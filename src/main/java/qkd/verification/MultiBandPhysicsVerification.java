@@ -32,7 +32,7 @@ import qkd.physical.QKDPhysicalParameters;
  * Items that depend on effects not modelled yet (NLI/FWM near the classical comb) are printed as [PENDENTE] and do
  * not fail the run.
  *
- * <p>Referências: [MEHDI24] P. Mehdizadeh et al., IEEE Commun. Lett. 28(3), 2024; [DIBAJ24] M. R. Dibaj et al.,
+ * <p>ReferÃªncias: [MEHDI24] P. Mehdizadeh et al., IEEE Commun. Lett. 28(3), 2024; [DIBAJ24] M. R. Dibaj et al.,
  * IWCIT 2024; [DIBAJ25] M. R. Dibaj et al., JLT 43(1), 2025; [ERAERDS10] P. Eraerds et al., New J. Phys. 12,
  * 063027, 2010; [CAI20] C. Cai, Y. Sun, Y. Ji, New J. Phys. 22, 083020, 2020; [FERRARI20] A. Ferrari et al.,
  * JLT 38(16), 2020.</p>

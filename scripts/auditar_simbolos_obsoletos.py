@@ -32,7 +32,6 @@ RETIRED = {
     'network/LobatoSpectralOverlap',
     'network/PoggioliniGnIntegral',
     'network/Poggiolini2017HybridVerification',
-    'network/TrackedRequestList',
 }
 
 OLD_TYPES = {t.split('/')[-1] for t in RETIRED}

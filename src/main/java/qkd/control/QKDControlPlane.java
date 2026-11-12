@@ -75,6 +75,29 @@ public class QKDControlPlane extends ControlPlane {
 		this.costRecorder = recorder;
 	}
 
+	private final qkd.key.QKDTemporalKeyInventory keyInventory;
+
+	/** Null means historical instantaneous-rate semantics with no key stock. */
+	public qkd.key.QKDTemporalKeyInventory getKeyInventory() { return keyInventory; }
+
+	private void advanceInventory(double timeHours) {
+		if (keyInventory == null) return;
+		if (!Double.isFinite(timeHours) || timeHours < 0.0)
+			throw new IllegalArgumentException("Invalid simulation event time for QKD stock");
+		keyInventory.advance(timeHours * 3600.0,
+				provisioningService.getResourceManager().snapshotChannels());
+	}
+
+	private boolean canOpenInventory(QKDActiveConnection c) {
+		return keyInventory == null || keyInventory.canOpen(c.getRequest(), c.getQkdSession());
+	}
+	private void openInventory(QKDActiveConnection c) {
+		if (keyInventory != null) keyInventory.open(c.getRequest(), c.getQkdSession());
+	}
+	private void rollbackInventory(request.RequestForConnection r) {
+		if (keyInventory != null) keyInventory.rollbackOpen(r);
+	}
+
 	private final boolean multibandEnabled;
 	private final double warmupArrivals;
 
@@ -127,6 +150,9 @@ public class QKDControlPlane extends ControlPlane {
 				powerAssignment);
 
 		this.provisioningService = new QKDProvisioningService(mesh);
+		this.keyInventory = mesh.getKeyInventoryConfig().isStock()
+				? new qkd.key.QKDTemporalKeyInventory(mesh.getKeyInventoryConfig(),
+					mesh.getQkdNetworkParameters().isUndirectedChannels()) : null;
 		this.sessionRegistry = new QKDSessionRegistry();
 		this.existingSessionImpactEvaluator =
 				new QKDExistingSessionImpactEvaluator(mesh);
@@ -180,6 +206,7 @@ public class QKDControlPlane extends ControlPlane {
 		qkdAlternativeRouteAccepted = 0; qkdAdmittedQTrxSum = 0; qkdAdmittedHopsSum = 0; qkdAdmittedRouteKmSum = 0;
 		qkdPerPair.clear();
 		provisioningService.resetStatistics();
+		if (keyInventory != null) keyInventory.resetStatistics();
 	}
 
 	/**
@@ -320,6 +347,14 @@ public class QKDControlPlane extends ControlPlane {
 				return false;
 			}
 
+			if (!canOpenInventory(qkd.getConnection())) {
+				if (!provisioningService.release(qkd.getConnection()))
+					throw new IllegalStateException("Unable to rollback missing QKD stock");
+				qkdPrecommitAdmissionRejections++;
+				lastQkdPrecommitFailureReason = "[KEY_STOCK] insufficient secret-key stock";
+				lastQkdRejectCause = BlockingDetailRecorder.C_QKD_SKR;
+				return false;
+			}
 			lastQkdPrecommitFailureReason = null;
 			pendingQkdAdmissions.put(circuit, qkd.getConnection());
 			trace("QKD_PRECOMMIT_OK", request,
@@ -430,6 +465,7 @@ public class QKDControlPlane extends ControlPlane {
 			classicalAllocated = true;
 
 			if (pending != null) {
+				openInventory(pending);
 				sessionRegistry.register(pending.getRequest(), pending);
 				qkdRegistered = true;
 				trace("QKD_RESOURCE_COMMIT", pending.getRequest(),
@@ -440,6 +476,7 @@ public class QKDControlPlane extends ControlPlane {
 		} catch (Exception failure) {
 			// Undo in reverse order; preserve all rollback errors as suppressed
 			// exceptions rather than masking the original admission failure.
+			if (pending != null) rollbackInventory(pending.getRequest());
 			if (qkdRegistered) sessionRegistry.remove(pending.getRequest());
 
 			// The legacy allocateCircuit may have partially changed its state
@@ -475,6 +512,7 @@ public class QKDControlPlane extends ControlPlane {
 	@Override
 	public boolean handleRequisition(RequestForConnection request) throws Exception {
 		lastQkdRejectCause = null;
+		if (request != null) advanceInventory(request.getTimeOfRequestHours());
 
 		if (request != null) blockingDetails.arrival();
 		final qkd.capacity.QKDSharedResourceManager rmLog = provisioningService.getResourceManager();
@@ -591,6 +629,8 @@ public class QKDControlPlane extends ControlPlane {
 		if (failure == null && !sessionRegistry.isEmpty()
 				&& !existingSessionImpactEvaluator.evaluateCandidate(null, sessionRegistry, true).isAdmissible())
 			failure = "[QKD_PROTECT] PICh degrades an active QKD session";
+		if (failure == null && !canOpenInventory(preflight.getConnection()))
+			failure = "[KEY_STOCK] no initial secret key on every QKDSpan";
 		if (failure != null) {
 			if (preflight.isSuccess() && !provisioningService.release(preflight.getConnection()))
 				throw new IllegalStateException("Unable to rollback exact-fit QKD preflight");
@@ -608,9 +648,11 @@ public class QKDControlPlane extends ControlPlane {
 			first.addRequest(request);
 			requestAdded = true;
 			request.getCircuits().add(first);
+			openInventory(preflight.getConnection());
 			sessionRegistry.register(request, preflight.getConnection());
 			registered = true;
 		} catch (RuntimeException failureCommit) {
+			rollbackInventory(request);
 			if (registered) sessionRegistry.remove(request);
 			if (requestAdded) first.removeRequest(request);
 			request.getCircuits().remove(first);
@@ -688,6 +730,8 @@ public class QKDControlPlane extends ControlPlane {
 			if (failureReason == null && !sessionRegistry.isEmpty() &&
 					!existingSessionImpactEvaluator.evaluateCandidate(null, sessionRegistry, true).isAdmissible())
 				failureReason = "[QKD_PROTECT] fallback PICh degrades an active QKD session";
+			if (failureReason == null && !canOpenInventory(fallback.getConnection()))
+				failureReason = "[KEY_STOCK] no initial secret key on every QKDSpan";
 			if (failureReason != null) {
 				// Post-commit grooming expansion cannot be undone by the QKD
 				// allocator. The legacy grooming implementation must compensate.
@@ -706,6 +750,7 @@ public class QKDControlPlane extends ControlPlane {
 			}
 
 			connection = fallback.getConnection();
+			openInventory(connection);
 			sessionRegistry.register(request, connection);
 		}
 
@@ -729,6 +774,12 @@ public class QKDControlPlane extends ControlPlane {
 			return false;
 		}
 		QKDActiveConnection accepted = outcome.getConnection();
+		if (!canOpenInventory(accepted)) {
+			if (!provisioningService.release(accepted))
+				throw new IllegalStateException("QKD-only key stock rollback incomplete");
+			qkdRejected++; statistics[1]++; countBlockingCause("[KEY_STOCK] exhausted");
+			return false;
+		}
 		// The optical PICh must not invalidate any existing classical DCh or PICh.
 		if (!isPichSafeForClassicalTraffic(null, accepted)) {
 			if (!provisioningService.release(accepted))
@@ -750,6 +801,7 @@ public class QKDControlPlane extends ControlPlane {
 				return false;
 			}
 		}
+		openInventory(accepted);
 		sessionRegistry.register(request, accepted);
 		// The optical load of this PICh is now part of the accepted network.
 		refreshActiveQkdPhysicalState(null);
@@ -760,6 +812,7 @@ public class QKDControlPlane extends ControlPlane {
 
 	@Override
 	public void finalizeConnection(RequestForConnection request) throws Exception {
+		if (request != null) advanceInventory(request.getTimeOfFinalizeHours());
 		Exception qkdFailure = null;
 
 		QKDActiveConnection connection = sessionRegistry.get(request);
@@ -767,6 +820,7 @@ public class QKDControlPlane extends ControlPlane {
 		if (connection != null) {
 			try {
 				if (provisioningService.release(connection)) {
+					if (keyInventory != null) keyInventory.close(request);
 					sessionRegistry.remove(request);
 					// PICh removals can affect Raman, GN, FWM and EDFA load.
 					if (request.getProtectionType() == qkd.traffic.RequestProtectionType.QKD_ONLY)
@@ -946,6 +1000,20 @@ public class QKDControlPlane extends ControlPlane {
 	public QKDMetricsSnapshot snapshotQkdMetrics(int loadPoint, int replication) {
 		QKDMetricsSnapshot m = new QKDMetricsSnapshot();
 		m.loadPoint=loadPoint; m.replication=replication;
+		if (keyInventory != null) {
+			m.keyInventoryMode="stock";
+			m.keyGeneratedBits=keyInventory.getGeneratedBits();
+			m.keyConsumedBits=keyInventory.getConsumedBits();
+			m.keyDiscardedBits=keyInventory.getDiscardedBits();
+			m.keyUnservedBits=keyInventory.getUnservedBits();
+			m.keyRemainingBits=keyInventory.getTotalBalanceBits();
+			m.keyExhaustionEvents=keyInventory.getExhaustionEvents();
+			m.keyStockRejected=keyInventory.getRejectedAdmissions();
+			m.keyServedRenewals=keyInventory.getServedRenewals();
+			m.keyUnservedRenewals=keyInventory.getUnservedRenewals();
+			m.keyBatchedWindows=keyInventory.getBatchedWindows();
+			m.keyApproximatedRenewals=keyInventory.getApproximatedRenewals();
+		}
 		m.multiband = multibandEnabled;
 		m.nli = nliEnabled;
 		m.totalRequestAttempts=totalRequestAttempts; m.protectedAttempts=qkdProtectedAttempts; m.accepted=qkdAccepted; m.rejected=qkdRejected; m.released=qkdReleased;

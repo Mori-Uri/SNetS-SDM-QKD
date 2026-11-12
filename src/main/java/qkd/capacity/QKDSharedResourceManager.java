@@ -287,6 +287,10 @@ public final class QKDSharedResourceManager implements Serializable {
 
 				if (spanGranularity) {
 					for (QKDSpan span : plan.getSpans()) {
+						// Each QKDSpan is an independent QKD session ending at
+						// a trusted node. Preserve contiguity WITHIN that span,
+						// not a common band across independent spans.
+						requiredBand = null;
 						Object key = poolKey(link, span);
 						List<QKDSharedChannel> pool = spanPools.get(key);
 
@@ -303,12 +307,10 @@ public final class QKDSharedResourceManager implements Serializable {
 									"span " + span.getIndex() + " of link " + link.getName()));
 						}
 
-						int[] band = continuousSessionBand(shares);
-						if (band == null || (requiredBand != null && !java.util.Arrays.equals(requiredBand, band))) {
-							rollback(allShares, newlyActivated, guardBand);
-							return QKDSharedAllocationResult.failure("[SPECTRUM] QCh contiguous band cannot remain continuous through a trusted node");
-						}
-						if (requiredBand == null) requiredBand = band;
+						// Each independently launched optical QCh has one contiguous
+						// band by construction. One key session can use several QCh
+						// carriers; do not force them all onto the same wavelength.
+						// A trusted node also permits retuning between QKDSpans.
 						reservations.add(new QKDLinkCapacityReservation(link, requiredKeyRateBps, shares));
 					}
 
@@ -326,12 +328,21 @@ public final class QKDSharedResourceManager implements Serializable {
 								"link " + link.getName()));
 					}
 
-					int[] band = continuousSessionBand(shares);
-					if (band == null || (requiredBand != null && !java.util.Arrays.equals(requiredBand, band))) {
-						rollback(allShares, newlyActivated, guardBand);
-						return QKDSharedAllocationResult.failure("[SPECTRUM] QCh contiguous band cannot remain continuous over the QKD route");
+					// A QCh spanning a physical link already has one constant
+					// band. With per-link conversion allowed, a key session may
+					// stripe its demand across several parallel QCh wavelengths.
+					// When cross-node continuity is explicitly requested, keep
+					// the strict historical single-band rule until there is a
+					// lane-by-lane multicarrier continuity mapping.
+					if (route.getLinkList().size() > 1
+							&& mesh.getQkdNetworkParameters().isQchSlotContinuityAtNetworkNodes()) {
+						int[] band = continuousSessionBand(shares);
+						if (band == null || (requiredBand != null && !java.util.Arrays.equals(requiredBand, band))) {
+							rollback(allShares, newlyActivated, guardBand);
+							return QKDSharedAllocationResult.failure("[SPECTRUM] strict QCh route continuity cannot map multiple lanes");
+						}
+						if (requiredBand == null) requiredBand = band;
 					}
-					if (requiredBand == null) requiredBand = band;
 					reservations.add(new QKDLinkCapacityReservation(link, requiredKeyRateBps, shares));
 				}
 			}

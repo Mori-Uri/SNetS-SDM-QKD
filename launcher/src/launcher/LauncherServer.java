@@ -68,7 +68,7 @@ public final class LauncherServer {
             } else if ("--web".equals(a) && i + 1 < args.length) {
                 webDir = new File(args[++i]);
             } else if ("--help".equals(a) || "-h".equals(a)) {
-                System.out.println("java -jar snets-launcher.jar [--port 8766] [--project <pasta do SNetS>] "
+                System.out.println("java -jar snets-launcher.jar [--port " + Edition.DEFAULT_PORT + "] [--project <pasta do SNetS>] "
                         + "[--no-browser]");
                 return;
             }
@@ -124,7 +124,7 @@ public final class LauncherServer {
         }
     }
 
-    private static void openBrowser(String url) {
+    public static void openBrowser(String url) {
         try {
             if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
                 Desktop.getDesktop().browse(new URI(url));

@@ -297,7 +297,22 @@ public class SimulationFileManager {
      */
 	private void saveConfig(String path, SimulationRequest sr) throws IOException {
 		Gson gson = new GsonBuilder().create();
-		saveConfig(path, "network", gson.toJson(sr.getNetworkConfig()));
+        // Optional QKD parameters in NetworkConfig use NaN as a sentinel for
+        // "not configured" (e.g. deprecated PICh sensitivity coefficients).
+        // Default Gson refuses NaN, so otherwise any completed QKD simulation
+        // crashes DURING RESULTS EXPORT, after all event processing finished.
+        // Write unset values as absent JSON fields, preserving defaults upon
+        // re-read. All finite parameters are serialized normally; do not emit
+        // nonstandard NaN JSON or enable serializeSpecialFloatingPointValues.
+        com.google.gson.JsonSerializer<Double> finiteNetworkNumber =
+                (number, type, context) -> number == null || !Double.isFinite(number)
+                        ? com.google.gson.JsonNull.INSTANCE
+                        : new com.google.gson.JsonPrimitive(number);
+        Gson networkGson = new GsonBuilder()
+                .registerTypeAdapter(Double.TYPE, finiteNetworkNumber)
+                .registerTypeAdapter(Double.class, finiteNetworkNumber)
+                .create();
+		saveConfig(path, "network", networkGson.toJson(sr.getNetworkConfig()));
 		saveConfig(path, "simulation", gson.toJson(sr.getSimulationConfig()));
 		saveConfig(path, "physicalLayer", gson.toJson(sr.getPhysicalLayerConfig()));
 		saveConfig(path, "others", gson.toJson(sr.getOthersConfig()));

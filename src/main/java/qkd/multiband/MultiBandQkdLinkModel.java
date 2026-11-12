@@ -30,8 +30,8 @@ import qkd.physical.QKDPhysicalResult;
  * <p>The object is immutable and thread-safe. Cost: O(number of classical channels) per evaluation, with no
  * allocation besides the result.</p>
  *
- * <p>Referências: [MEHDI24] P. Mehdizadeh et al., IEEE Commun. Lett. 28(3), 2024 (QKD em O/E com C+L);
- * [DIBAJ25] M. R. Dibaj et al., JLT 43(1), 2025 (eq. 6, mesma configuração); [DIBAJ24] IWCIT 2024 (MF/MB);
+ * <p>ReferÃªncias: [MEHDI24] P. Mehdizadeh et al., IEEE Commun. Lett. 28(3), 2024 (QKD em O/E com C+L);
+ * [DIBAJ25] M. R. Dibaj et al., JLT 43(1), 2025 (eq. 6, mesma configuraÃ§Ã£o); [DIBAJ24] IWCIT 2024 (MF/MB);
  * [ERAERDS10] New J. Phys. 12, 063027 (eqs. 2, 3, 11); [CAI20] New J. Phys. 22, 083020 (eqs. 11 e 18).</p>
  */
 public final class MultiBandQkdLinkModel {

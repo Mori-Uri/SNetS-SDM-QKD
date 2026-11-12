@@ -29,7 +29,7 @@ import java.util.Locale;
  * <p>Default fibre values ([MEHDI24], [DIBAJ25]): gamma = 1.2 1/(W km), beta2 = -22.317 ps^2/km,
  * beta3 = 0.1331 ps^3/km at f_ref = 193.5 THz.</p>
  *
- * <p>Referências: [POGGIOLINI14] P. Poggiolini et al., "The GN-Model of Fiber Non-Linear Propagation and its
+ * <p>ReferÃªncias: [POGGIOLINI14] P. Poggiolini et al., "The GN-Model of Fiber Non-Linear Propagation and its
  * Applications", JLT 32(4), 2014 (eqs. 1 e 13); [SEMRAU18] D. Semrau et al., JLT 36(14), 2018 (GGN); [MEHDI24]
  * eq. 3 (G_NLI no QCh).</p>
  */
@@ -49,8 +49,9 @@ public final class NonlinearInterferenceModel implements Serializable {
 
 	public NonlinearInterferenceModel(double gammaPerWKm, double beta2Ps2PerKm, double beta3Ps3PerKm,
 			double referenceHz) {
-		if (!(gammaPerWKm >= 0.0) || !Double.isFinite(beta2Ps2PerKm) || !Double.isFinite(beta3Ps3PerKm)
-				|| !(referenceHz > 0.0)) {
+		if (!(gammaPerWKm >= 0.0) || !Double.isFinite(gammaPerWKm)
+                || !Double.isFinite(beta2Ps2PerKm) || !Double.isFinite(beta3Ps3PerKm)
+				|| !(referenceHz > 0.0) || !Double.isFinite(referenceHz)) {
 			throw new IllegalArgumentException("invalid NLI parameters");
 		}
 
@@ -83,9 +84,23 @@ public final class NonlinearInterferenceModel implements Serializable {
      */
 	public double psdWPerHz(double[] psdWPerHz, double startHz, double stepHz, double fHz, double lengthKm,
 			double alphaClassical, double alphaQuantum) {
+        if (psdWPerHz == null || !Double.isFinite(startHz)
+                || !(stepHz > 0.0) || !Double.isFinite(stepHz)
+                || !Double.isFinite(fHz) || !(lengthKm >= 0.0)
+                || !Double.isFinite(lengthKm)
+                || !(alphaClassical >= 0.0) || !Double.isFinite(alphaClassical)
+                || !(alphaQuantum >= 0.0) || !Double.isFinite(alphaQuantum)) {
+            throw new IllegalArgumentException("invalid QKD multiband GN geometry");
+        }
+        // A NaN PSD would propagate to the QCh detector estimate or be
+        // masked by a later bound. Reject the invalid source at its origin.
+        for (double density : psdWPerHz) {
+            if (!(density >= 0.0) || !Double.isFinite(density))
+                throw new ArithmeticException("invalid classical PSD for QKD GN: " + density);
+        }
 		final int n = psdWPerHz.length;
 
-		if (n == 0 || gammaPerWKm == 0.0 || lengthKm <= 0.0) {
+		if (n == 0 || gammaPerWKm == 0.0 || lengthKm == 0.0) {
 			return 0.0;
 		}
 
@@ -150,7 +165,9 @@ public final class NonlinearInterferenceModel implements Serializable {
 			}
 		}
 
-		return (16.0 / 27.0) * gammaPerWKm * gammaPerWKm * out * sum * stepHz * stepHz;
+        return network.GnModelMath.nonnegative(
+                (16.0 / 27.0) * gammaPerWKm * gammaPerWKm * out * sum * stepHz * stepHz,
+                "QKD multi-band GN quadrature");
 	}
 
 	/**
@@ -193,7 +210,7 @@ public final class NonlinearInterferenceModel implements Serializable {
 			z = end;
 		}
 
-		return total;
+		return network.GnModelMath.nonnegative(total,"QKD longitudinal multi-band GN");
 	}
 
 	/** One co-propagating classical source occupying inclusive SNetS slot indices. */
@@ -262,7 +279,7 @@ public final class NonlinearInterferenceModel implements Serializable {
 			z = end;
 		}
 
-		return total;
+		return network.GnModelMath.nonnegative(total,"QKD sources longitudinal GN");
 	}
 
 	/** Cells next to the phase-matching lines that are sub-sampled. */

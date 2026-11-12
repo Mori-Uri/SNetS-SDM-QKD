@@ -205,30 +205,24 @@ public final class ClassicalPowerEvolution implements Serializable {
 		if (spectralModel != null)
 			snapshot.spectralStates = new MultiBandEdFA.State[snapshot.dynamicGains.length];
 
-		// Each source is launched at its own insertion point and removed at its drop point.
-		// The aggregate input power is computed at every EDFA before gain compression.
+		// Track the gain accumulated by every active source only once per EDFA.
+		// Previous code recomputed all preceding gains for each source and each
+		// amplifier (O(sources * amplifiers^2)); this is O(sources * amplifiers).
+		// Insertions and drops are evaluated on the directed fibre, not on QCh.
+		final double[] priorGainLog = new double[sources.size()];
 		for (int index = 1; index <= count; index++) {
 			double z = index * amplifierSpacingKm;
 			double input = 0.0;
 			final List<MultiBandEdFA.Input> spectralInputs = spectralModel == null ? null
 					: new ArrayList<MultiBandEdFA.Input>();
 
-			for (LoadSource src : sources) {
+			for (int sourceIndex = 0; sourceIndex < sources.size(); sourceIndex++) {
+				final LoadSource src = sources.get(sourceIndex);
 				if (src.startKm >= z || src.endKm <= z) continue;
-				double logGain = -alphaNeperKm * (z - src.startKm);
+				double logGain = -alphaNeperKm * (z - src.startKm)
+						+ priorGainLog[sourceIndex];
 
 				if (src.startKm == 0.0) logGain += Math.log(snapshot.dynamicBoosterGain);
-
-				for (int j = 1; j < index; j++) {
-					final double ampZ = j * amplifierSpacingKm;
-
-					if (ampZ > src.startKm && ampZ < src.endKm) {
-						final double previousGain = spectralModel == null
-								? snapshot.dynamicGains[j]
-								: snapshot.spectralStates[j].gain(snapshot.sourceFrequency(src));
-						logGain += Math.log(previousGain);
-					}
-				}
 
 				final double sourceInput = src.launchPowerW * Math.exp(logGain);
 				input += sourceInput;
@@ -243,8 +237,18 @@ public final class ClassicalPowerEvolution implements Serializable {
 				snapshot.dynamicGains[index] = snapshot.gainFromInput(input);
 			} else {
 				snapshot.spectralStates[index] = spectralModel.evaluate(spectralInputs);
-				snapshot.dynamicGains[index] = snapshot.spectralStates[index].gain(
-						spectralModel.getBands().get(0).lowerHz);
+				// A scalar gain has no physical meaning for a multiband amplifier.
+				// Frequency-resolved callers must use gainLinearAt(index,alpha,f).
+				snapshot.dynamicGains[index] = Double.NaN;
+			}
+			for (int sourceIndex = 0; sourceIndex < sources.size(); sourceIndex++) {
+				final LoadSource src = sources.get(sourceIndex);
+				if (z > src.startKm && z < src.endKm) {
+					final double sourceGain = spectralModel == null
+							? snapshot.dynamicGains[index]
+							: snapshot.spectralStates[index].gain(src.frequencyHz);
+					priorGainLog[sourceIndex] += Math.log(sourceGain);
+				}
 			}
 		}
 
@@ -390,6 +394,8 @@ public final class ClassicalPowerEvolution implements Serializable {
 			throw new IllegalArgumentException("invalid amplifier index or attenuation");
 
 		if (hasDynamicLoad()) {
+			if (spectralStates != null)
+				throw new IllegalStateException("multiband amplifier gain requires a carrier frequency");
 			if (amplifierIndex >= dynamicGains.length)
 				throw new IllegalArgumentException("amplifier index outside load snapshot");
 
@@ -443,9 +449,30 @@ public final class ClassicalPowerEvolution implements Serializable {
      */
 	public double aseAtQuantumReceiverW(double startKm, double endKm, double alphaClassical,
 			double alphaQuantum, double classicalFrequencyHz, double quantumBandwidthHz, double planckJs) {
+		if (!Double.isFinite(startKm) || !Double.isFinite(endKm) || startKm < 0.0
+				|| !Double.isFinite(alphaClassical) || alphaClassical < 0.0
+				|| !Double.isFinite(alphaQuantum) || alphaQuantum < 0.0
+				|| !(classicalFrequencyHz > 0.0) || !Double.isFinite(classicalFrequencyHz)
+				|| !Double.isFinite(quantumBandwidthHz) || quantumBandwidthHz < 0.0
+				|| !Double.isFinite(planckJs) || planckJs <= 0.0)
+			throw new IllegalArgumentException("invalid classical-ASE/QCh receiver transfer parameters");
 		if (endKm <= startKm || aseLeakageLinear == 0.0) return 0.0;
 		final int last = (int) Math.floor((endKm - 1e-9) / amplifierSpacingKm);
 		double ase = 0.0;
+
+		// Classical booster ASE is generated at the directed-link input. Its
+		// transfer to a QCh filter is still controlled by the EXPLICIT spectral
+		// leakage parameter; no quantum gain or spontaneous leakage is assumed.
+		if (startKm == 0.0 && getBoosterGainLinear() > 1.0) {
+			final double boosterGain = getBoosterGainLinear();
+			final double boosterPsd = Amplifier.asePsd(classicalFrequencyHz,
+					noiseFigureAt(classicalFrequencyHz), boosterGain, planckJs,
+					hasDynamicLoad() ? dynamicBoosterInputW : referenceLaunchPowerW,
+					noiseFactorA1, noiseFactorA2, boosterSaturated);
+			ase += boosterPsd * quantumBandwidthHz * aseLeakageLinear
+					* powerRatio(0.0, endKm, alphaClassical, classicalFrequencyHz)
+					/ boosterGain;
+		}
 
 		for (int index = 1; index <= last; index++) {
 			double z = index * amplifierSpacingKm;
@@ -458,21 +485,10 @@ public final class ClassicalPowerEvolution implements Serializable {
 							noiseFactorA1, noiseFactorA2, gainModel == GainModel.SATURATED)
 					: spectralStates[index].asePsd(classicalFrequencyHz, planckJs);
 
-			// Leakage into the QCh filter occurs AFTER the classical ASE chain;
-			// quantum-band leakage is not assumed to be amplified downstream.
-			// The classical ASE itself is amplified by downstream EDFAs before
-			// it reaches the receiver-side spectral transfer/filter.
-			double downstreamGain = 1.0;
-
-			for (int downstream = index + 1; downstream <= last; downstream++) {
-				double downstreamKm = downstream * amplifierSpacingKm;
-
-				if (downstreamKm >= endKm) break;
-				downstreamGain *= gainLinearAt(downstream, alphaClassical, classicalFrequencyHz);
-			}
-
+			// Classical-band ASE propagates to the receiver through later line
+			// EDFAs; only the final calibrated coupling enters the QCh filter.
 			ase += psd * quantumBandwidthHz * aseLeakageLinear
-					* Math.exp(-alphaClassical * (endKm - z)) * downstreamGain;
+					* powerRatio(z, endKm, alphaClassical, classicalFrequencyHz);
 		}
 
 		return ase;
@@ -490,6 +506,8 @@ public final class ClassicalPowerEvolution implements Serializable {
 	public double powerRatio(double sourceKm, double xKm, double alphaClassicalNeperKm,
 			double frequencyHz) {
 		check(sourceKm, xKm, alphaClassicalNeperKm);
+		if (spectralStates != null && !Double.isFinite(frequencyHz))
+			throw new IllegalArgumentException("multiband power evolution requires optical frequency");
 
 		if (xKm < sourceKm) return 0.0;
 		final double eps = 1e-10 * amplifierSpacingKm;

@@ -51,8 +51,14 @@ public final class PhysicalModelRefactorVerification {
                 cut.powerW, 1.0) == null)
             throw new AssertionError("QPSK metadata for numerical GN fallback");
         if (PhysicalLayer.supportedChannel(cut.centerHz, cut.bandwidthHz,
-                cut.powerW, .6667) != null)
-            throw new AssertionError("unsupported metadata must not create a synthetic reference");
+                cut.powerW, .6667) == null)
+            throw new AssertionError("8-QAM must map to modulation-independent GN integral");
+        if (PhysicalLayer.supportedChannel(cut.centerHz, cut.bandwidthHz,
+                cut.powerW, .69) == null)
+            throw new AssertionError("32-QAM must map to modulation-independent GN integral");
+        if (PhysicalLayer.supportedChannel(cut.centerHz, cut.bandwidthHz,
+                cut.powerW, .725) != null)
+            throw new AssertionError("unknown Phi must not create a synthetic reference");
 
         double gn = Poggiolini2017GnIntegral.evaluateGnIntegral(
                 fiber, Arrays.asList(cut), 0, 16, 6).total();

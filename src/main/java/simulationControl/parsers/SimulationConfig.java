@@ -65,6 +65,49 @@ public class SimulationConfig {
      */
 	private QKDKeyDemandConfig qkdKeyDemand;
 
+	/** Optional stock-ledger mode. Absent = historical instantaneous-rate mode. */
+	private QKDKeyInventoryConfig qkdKeyInventory = new QKDKeyInventoryConfig();
+
+	public QKDKeyInventoryConfig getQkdKeyInventory() {
+		if (qkdKeyInventory == null) qkdKeyInventory = new QKDKeyInventoryConfig();
+		qkdKeyInventory.validate();
+		return qkdKeyInventory;
+	}
+	public void setQkdKeyInventory(QKDKeyInventoryConfig config) {
+		if (config == null) throw new IllegalArgumentException("qkdKeyInventory cannot be null");
+		config.validate();
+		this.qkdKeyInventory = config;
+	}
+
+	/** Stock is a per-QKDSpan temporal balance of secret key bits; it is not an
+	 * application-layer cipher or proof of composable security. */
+	public static final class QKDKeyInventoryConfig implements Serializable {
+		private static final long serialVersionUID = 1L;
+		private String mode = "rate";   // rate | stock; also accepts descriptive aliases
+		private double initialBits = 256.0;
+		private double capacityBits = 1.0e9;
+		public String getMode() {
+			String selected = mode == null ? "rate" : mode.trim().toLowerCase(java.util.Locale.ROOT);
+			if ("rate-reservation".equals(selected)) return "rate";
+			if ("temporal-inventory".equals(selected)) return "stock";
+			return selected;
+		}
+		public void setMode(String mode) { this.mode = mode; validate(); }
+		public double getInitialBits() { return initialBits; }
+		public void setInitialBits(double bits) { initialBits = bits; validate(); }
+		public double getCapacityBits() { return capacityBits; }
+		public void setCapacityBits(double bits) { capacityBits = bits; validate(); }
+		public boolean isStock() { return "stock".equals(getMode()); }
+		public void validate() {
+			if (!("rate".equals(getMode()) || "stock".equals(getMode())))
+				throw new IllegalArgumentException("simulation.qkdKeyInventory.mode must be 'rate'/'rate-reservation' or 'stock'/'temporal-inventory'");
+			if (!Double.isFinite(capacityBits) || !(capacityBits > 0.0)
+					|| !Double.isFinite(initialBits) || initialBits < 0.0 || initialBits > capacityBits)
+				throw new IllegalArgumentException("simulation.qkdKeyInventory initialBits/capacityBits invalid");
+		}
+	}
+
+
 	/**
      * Fraction of the arrivals of each replication whose QKD statistics are
      * discarded as transient (warm-up). null = same rule used by the SNetS

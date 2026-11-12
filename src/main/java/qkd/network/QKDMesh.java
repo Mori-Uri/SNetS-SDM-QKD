@@ -37,6 +37,16 @@ public class QKDMesh extends Mesh {
 	private static final long serialVersionUID = 1L;
 
 	private final double protectedRequestProbability;
+	private simulationControl.parsers.SimulationConfig.QKDKeyInventoryConfig keyInventoryConfig =
+			new simulationControl.parsers.SimulationConfig.QKDKeyInventoryConfig();
+	public simulationControl.parsers.SimulationConfig.QKDKeyInventoryConfig getKeyInventoryConfig() {
+		return keyInventoryConfig;
+	}
+	public void setKeyInventoryConfig(simulationControl.parsers.SimulationConfig.QKDKeyInventoryConfig config) {
+		if (config == null) throw new IllegalArgumentException("null QKD inventory configuration");
+		config.validate(); keyInventoryConfig = config;
+	}
+
 	private final QKDKeyDemandPolicy keyDemandPolicy;
 	private transient simulationControl.parsers.TrafficConfig trafficConfigForQkd;
 	private final QKDNetworkParameters qkdNetworkParameters;

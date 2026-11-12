@@ -36,7 +36,7 @@ import javax.tools.ToolProvider;
 /**
  * Builds the simulator jar from the project sources, without Maven (launcher "Gerar JAR").
  *
- * <p>It compiles every {@code .java} under the source folder (Java 8 bytecode, ISO-8859-1, as in
+ * <p>It compiles every {@code .java} under the source folder (Java 8 bytecode, UTF-8, as in
  * the pom) against an existing simulator jar, which provides the dependencies (Gson, OpenCSV,
  * Firebase…) and the classes whose sources do not compile without Maven (simulationControl/Main,
  * which needs a newer Firebase). The new jar is the base jar with the compiled classes replacing
@@ -60,8 +60,7 @@ public final class JarBuilder {
             "network/HabibiEgnComparisonVerification",
             "network/AmplifierGainLaw", "network/HabibiEgnHybrid",
             "network/LobatoSpectralOverlap", "network/PoggioliniGnIntegral",
-            "network/Poggiolini2017HybridVerification",
-            "network/TrackedRequestList"));
+            "network/Poggiolini2017HybridVerification"));
 
     /** Includes inner classes of removed types and the superseded PhysicalLayer decision. */
     static boolean isRetiredClass(String jarEntry) {
@@ -143,7 +142,7 @@ public final class JarBuilder {
         if (sources.isEmpty()) fail("Nenhum arquivo .java em " + src);
 
         // 2. compile
-        System.out.println("[2/4] Compilando (Java 8, ISO-8859-1) contra " + base.getName() + " …");
+        System.out.println("[2/4] Compilando (Java 8, UTF-8) contra " + base.getName() + " …");
         File argFile = new File(work, "sources.txt");
         try (PrintWriter w = new PrintWriter(argFile, "UTF-8")) {
             for (File f : sources) w.println(quote(f.getAbsolutePath()));
@@ -190,7 +189,7 @@ public final class JarBuilder {
 
     private static int compile(String javacPath, File base, File classes, File argFile) throws Exception {
         boolean modern = !System.getProperty("java.specification.version", "1.8").startsWith("1.");
-        List<String> opts = new ArrayList<String>(Arrays.asList("-nowarn", "-encoding", "ISO-8859-1",
+        List<String> opts = new ArrayList<String>(Arrays.asList("-nowarn", "-encoding", "UTF-8",
                 "-cp", base.getAbsolutePath(), "-d", classes.getAbsolutePath(), "-proc:none"));
         JavaCompiler jc = javacPath == null ? ToolProvider.getSystemJavaCompiler() : null;
         if (jc != null) {

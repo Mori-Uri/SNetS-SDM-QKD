@@ -7,7 +7,7 @@ package launcher;
  *
  * <ul>
  *   <li>{@link #NAME}: shown next to the launcher name;</li>
- *   <li>{@link #DEFAULT_PORT}: 8766 (the main launcher uses 8765);</li>
+ *   <li>{@link #DEFAULT_PORT}: 8766 by default; 8765 when -Dsnets.edition=main;</li>
  *   <li>{@link #SIMULATOR_JAR}: JAR used by default to run cases and as the output of "Gerar JAR".</li>
  * </ul>
  *
@@ -15,9 +15,11 @@ package launcher;
  * NAME = "", DEFAULT_PORT = 8765 and SIMULATOR_JAR = "SNetS-SDM-QKD.jar").
  */
 final class Edition {
-    static final String NAME = "experimental";
-    static final int DEFAULT_PORT = 8766;
-    static final String SIMULATOR_JAR = "SNetS-SDM-QKD-exp.jar";
+    /** Optional edition selector without changing the Stage-5 defaults. */
+    static final boolean EXPERIMENTAL = !"main".equalsIgnoreCase(System.getProperty("snets.edition", "experimental"));
+    static final String NAME = EXPERIMENTAL ? "experimental" : "";
+    static final int DEFAULT_PORT = EXPERIMENTAL ? 8766 : 8765;
+    static final String SIMULATOR_JAR = EXPERIMENTAL ? "SNetS-SDM-QKD-exp.jar" : "SNetS-SDM-QKD.jar";
 
     private Edition() {
     }

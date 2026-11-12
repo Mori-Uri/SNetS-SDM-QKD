@@ -7,7 +7,7 @@ package qkd.multiband;
  * coefficient of each band follow Table II of [FERRARI20]. The U band is outside that table and is kept only
  * so that a frequency can always be classified; it has no default amplifier.</p>
  *
- * <p>Referências: [FERRARI20] A. Ferrari et al., "Assessment on the Achievable Throughput of Multi-Band
+ * <p>ReferÃªncias: [FERRARI20] A. Ferrari et al., "Assessment on the Achievable Throughput of Multi-Band
  * ITU-T G.652.D Fiber Transmission Systems", J. Lightw. Technol. 38(16):4279-4291, 2020, Tab. II.</p>
  */
 public enum OpticalBand {

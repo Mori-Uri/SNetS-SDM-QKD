@@ -68,7 +68,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 */
 	public Circuit() {
 		this.id = quantity++;
-		this.requests = new ArrayList<>();
+		this.requests = new TrackedRequestList();
 
 		this.QoT = true; // Assuming that a request always starts with admissible QoT
 		this.QoTForOther = true; // Assuming that it is admissible for the other requirements
@@ -139,15 +139,55 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 *
 	 * @return the requiredBitRate
 	 */
+	/**
+     * Experimental rate memo adapted for the Stage-5 model. The direct sum
+     * and its original iteration order are preserved, and can be checked
+     * bitwise with -Dsnets.verifyPerf=true. Non-tracked lists bypass the cache.
+     */
 	public double getRequiredBitRate() {
-		double res = 0.0;
+        if (simulator.PerfChecks.ENABLED && requests instanceof TrackedRequestList) {
+            TrackedRequestList tracked = (TrackedRequestList) requests;
+            long stamp = tracked.stamp();
+            long epoch = RequestForConnection.bitRateChanges();
+            if (rateCacheValid && rateCacheList == tracked
+                    && rateCacheStamp == stamp && rateCacheEpoch == epoch) {
+                if (simulator.PerfChecks.VERIFY)
+                    simulator.PerfChecks.same(rateCacheValue, requiredBitRateDirect(), "taxa de circuito");
+                simulator.PerfChecks.count(simulator.PerfChecks.RATE_HIT);
+                return rateCacheValue;
+            }
+            double value = requiredBitRateDirect();
+            rateCacheList = tracked;
+            rateCacheStamp = stamp;
+            rateCacheEpoch = epoch;
+            rateCacheValue = value;
+            rateCacheValid = true;
+            simulator.PerfChecks.count(simulator.PerfChecks.RATE_MISS);
+            return value;
+        }
+        return requiredBitRateDirect();
+    }
 
-		for (RequestForConnection r : requests) {
-			res += r.getRequiredBitRate();
-		}
+    private double requiredBitRateDirect() {
+        double sum=0.0;
+        for (RequestForConnection request : requests)
+            sum += request.getRequiredBitRate();
+        return sum;
+    }
 
-		return res;
-	}
+    private transient boolean rateCacheValid;
+    private transient TrackedRequestList rateCacheList;
+    private transient long rateCacheStamp;
+    private transient long rateCacheEpoch;
+    private transient double rateCacheValue;
+
+    /** Transponder power memo; physical inputs are rechecked by the caller. */
+    transient boolean powerCacheValid;
+    transient Object powerCacheRoute;
+    transient Object powerCacheModulation;
+    transient long powerCacheSlotWidthBits, powerCacheModulationMBits;
+    transient int powerCacheStart, powerCacheEnd;
+    transient double powerCacheValue;
 
 	/**
 	 * Compute the residual capacity of circuit in terms of bit rate
@@ -256,7 +296,12 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
      * @param requests
      */
 	public void setRequests(List<RequestForConnection> requests) {
-		this.requests = requests;
+        this.requests = requests;
+        this.rateCacheValid = false;
+        this.rateCacheList = null;
+        if (requests instanceof TrackedRequestList)
+            for (RequestForConnection r : requests) if (r != null) r.markInTrackedList();
+        // Foreign mutable lists retain their normal behavior, but are never memoized.
 		PhysicalStateChanges.mutated();
 	}
 
@@ -718,6 +763,9 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 		Circuit copy = (Circuit) super.clone();
 		// Caches belong to the individual circuit, not to its cloned state.
 		copy.gnPairs = null;
+        copy.rateCacheValid = false;
+        copy.rateCacheList = null;
+        copy.powerCacheValid = false;
 		return copy;
 	}
 

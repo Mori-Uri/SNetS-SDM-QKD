@@ -87,7 +87,7 @@ public class SimulationManagement {
 				simulationRequest.getPhysicalLayerConfig();
 		OthersConfig othersConfig = simulationRequest.getOthersConfig();
 
-		System.out.println("Calculating the modulations transmission ranges");
+		System.out.println("[INFO] Preparando malhas e recursos: pre-calculo de alcances desativado.");
 
 		Mesh baseMesh = QKDMeshFactory.create(
 				networkConfig,
@@ -484,6 +484,19 @@ public class SimulationManagement {
 			metrics.put("Maximum admission NLI background probability", m -> m.accepted > 0 ? m.maximumAdmissionNliProbability : Double.NaN);
 		}
 
+		// Stock metrics are appended even in legacy mode (zero counters in rate mode),
+		// enabling fair side-by-side comparisons with identical CSV schemas.
+		metrics.put("Temporal key stock enabled", m -> "stock".equals(m.keyInventoryMode) ? 1.0 : 0.0);
+		metrics.put("QKD key bits generated", m -> m.keyGeneratedBits);
+		metrics.put("QKD key bits consumed per hop", m -> m.keyConsumedBits);
+		metrics.put("QKD key bits discarded (capacity)", m -> m.keyDiscardedBits);
+		metrics.put("QKD key bits remaining", m -> m.keyRemainingBits);
+		metrics.put("QKD key bits unavailable for renewals", m -> m.keyUnservedBits);
+		metrics.put("QKD key renewal events served", m -> m.keyServedRenewals);
+		metrics.put("QKD key renewal events not served", m -> m.keyUnservedRenewals);
+		metrics.put("QKD key stock rejected admissions", m -> m.keyStockRejected);
+		metrics.put("QKD key stock batched windows (approximate)", m -> m.keyBatchedWindows);
+		metrics.put("QKD key stock renewals processed approximately", m -> m.keyApproximatedRenewals);
 		metrics.put("Mean key demand (Mbit/s)", m -> m.accepted > 0 ? m.totalDemandMbps / m.accepted : Double.NaN);
 		metrics.put("Mean active QChs", m -> m.meanActiveQchs);
 		metrics.put("Mean active Q-TRx pairs", m -> m.meanActiveQTrxPairs);

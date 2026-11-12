@@ -18,9 +18,9 @@ import java.util.Arrays;
  * 3-Clause License of GNPy (redistributions must retain this notice; the names of the copyright holder and
  * contributors may not be used to endorse products derived from it; provided "as is", without warranty).</p>
  *
- * <p>Referências: [GNPY] Telecom Infra Project, GNPy, {@code gnpy/core/parameters.py} (perfil g0 da SSMF);
- * [ERAERDS10] P. Eraerds et al., New J. Phys. 12, 063027, 2010 (seção de choque medida, usada na
- * calibração).</p>
+ * <p>ReferÃªncias: [GNPY] Telecom Infra Project, GNPy, {@code gnpy/core/parameters.py} (perfil g0 da SSMF);
+ * [ERAERDS10] P. Eraerds et al., New J. Phys. 12, 063027, 2010 (seÃ§Ã£o de choque medida, usada na
+ * calibraÃ§Ã£o).</p>
  */
 public final class RamanGainProfile {
 

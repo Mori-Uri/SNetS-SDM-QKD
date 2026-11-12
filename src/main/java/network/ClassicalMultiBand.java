@@ -34,7 +34,7 @@ import qkd.multiband.OpticalBand;
  * <p>f_ref and lambda_ref are the centerFrequency of the physicalLayer file. The classical slot grid is still
  * centerFrequency +- slots/2 x slot width: for a C+L grid set centerFrequency to the middle of the band.</p>
  *
- * <p>Referências: [ZIRNGIBL98] M. Zirngibl, Electron. Lett. 34(8), 1998; [SEMRAU18] D. Semrau, R. Killey, P.
+ * <p>ReferÃªncias: [ZIRNGIBL98] M. Zirngibl, Electron. Lett. 34(8), 1998; [SEMRAU18] D. Semrau, R. Killey, P.
  * Bayvel, JLT 36(14), 2018; [FERRARI20] A. Ferrari et al., JLT 38(16), 2020 (G.652.D e bandas); [GNPY]
  * A. Ferrari et al., JOCN 12(6), 2020.</p>
  */

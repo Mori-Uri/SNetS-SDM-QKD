@@ -26,6 +26,13 @@ public class RequestForConnection implements Serializable {
 	protected double timeOfRequestHours;
 	protected double timeOfFinalizeHours;
 	protected double requiredBitRate;
+    /** Shared invalidation epoch only for requests attached to tracked circuit lists. */
+    private static final java.util.concurrent.atomic.AtomicLong BIT_RATE_CHANGES =
+            new java.util.concurrent.atomic.AtomicLong();
+    private transient boolean inTrackedList;
+    public void markInTrackedList() { inTrackedList = true; }
+    public static long bitRateChanges() { return BIT_RATE_CHANGES.get(); }
+
 	protected RequestGenerator rg;
 	protected List<Circuit> circuit;
 
@@ -73,6 +80,8 @@ public class RequestForConnection implements Serializable {
 	}
 
 	public void setRequiredBitRate(double requiredBitRate) {
+        if (inTrackedList && Double.doubleToRawLongBits(this.requiredBitRate) != Double.doubleToRawLongBits(requiredBitRate))
+            BIT_RATE_CHANGES.incrementAndGet();
 		this.requiredBitRate = requiredBitRate;
 	}
 

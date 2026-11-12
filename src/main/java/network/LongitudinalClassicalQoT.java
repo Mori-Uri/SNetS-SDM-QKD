@@ -112,16 +112,17 @@ public final class LongitudinalClassicalQoT {
 		ase = ase * pre + Amplifier.asePsd(frequencyHz,
 				nfLinear, pre, h, preInput, noiseFactorA1, noiseFactorA2, saturated);
 
-		for(int k=0;k<spans;k++) {
-			double from=ends[k];
-			double downstream=Math.exp(-alphaKm*(fibreKm-from))*pre;
-
-			for(int j=k+1;j<=count;j++)
-				downstream*=snapshot.operatingPointAt(j,alphaKm,frequencyHz,h).getGainLinear();
-
-			if(k<count) downstream*=snapshot.operatingPointAt(k+1,alphaKm,frequencyHz,h).getGainLinear();
-			toReceiver[k]=downstream;
+		// One reverse pass replaces O(number_of_spans^2) repeated EDFA lookups.
+		// The gain at the END of span k belongs to its downstream transfer.
+		double downstreamGain=pre;
+		for(int k=spans-1;k>=0;k--) {
+			if(k<count) downstreamGain*=snapshot.operatingPointAt(
+					k+1,alphaKm,frequencyHz,h).getGainLinear();
+			toReceiver[k]=Math.exp(-alphaKm*(fibreKm-ends[k]))*downstreamGain;
 		}
+		if (!Double.isFinite(transfer) || transfer <= 0.0
+				|| !Double.isFinite(ase) || ase < 0.0)
+			throw new ArithmeticException("nonphysical longitudinal QoT gain/ASE");
 
 		return new Result(transfer,ase,booster,pre,preInput,
 				ratios,ends,lengths,toReceiver);

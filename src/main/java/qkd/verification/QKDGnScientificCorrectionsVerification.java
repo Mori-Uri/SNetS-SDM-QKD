@@ -56,10 +56,16 @@ public final class QKDGnScientificCorrectionsVerification {
 		check(joh>0 && Double.isFinite(joh),"Johannisson remains valid");
 		check(Math.abs(joh-habQpsk)>1.e-24,"models are physically distinct");
 
-		// Negative EGN values must NEVER reach a noise denominator.
+		// Negative and non-finite EGN values MUST fail closed, never become 0.
 		GnModelMath.resetDiagnostics();
-		rel(GnModelMath.nonnegative(-1.0e-17,"verification"),0.0,0.0,"negative PSD clamp");
-		check(GnModelMath.negativeClampCount()==1,"negative PSD diagnostic counter");
+		try { GnModelMath.nonnegative(-1.0e-17,"verification");
+			throw new AssertionError("negative PSD was accepted");
+		} catch(ArithmeticException expected) { }
+		check(GnModelMath.negativeRejectionCount()==1,"negative PSD rejection counter");
+		try { GnModelMath.nonnegative(Double.NaN,"verification");
+			throw new AssertionError("NaN PSD was accepted");
+		} catch(ArithmeticException expected) { }
+		check(GnModelMath.nonFiniteCount()==1,"non-finite PSD rejection counter");
 		rel(GnModelMath.nonnegative(1.0e-17,"verification"),1.0e-17,1e-12,"positive PSD unchanged");
 		System.out.println("PASS QKDGnScientificCorrectionsVerification");
 		System.out.println("johannisson_narrow_sci_kernel="+narrow);

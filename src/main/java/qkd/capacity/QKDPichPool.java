@@ -240,6 +240,9 @@ public final class QKDPichPool implements Serializable {
 
 				for (QKDSpan span : lp.getSpans()) {
 					validateSpanInsideLink(link, span);
+					// Trusted nodes terminate the preceding authenticated PICh.
+					// A new session may select another optical wavelength/core.
+					preceding = null;
 					Channel c = acquireSpanChannel(link, span, guardBand, candidate, preceding);
 
 					if (c == null) {

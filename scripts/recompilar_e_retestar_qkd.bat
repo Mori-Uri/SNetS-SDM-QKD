@@ -16,6 +16,11 @@ if not exist "%SRC%" (
     echo [ERRO] Fontes nao encontradas: %SRC%
     exit /b 1
 )
+rem O ZIP da Etapa 5 pode conter apenas o JAR experimental; ele fornece as bibliotecas e o Main.
+if not exist "%BASE%" if exist "%OUT%" (
+    echo [INFO] JAR base classico ausente. Usando o JAR experimental atual como base do rebuild.
+    set "BASE=%OUT%"
+)
 if not exist "%BASE%" (
     echo [ERRO] JAR base nao encontrado: %BASE%
     exit /b 1
@@ -33,16 +38,8 @@ if errorlevel 1 (
 call "%~dp0limpar_bytecode_bifibra.bat"
 if errorlevel 1 exit /b 1
 rem Audita o codigo ANTES do javac, com erro claro se houver classes antigas.
-rem Nao importar TrackedRequestList isoladamente da experimental.
-if exist "%SRC%\network\TrackedRequestList.java" (
-    where python >nul 2>nul
-    if errorlevel 1 (
-        echo [ERRO] TrackedRequestList experimental incompleta detectada; Python necessario para a limpeza segura.
-        exit /b 1
-    )
-    python "%~dp0limpar_tracked_experimental.py" "%ROOT%"
-    if errorlevel 1 exit /b 1
-)
+rem TrackedRequestList agora esta integrada com Circuit e RequestForConnection.
+rem O JarBuilder e a auditoria GN permitem a classe; nao executar a limpeza antiga.
 where python >nul 2>nul
 if not errorlevel 1 (
     python "%~dp0auditar_simbolos_obsoletos.py" "%ROOT%"

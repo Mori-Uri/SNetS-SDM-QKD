@@ -1150,16 +1150,20 @@ public class PhysicalLayer implements Serializable {
 			circuitList.add(circuit);
 		}
 
-		if(testCircuit != null && testCircuit.getRoute().containThisLink(link)) {
-
-			if(!circuitList.contains(testCircuit) && addTestCircuit) {
-				circuitList.add(testCircuit);
-			}
-
-			if(circuitList.contains(testCircuit) && !addTestCircuit) {
-				circuitList.remove(testCircuit);
-			}
-		}
+        // GN/XCI is generated only by signals propagating in the SAME core.
+        // A hypothetical new circuit evaluated against an established victim
+        // can be on a neighboring core: its effect then belongs to XT, not NLI.
+        if (testCircuit != null && testCircuit.getRoute().containThisLink(link)) {
+            Integer testCore = testCircuit.getIndexCoreByLink(link);
+            if (testCore != null && testCore.intValue() == core) {
+                if (!circuitList.contains(testCircuit) && addTestCircuit) {
+                    circuitList.add(testCircuit);
+                }
+                if (circuitList.contains(testCircuit) && !addTestCircuit) {
+                    circuitList.remove(testCircuit);
+                }
+            }
+        }
 
 		return circuitList;
 	}
@@ -1744,6 +1748,7 @@ public class PhysicalLayer implements Serializable {
                 gnli_res=result.corrected+pichXci-pichCorr;
             } else {
                 PhysicalLayer.warnUnsupportedCut(Phii,BsI);
+                throw new ArithmeticException("[GN] Habibi fallback unavailable for Phi="+Phii);
             }
         }
         return GnModelMath.nonnegative(gnli_res, "Habibi + optional numerical GN fallback");
@@ -3509,12 +3514,11 @@ private static final int MAX_CACHED = 512;
         if(warnedUnsupportedCut.compareAndSet(false,true))
             System.err.println("[SNetS GN] Habibi integral fallback unavailable for modulation Phi="
                     +positivePhi+", bandwidth="+(bandwidthHz/1e9)+" GHz. "
-                    +"Original Habibi approximation remains in use for this modulation. "
-                    +"Supported reference mappings: QPSK, 16QAM, 64QAM.");
+                    +"Integral reference mapping unavailable; a nonphysical approximation is rejected. "
+                    +"Reference mappings: QPSK, 8QAM, 16QAM, 32QAM, 64QAM.");
     }
-    /** Legacy Habibi modulation metadata (signed phi) for the GN fallback.
-     *  Only the prior set of modulations is accepted to avoid expanding the
-     *  scientific reference domain silently with this removal. */
+    /** Signed phi is metadata only. The numerical GN quadrature is independent
+     *  of modulation moments; 8/32 QAM use Jurandir (2024) Table 5 values. */
     /** The GN spectral kernel does not depend on modulation moments. For explicit
      *  integral mode allow any finite Phi, unlike the historical restricted fallback. */
     public static Poggiolini2017GnIntegral.Channel integralChannel(double frequencyHz,
@@ -3527,8 +3531,12 @@ private static final int MAX_CACHED = 512;
             double bandwidthHz,double powerW,double lacerdPhi) {
         if(Math.abs(lacerdPhi-1.0)<1e-8)
             return Poggiolini2017GnIntegral.Channel.qpsk(centerHz,bandwidthHz,powerW);
+        if(Math.abs(lacerdPhi-2.0/3.0)<5e-5)
+            return Poggiolini2017GnIntegral.Channel.qam8(centerHz,bandwidthHz,powerW);
         if(Math.abs(lacerdPhi-17.0/25.0)<1e-8)
             return Poggiolini2017GnIntegral.Channel.qam16(centerHz,bandwidthHz,powerW);
+        if(Math.abs(lacerdPhi-69.0/100.0)<1e-8)
+            return Poggiolini2017GnIntegral.Channel.qam32(centerHz,bandwidthHz,powerW);
         if(Math.abs(lacerdPhi-13.0/21.0)<1e-8)
             return Poggiolini2017GnIntegral.Channel.qam64(centerHz,bandwidthHz,powerW);
         return null;
@@ -3589,9 +3597,13 @@ private static final int MAX_CACHED = 512;
             double legacyRaw,double narrowbandGHz,boolean enabled,int quadratureOrder,
             int receiverOrder){
         if(cut==null || interfering==null)throw new IllegalArgumentException("channels required");
-        double base=Math.max(0,legacyRaw);
+        // Keeping a raw negative result would cause an erroneously high OSNR.
+        // Only a successful GN integral fallback can replace an invalid EGN
+        // approximation. Otherwise fail explicitly rather than manufacture 0.
         if(!enabled || (cut.bandwidthHz>narrowbandGHz*1e9 && legacyRaw>=0))
-            return new HabibiGnDecision(0,0,legacyRaw,base,false,0,interfering.size());
+            return new HabibiGnDecision(0,0,legacyRaw,
+                    GnModelMath.nonnegative(legacyRaw,"Habibi approximation without fallback"),
+                    false,0,interfering.size());
         fallbacks.incrementAndGet();
         Poggiolini2017GnIntegral.GnResult solo=cachedPoggioliniGn(fiber,
                 Arrays.asList(cut),quadratureOrder,receiverOrder);
@@ -3600,9 +3612,21 @@ private static final int MAX_CACHED = 512;
         int pairs=0,unsupportedPairs=0;
         double refXci=0;
         for(Poggiolini2017GnIntegral.Channel src:interfering){
-            if(src==null || Math.abs(src.centerHz-cut.centerHz)<
-                        0.999*cut.bandwidthHz){
-                unsupportedPairs++;continue;
+            if(src==null) {
+                unsupportedPairs++;
+                unsupported.incrementAndGet();
+                throw new ArithmeticException("[GN] Habibi fallback missing interferer metadata");
+            }
+            // Spectral overlap is determined by BOTH channel half-widths,
+            // not by the victim width alone. The old 0.999*Bcut check wrongly
+            // rejected disjoint unequal-bandwidth neighbors (e.g. 50/12.5 GHz).
+            double separation = Math.abs(src.centerHz - cut.centerHz);
+            double sumHalfWidths = 0.5 * (src.bandwidthHz + cut.bandwidthHz);
+            if (separation < sumHalfWidths - Math.max(1.0, sumHalfWidths*1e-10)) {
+                unsupportedPairs++;
+                unsupported.incrementAndGet();
+                throw new ArithmeticException("[GN] Habibi pairwise fallback cannot model "
+                        + "coincident/overlapping interferer; check spectrum assignment");
             }
             Poggiolini2017GnIntegral.GnResult two=cachedPoggioliniGn(fiber,
                     Arrays.asList(cut,src),quadratureOrder,receiverOrder);
@@ -3613,8 +3637,7 @@ private static final int MAX_CACHED = 512;
         if(unsupportedPairs>0)unsupported.addAndGet(unsupportedPairs);
         // A negative here is a genuine numerical/model problem. Never label a
         // truncated negative PSD as a valid GN integral.
-        if(!Double.isFinite(corrected)||corrected<0)
-            throw new ArithmeticException("Habibi/GN fallback nonphysical PSD "+corrected);
+        GnModelMath.nonnegative(corrected,"Habibi/GN hybrid fallback");
         return new HabibiGnDecision(solo.sci,refXci,legacyRaw,corrected,true,pairs,unsupportedPairs);
     }
 }

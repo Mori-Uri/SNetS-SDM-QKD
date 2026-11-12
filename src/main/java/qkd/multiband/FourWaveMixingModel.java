@@ -20,7 +20,7 @@ package qkd.multiband;
  * about 2.5 dB (verification VMB-12b). The simulator uses the GN model; this class exists for the verification
  * against the literature.</p>
  *
- * <p>Referências: [PETERS09] N. A. Peters et al., New J. Phys. 11, 045012, 2009 (eqs. 1-3); [NIU18] J.-N. Niu et
+ * <p>ReferÃªncias: [PETERS09] N. A. Peters et al., New J. Phys. 11, 045012, 2009 (eqs. 1-3); [NIU18] J.-N. Niu et
  * al., Appl. Opt. 57(27), 7987, 2018 (eqs. 2-4); K. Inoue, J. Lightw. Technol. 10(11), 1992.</p>
  */
 public final class FourWaveMixingModel {

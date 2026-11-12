@@ -242,13 +242,20 @@ public final class QKDProvisioningService implements java.io.Serializable {
 			}
 		}
 
+		// Stock mode maintains a physical QCh as a source of generated keys, but
+		// does not reserve each client's long-run average consumption as TDM
+		// throughput. Its per-span temporal balance is authoritative for key
+		// availability. A minimal 1-bit/s QCh anchor preserves the existing
+		// spectrum, PICh, Q-TRx and physical feasibility checks.
+		final boolean stockMode = mesh.getKeyInventoryConfig().isStock();
+		final double reservedRateBps = stockMode ? 1.0 : keyDemand.getRequiredKeyRateBps();
 		final QKDSharedAllocationResult allocation;
 
 		try {
 			allocation = resourceManager.allocate(
 					route,
 					routePlan,
-					keyDemand.getRequiredKeyRateBps(),
+					reservedRateBps,
 					requiredSlots,
 					getQkdGuardBandSlots(),
 					physicalParameters.getAttenuationCenterNm(),
@@ -338,7 +345,7 @@ public final class QKDProvisioningService implements java.io.Serializable {
 					+ physicalResult.getMinimumSecretKeyRateBps() + " bit/s");
 		}
 
-		if (session.getProvisionedKeyRateBps() + 1e-6 < keyDemand.getRequiredKeyRateBps()) {
+		if (!stockMode && session.getProvisionedKeyRateBps() + 1e-6 < keyDemand.getRequiredKeyRateBps()) {
 			releaseQuietly(session);
 
 			if (pichPool != null) pichPool.release(pichShares);
@@ -353,6 +360,7 @@ public final class QKDProvisioningService implements java.io.Serializable {
 
 		QKDActiveConnection connection = new QKDActiveConnection(
 				request, classicalRoute, session, physicalResult);
+		connection.setStockManaged(stockMode);
 		connection.setQkdRoute(route, alternative);
 
 		if (pichShares != null) connection.setPichShares(pichShares);

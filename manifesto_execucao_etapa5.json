@@ -1,0 +1,45 @@
+{
+  "article_comparison_scope": "analytic / numerical; not experimental SSFM",
+  "cases": 36,
+  "executed_utc": "2026-11-12T00:01:08.148548+00:00",
+  "jar": "/mnt/data/stage5_work/SNetS-SDM-QKD-etapa5.jar",
+  "jar_sha256": "ce821078c0057ba07595ed3c69a25382854d090c55d6e2861864aeaa69281448",
+  "java_version": "openjdk version \"21.0.12.1\" 2026-08-18\nOpenJDK Runtime Environment (build 21.0.12.1+1-1-deb13u1-Debian)\nOpenJDK 64-Bit Server VM (build 21.0.12.1+1-1-deb13u1-Debian, mixed mode, sharing)",
+  "pending_details": [
+    {
+      "log": "logs/QKDStage5MultibandQuantitativeVerification.log",
+      "pendencia": "[PENDENTE] Dibaj 2024 MB 1380nm: model optimum 20km, gain 74.6975%, article +40%; discrepancy 34.6975 percentage points. Original gain denominator/source data not fully reproducible.",
+      "verificador": "QKDStage5MultibandQuantitativeVerification"
+    },
+    {
+      "log": "logs/MultiBandIwcitVerification.log",
+      "pendencia": "[PENDENTE] VMB-10b MB: ganho de +40 % do artigo nao reproduzido por nenhuma convencao de contagem de saltos (ver G1_qkd_multibanda.md, 3.7).",
+      "verificador": "MultiBandIwcitVerification"
+    },
+    {
+      "log": "logs/MultiBandLiteratureVerification.log",
+      "pendencia": "[PENDENTE] VMB-12e inicio do ruido no fim da banda E (QBER modelo x artigo): 1410 nm/30 km: 0.024 x 0.057; 1450 nm/30 km: 0.099 x 0.125; 1392 nm/70 km: 0.030 x 0.056; 1410 nm/70 km: 0.046 x 0.140; 1450 nm/70 km: 0.202 x 0.245; o artigo tem 2 a 5 vezes mais SpRS a 14-20 THz da borda do comb (1392-1450 nm), fora da janela medida da secao de choque; o artigo nao diz como a estendeu.",
+      "verificador": "MultiBandLiteratureVerification"
+    },
+    {
+      "log": "logs/MultiBandPhysicsVerification.log",
+      "pendencia": "[PENDENTE] VMB-5 com o SpRS do comb C+L a 0 dBm o modelo da 0.51 kbit/s a 150 km (p_SpRS 1.2e-06); o artigo indica ruido desprezivel no O-band -> conflito a discutir",
+      "verificador": "MultiBandPhysicsVerification"
+    }
+  ],
+  "sources": [
+    "Johannisson/Agrell 2014 Eq11/15/16",
+    "Poggiolini/Jiang 2017 GN/EGN",
+    "Jurandir Lacerda Junior 2024 Table6 Fig21/22",
+    "Dibaj 2024 Fig3/5",
+    "Mehdizadeh 2024 Fig3/5"
+  ],
+  "suite": "completo",
+  "summary": {
+    "FAIL": 0,
+    "PASS": 33,
+    "PENDENTE": 4,
+    "TIMEOUT": 0
+  },
+  "timeout_s": 90
+}

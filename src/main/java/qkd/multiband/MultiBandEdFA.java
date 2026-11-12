@@ -10,9 +10,11 @@ import network.Amplifier;
 /**
  * Frequency-resolved, shared-saturation EDFA surrogate for co-propagating
  * classical carriers. Each configured band has a small-signal gain and NF;
- * ALL bands compete for the same finite output power. This is NOT a rate-
- * equation erbium population inversion model: spectral profiles must be
- * calibrated, particularly for L-band and hybrid C+L gain blocks.
+ * By default ALL bands compete for a common finite output-power reservoir.
+ * An explicit PER_BAND option models separate, independently pumped gain
+ * blocks (each with the configured output-saturation scale). This is NOT a
+ * rate-equation erbium population inversion model: profiles and saturation
+ * must be calibrated, particularly for L-band and hybrid C+L gain blocks.
  *
  * All powers in W; frequencies Hz; gains and noise factors linear.
  * The model neither amplifies quantum photons nor assumes C-band ASE leaks
@@ -20,6 +22,18 @@ import network.Amplifier;
  */
 public final class MultiBandEdFA implements Serializable {
 	private static final long serialVersionUID = 1L;
+
+	/** SHARED: one gain reservoir; PER_BAND: independently pumped gain blocks.
+	 * Neither configuration implements erbium population rate equations. */
+	public enum SaturationScope {
+		SHARED, PER_BAND;
+		public static SaturationScope parse(String raw) {
+			if (raw == null || "shared".equalsIgnoreCase(raw.trim())) return SHARED;
+			if ("per-band".equalsIgnoreCase(raw.trim()) || "per_band".equalsIgnoreCase(raw.trim())
+					|| "perband".equalsIgnoreCase(raw.trim())) return PER_BAND;
+			throw new IllegalArgumentException("edfaSaturationScope must be shared or per-band: " + raw);
+		}
+	}
 	public static final class Band implements Serializable {
 		private static final long serialVersionUID = 1L;
 		public final String name;
@@ -55,44 +69,66 @@ public final class MultiBandEdFA implements Serializable {
 	}
 
 	/** One immutable result of an amplifier; usable by both QoT and QKD. */
+	/** Immutable, frequency-resolved operating point for one EDFA. */
 	public static final class State implements Serializable {
 		private static final long serialVersionUID = 1L;
 		private final MultiBandEdFA model;
-		private final double compression, inputW, outputSignalW;
-		private State(MultiBandEdFA model, double compression, double inputW, double outputSignalW) {
-			this.model = model; this.compression = compression;
-			this.inputW = inputW; this.outputSignalW = outputSignalW;
+		private final double[] compression, bandInputW;
+		private final double inputW, outputSignalW;
+		private State(MultiBandEdFA model, double[] compression, double[] bandInputW,
+				double inputW, double outputSignalW) {
+			this.model = model;
+			this.compression = compression.clone();
+			this.bandInputW = bandInputW.clone();
+			this.inputW = inputW;
+			this.outputSignalW = outputSignalW;
 		}
 
 		public double getInputW() { return inputW; }
 		public double getOutputSignalW() { return outputSignalW; }
-		public double getCompression() { return compression; }
-		public double gain(double frequencyHz) {
-			return Amplifier.gainFromCompression(
-					model.band(frequencyHz).smallSignalGain, compression);
+		/** Unambiguous only for a physically shared gain reservoir. */
+		public double getCompression() {
+			if (model.saturationScope != SaturationScope.SHARED)
+				throw new IllegalStateException("per-band EDFA has no single compression factor");
+			return compression[0];
 		}
-
+		public double getCompression(double frequencyHz) {
+			return compression[model.bandIndex(frequencyHz)];
+		}
+		public double getBandInputW(double frequencyHz) {
+			return bandInputW[model.bandIndex(frequencyHz)];
+		}
+		public double gain(double frequencyHz) {
+			final int index = model.bandIndex(frequencyHz);
+			return Amplifier.gainFromCompression(
+					model.bands.get(index).smallSignalGain, compression[index]);
+		}
 		public double asePsd(double frequencyHz, double planckJs) {
-			return Amplifier.asePsd(frequencyHz,
-					model.band(frequencyHz).noiseFigure, gain(frequencyHz), planckJs,
-					inputW, model.noiseFactorA1, model.noiseFactorA2, model.saturated);
+			final int index = model.bandIndex(frequencyHz);
+			final double saturationInputW = model.saturationScope == SaturationScope.SHARED
+					? inputW : bandInputW[index];
+			return Amplifier.asePsd(frequencyHz, model.bands.get(index).noiseFigure,
+					gain(frequencyHz), planckJs, saturationInputW,
+					model.noiseFactorA1, model.noiseFactorA2, model.saturated);
 		}
 	}
 
 	private final List<Band> bands;
 	private final double saturationOutputW;
 	private final boolean saturated;
+	private final SaturationScope saturationScope;
 	private final double noiseFactorA1;
 	private final double noiseFactorA2;
 
 	public MultiBandEdFA withNoiseFactorModel(double a1, double a2) {
 		Amplifier.noiseFactor(1.0, 0.0, a1, a2, false);
 
-		return new MultiBandEdFA(bands, saturationOutputW, saturated, a1, a2);
+		return new MultiBandEdFA(bands, saturationOutputW, saturated, a1, a2, saturationScope);
 	}
 
 	private MultiBandEdFA(List<Band> profiles, double saturationOutputW,
-			boolean saturated, double a1, double a2) {
+			boolean saturated, double a1, double a2, SaturationScope scope) {
+		this.saturationScope = scope;
 		this.bands = Collections.unmodifiableList(new ArrayList<Band>(profiles));
 		this.saturationOutputW = saturationOutputW;
 		this.saturated = saturated;
@@ -101,6 +137,14 @@ public final class MultiBandEdFA implements Serializable {
 	}
 
 	public MultiBandEdFA(List<Band> profiles, double saturationOutputDbm, boolean saturated) {
+		this(profiles, saturationOutputDbm, saturated, SaturationScope.SHARED);
+	}
+
+	/** Explicit opt-in for separately pumped EDFA blocks (e.g. C and L). */
+	public MultiBandEdFA(List<Band> profiles, double saturationOutputDbm,
+			boolean saturated, SaturationScope scope) {
+		if (scope == null) throw new IllegalArgumentException("null EDFA saturation scope");
+		this.saturationScope = scope;
 		if (profiles == null || profiles.isEmpty() || !Double.isFinite(saturationOutputDbm))
 			throw new IllegalArgumentException("EDFA requires calibrated band profiles");
 		ArrayList<Band> sorted = new ArrayList<Band>(profiles);
@@ -125,38 +169,55 @@ public final class MultiBandEdFA implements Serializable {
 
 	public List<Band> getBands() { return bands; }
 	public boolean isSaturated() { return saturated; }
+	public SaturationScope getSaturationScope() { return saturationScope; }
 	public double getSaturationOutputW() { return saturationOutputW; }
 	public double noiseFigureAt(double frequencyHz) { return band(frequencyHz).noiseFigure; }
-	public Band band(double frequencyHz) {
-		for (Band b : bands) if (b.contains(frequencyHz)) return b;
-
+	private int bandIndex(double frequencyHz) {
+		for (int index = 0; index < bands.size(); index++)
+			if (bands.get(index).contains(frequencyHz)) return index;
 		throw new IllegalArgumentException("frequency outside configured EDFA bands: " + frequencyHz);
 	}
 
+	public Band band(double frequencyHz) { return bands.get(bandIndex(frequencyHz)); }
+
 	public State evaluate(List<Input> inputs) {
 		if (inputs == null) throw new IllegalArgumentException("null EDFA inputs");
+		final double[] bandInput = new double[bands.size()];
+		final double[] bandUnsaturatedOutput = new double[bands.size()];
 		double total = 0.0;
 		double unsaturatedOutput = 0.0;
 
-		for (Input i : inputs) {
-			total += i.powerW;
-			unsaturatedOutput += i.powerW * band(i.frequencyHz).smallSignalGain;
+		for (Input source : inputs) {
+			if (source == null) throw new IllegalArgumentException("null EDFA input channel");
+			final int index = bandIndex(source.frequencyHz);
+			bandInput[index] += source.powerW;
+			bandUnsaturatedOutput[index] += source.powerW * bands.get(index).smallSignalGain;
+			total += source.powerW;
+			unsaturatedOutput += source.powerW * bands.get(index).smallSignalGain;
 		}
 
 		if (!Double.isFinite(total) || !Double.isFinite(unsaturatedOutput))
 			throw new IllegalArgumentException("EDFA input overflow");
-
-		// One common inversion reservoir: interband gain competition.
-		// Use aggregate *unsaturated output* to produce gain compression.
-		final double compression = Amplifier.sharedCompression(
-				unsaturatedOutput, saturationOutputW, saturated);
+		final double[] compression = new double[bands.size()];
+		if (saturationScope == SaturationScope.SHARED) {
+			final double common = Amplifier.sharedCompression(
+					unsaturatedOutput, saturationOutputW, saturated);
+			java.util.Arrays.fill(compression, common);
+		} else {
+			for (int index = 0; index < bands.size(); index++) {
+				compression[index] = Amplifier.sharedCompression(
+						bandUnsaturatedOutput[index], saturationOutputW, saturated);
+			}
+		}
 		double output = 0.0;
 
-		for (Input i : inputs) {
-			output += i.powerW * Amplifier.gainFromCompression(
-					band(i.frequencyHz).smallSignalGain, compression);
+		for (Input source : inputs) {
+			final int index = bandIndex(source.frequencyHz);
+			output += source.powerW * Amplifier.gainFromCompression(
+					bands.get(index).smallSignalGain, compression[index]);
 		}
-
-		return new State(this, compression, total, output);
+		if (!Double.isFinite(output))
+			throw new IllegalArgumentException("EDFA output overflow");
+		return new State(this, compression, bandInput, total, output);
 	}
 }

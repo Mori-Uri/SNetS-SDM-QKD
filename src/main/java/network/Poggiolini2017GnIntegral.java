@@ -33,6 +33,8 @@ public final class Poggiolini2017GnIntegral {
             this.powerW=powerW;this.phi=legacySignedPhi;
         }
         public static Channel qpsk(double f,double b,double p) {return new Channel(f,b,p,-1.0);}
+        public static Channel qam8(double f,double b,double p) {return new Channel(f,b,p,-2.0/3.0);}
+        public static Channel qam32(double f,double b,double p) {return new Channel(f,b,p,-69.0/100.0);}
         public static Channel qam16(double f,double b,double p) {return new Channel(f,b,p,-17.0/25.0);}
         public static Channel qam64(double f,double b,double p) {return new Channel(f,b,p,-13.0/21.0);}
     }

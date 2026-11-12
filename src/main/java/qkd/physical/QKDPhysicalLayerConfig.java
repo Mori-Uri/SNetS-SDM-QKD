@@ -92,6 +92,8 @@ public final class QKDPhysicalLayerConfig implements Serializable {
 
 		/** Optional calibrated spectral gain/NF profiles for C/L/S etc. */
 		java.util.List<EdFABandConfig> edfaBands = null;
+		/** Shared gain medium (default) or separately pumped C/L amplifier blocks. */
+		String edfaSaturationScope = "shared";
 		double amplifierSaturationPowerDbm = 16.0;
 		double amplifierReferenceLaunchPowerDbm = 0.0;
 		double amplifierNoiseFigureDb = 5.0;
@@ -391,7 +393,9 @@ public final class QKDPhysicalLayerConfig implements Serializable {
 
 			evolution = evolution.withMultiBandEdFA(new qkd.multiband.MultiBandEdFA(
 					bands, multiband.amplifierSaturationPowerDbm,
-					model == qkd.multiband.ClassicalPowerEvolution.GainModel.SATURATED));
+					model == qkd.multiband.ClassicalPowerEvolution.GainModel.SATURATED,
+					qkd.multiband.MultiBandEdFA.SaturationScope.parse(
+						multiband.edfaSaturationScope)));
 		}
 
 		return evolution;

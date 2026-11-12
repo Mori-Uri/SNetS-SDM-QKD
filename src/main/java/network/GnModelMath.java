@@ -80,29 +80,33 @@ public final class GnModelMath {
 		integralMisses.set(0L);
 	}
 
-	/** Return nonnegative NLI PSD, retaining diagnostics of an invalid approximation. */
+	/**
+	 * Validate a generated NLI power spectral density. A negative or non-finite
+	 * estimate MUST NOT become zero noise: doing so inflates OSNR and can admit
+	 * a circuit that violates its real QoT constraint. Explicit approximate
+	 * mode therefore fails closed; adaptive mode must select a valid numerical
+	 * model before reaching this guard. Counters are kept for diagnostics.
+	 *
+	 * @throws ArithmeticException when the calculated NLI is nonphysical.
+	 */
 	public static double nonnegative(double value, String context) {
 		if (!Double.isFinite(value)) {
-			long n=invalidCount.incrementAndGet();
-
-			if (n <= 5) System.err.println("[GN] non-finite NLI in " + context + ": " + value);
-
-			return 0.0;
+			invalidCount.incrementAndGet();
+			throw new ArithmeticException("[GN] non-finite NLI in " + context + ": " + value);
 		}
-
 		if (value < 0.0) {
 			if (value < mostNegative) mostNegative = value;
-			long n=negativeCount.incrementAndGet();
-
-			if (n <= 5) System.err.println("[GN] negative NLI clamped to zero in " + context + ": " + value);
-
-			return 0.0;
+			negativeCount.incrementAndGet();
+			throw new ArithmeticException("[GN] negative NLI in " + context + ": " + value
+					+ "; select adaptive/integral instead of approximate");
 		}
-
 		return value;
 	}
 
-	public static long negativeClampCount() { return negativeCount.get(); }
+	/** Count of negative NLI estimates rejected instead of clamped. */
+	public static long negativeRejectionCount() { return negativeCount.get(); }
+	/** @deprecated Kept for existing diagnostic dashboards; no clamping occurs. */
+	@Deprecated public static long negativeClampCount() { return negativeRejectionCount(); }
 	public static long nonFiniteCount() { return invalidCount.get(); }
 	public static double mostNegativeUnclamped() { return mostNegative; }
 	public static void resetDiagnostics() { negativeCount.set(0); invalidCount.set(0); mostNegative=0.0; }
@@ -240,9 +244,8 @@ public final class GnModelMath {
 				"Johannisson Eq.16 logarithmic XCI");
 	}
 
-    /** Strict three-mode selection; old boolean overload stays unchanged for
-     *  scenarios without an explicit NLI mode. A nonphysical logarithm is
-     *  clamped and counted in approximate mode, never secretly integrated. */
+    /** Strict three-mode selection: an invalid logarithm is rejected in
+     *  approximate mode, while adaptive selects the finite positive integral. */
     public static double johannissonSciKernel(double rho,double widthHz,
             String mode,double narrowbandGHz,boolean legacyIntegral) {
         if(NliIntegrationMode.LEGACY.equals(mode))
@@ -273,7 +276,8 @@ public final class GnModelMath {
                         && (victimWidthHz<=narrowbandGHz*1e9
                                 || sourceWidthHz<=narrowbandGHz*1e9 || invalid)))
             return johannissonXciKernel(separationHz,victimWidthHz,sourceWidthHz,xi);
-        if(invalid) return nonnegative(-1.0,"Johannisson strict logarithmic XCI overlap");
+        if(invalid) throw new ArithmeticException("[GN] Johannisson approximate XCI "
+                + "undefined for overlapping frequencies; choose adaptive/integral");
         return nonnegative(Math.log1p(sourceWidthHz/left),
                 "Johannisson strict logarithmic XCI");
     }

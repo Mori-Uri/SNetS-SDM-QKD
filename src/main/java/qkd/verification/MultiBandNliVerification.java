@@ -24,7 +24,7 @@ import qkd.physical.QKDSpanPhysicalResult;
 import simulationControl.parsers.NetworkConfig.CoreConfig;
 
 /**
- * Parte 45 (nível N2): verification of the GN-model NLI on the quantum channel ({@link NonlinearInterferenceModel}).
+ * Parte 45 (nÃ­vel N2): verification of the GN-model NLI on the quantum channel ({@link NonlinearInterferenceModel}).
  *
  * <ul>
  *   <li>VMB-11a: in-band NLI at the centre of a flat spectrum equals the closed form of [POGGIOLINI14] (eq. 13);</li>

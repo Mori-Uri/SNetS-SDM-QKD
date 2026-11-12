@@ -24,6 +24,9 @@ public final class QKDActiveConnection implements Serializable {
 	private final Route classicalRoute;
 	private final QKDSession qkdSession;
 	private QKDRoutePhysicalResult physicalResult;
+	private boolean stockManaged;
+	public boolean isStockManaged() { return stockManaged; }
+	public void setStockManaged(boolean value) { stockManaged = value; }
 
 	/** Part 23: route actually used by the QCh (classical route or an alternative). */
 	private Route qkdRoute;
@@ -111,7 +114,7 @@ public final class QKDActiveConnection implements Serializable {
 	}
 
 	public double getMinimumSecretKeyRateBps() {
-		if (qkdSession.isSharedCapacityManaged()) {
+		if (qkdSession.isSharedCapacityManaged() && !stockManaged) {
 			return qkdSession.getProvisionedKeyRateBps();
 		}
 

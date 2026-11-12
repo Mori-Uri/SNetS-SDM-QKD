@@ -38,7 +38,7 @@ import qkd.physical.QKDPhysicalParameters;
  * <p>Values read from figures were digitized by hand (about 2% of full scale). The GNPy values come from the script
  * {@code verificacao/QKD_reference/Mehdizadeh_GNPy/gnpy_fig3.py} (GNPy 2.14.2).</p>
  *
- * <p>Referências: [PETERS09] N. A. Peters et al., New J. Phys. 11, 045012, 2009; [NIU18] J.-N. Niu et al., Appl.
+ * <p>ReferÃªncias: [PETERS09] N. A. Peters et al., New J. Phys. 11, 045012, 2009; [NIU18] J.-N. Niu et al., Appl.
  * Opt. 57(27), 2018; [MEHDI24] P. Mehdizadeh et al., IEEE Commun. Lett. 28(3), 2024; [DIBAJ25] M. R. Dibaj et al.,
  * JLT 43(1), 2025; [ERAERDS10] P. Eraerds et al., New J. Phys. 12, 063027, 2010; [GNPY] A. Ferrari et al., JOCN
  * 12(6), 2020; [POGGIOLINI12] P. Poggiolini et al., arXiv:1209.0394 (eqs. 120 e 123).</p>

@@ -7,21 +7,18 @@ set "OUT=%ROOT%\simulations\SNetS-SDM-QKD-exp.jar"
 set "LAUNCHER=%ROOT%\launcher\snets-launcher.jar"
 set "JAVA_CMD=java"
 if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" set "JAVA_CMD=%JAVA_HOME%\bin\java.exe"
+rem O ZIP da Etapa 5 pode conter apenas o JAR experimental; ele fornece as bibliotecas e o Main.
+if not exist "%BASE%" if exist "%OUT%" (
+    echo [INFO] JAR base classico ausente. Usando o JAR experimental atual como base do rebuild.
+    set "BASE=%OUT%"
+)
 if not exist "%BASE%" (echo [ERRO] JAR base inexistente: "%BASE%" & exit /b 2)
 if not exist "%LAUNCHER%" (echo [ERRO] Launcher inexistente: "%LAUNCHER%" & exit /b 2)
 echo [1/4] Limpando as fontes antigas EGN...
 call "%~dp0remover_egn_full_reference.bat"
 if errorlevel 1 exit /b 1
-rem Nao importar TrackedRequestList isoladamente da experimental.
-if exist "%SRC%\network\TrackedRequestList.java" (
-    where python >nul 2>nul
-    if errorlevel 1 (
-        echo [ERRO] TrackedRequestList experimental incompleta detectada; Python necessario para a limpeza segura.
-        exit /b 1
-    )
-    python "%~dp0limpar_tracked_experimental.py" "%ROOT%"
-    if errorlevel 1 exit /b 1
-)
+rem TrackedRequestList agora esta integrada com Circuit e RequestForConnection.
+rem O JarBuilder e a auditoria GN permitem a classe; nao executar a limpeza antiga.
 where python >nul 2>nul
 if errorlevel 1 (
     echo [INFO] Python nao encontrado. Prosseguindo; javac fara a verificacao de referencias.

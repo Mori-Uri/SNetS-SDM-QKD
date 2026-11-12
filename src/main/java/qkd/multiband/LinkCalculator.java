@@ -38,7 +38,7 @@ import qkd.physical.QKDPhysicalParameters;
  *   saida=arquivo.csv      grava CSV (sem saida: imprime na tela)
  * </pre>
  *
- * <p>Referências: ver {@link MultiBandQkdLinkModel}.</p>
+ * <p>ReferÃªncias: ver {@link MultiBandQkdLinkModel}.</p>
  */
 public final class LinkCalculator {
 

@@ -29,6 +29,10 @@ import simulationControl.parsers.NetworkConfig.NodeConfig;
 public final class QKDNliIntegrationModesVerification {
     private QKDNliIntegrationModesVerification() { }
     private static void check(boolean ok,String text) { if(!ok) throw new AssertionError(text); }
+    private static void mustReject(Runnable work,String description) {
+        try { work.run(); throw new AssertionError(description+" unexpectedly accepted"); }
+        catch(ArithmeticException expected) { }
+    }
     private static void close(double actual,double expected,String message) {
         if(!(Math.abs(actual-expected)<=1e-10*Math.max(1e-30,Math.abs(expected))))
             throw new AssertionError(message+": "+actual+" != "+expected);
@@ -88,13 +92,13 @@ public final class QKDNliIntegrationModesVerification {
         double beta=21.3e-27;
         double narrow=12.5e9;
         double rho=Math.PI*Math.PI*beta*narrow*narrow/alpha;
-        double strict=GnModelMath.johannissonSciKernel(rho,narrow,
-                "approximate",25.0,false);
+        mustReject(() -> GnModelMath.johannissonSciKernel(rho,narrow,
+                "approximate",25.0,false), "Johannisson invalid log");
         double integral=GnModelMath.johannissonSciKernel(rho,narrow,
                 "integral",25.0,false);
         double adaptive=GnModelMath.johannissonSciKernel(rho,narrow,
                 "adaptive",25.0,false);
-        check(strict==0.0 && integral>0,"narrow Johannisson must distinguish strict log/integral");
+        check(integral>0,"narrow Johannisson adaptive must return positive integral");
         close(adaptive,integral,"Johannisson adaptive for narrow SCI");
         double wide=50e9;
         double rhoWide=Math.PI*Math.PI*beta*wide*wide/alpha;
@@ -107,19 +111,17 @@ public final class QKDNliIntegrationModesVerification {
         double xciAdaptive=GnModelMath.johannissonXciKernel(75e9,12.5e9,32e9,
                 4*Math.PI*Math.PI*beta/alpha,"adaptive",25.0,false);
         close(xciAdaptive,xciIntegral,"Johannisson narrow source/victim XCI");
-        double johApprox=johannisson("approximate",12.5);
+        mustReject(() -> johannisson("approximate",12.5), "production Johannisson invalid log");
         double johIntegral=johannisson("integral",12.5);
         double johAuto=johannisson("adaptive",12.5);
-        check(johApprox==0.0 && johIntegral>0.0,
-                "production Johannisson approximate must not integrate");
+        check(johIntegral>0.0,"production Johannisson integral must be positive");
         close(johAuto,johIntegral,"production Johannisson adaptive narrow");
         close(johannisson("adaptive",50.0),johannisson("approximate",50.0),
                 "production Johannisson wide uses logarithmic approximation");
         double gnNarrow=habibi("integral",12.5);
         double autoNarrow=habibi("adaptive",12.5);
-        double rawNarrow=habibi("approximate",12.5);
-        check(gnNarrow>0.0 && rawNarrow==0.0,
-                "Habibi approximate must not integrate and negative NLI must clamp");
+        mustReject(() -> habibi("approximate",12.5), "production Habibi invalid approximation");
+        check(gnNarrow>0.0,"Habibi integral must recover physical NLI");
         close(autoNarrow,gnNarrow,"Habibi adaptive narrow");
         double rawWide=habibi("approximate",50.0);
         double autoWide=habibi("adaptive",50.0);
@@ -147,6 +149,6 @@ public final class QKDNliIntegrationModesVerification {
                 "strict logarithmic mode must never run the integral");
         System.out.printf(java.util.Locale.ROOT,
                 "PASS NLI modes Johannisson/Habibi: Sci narrow [log=%.6g integral=%.6g], Habibi 12.5GHz [approx=%.6g integral=%.6g] wide [approx=%.6g integral=%.6g]%n",
-                strict,integral,rawNarrow,gnNarrow,rawWide,integralWide);
+                Double.NaN,integral,Double.NaN,gnNarrow,rawWide,integralWide);
     }
 }

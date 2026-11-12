@@ -11,6 +11,7 @@ for %%T in (
   qkd.verification.JurandirBerThesisVerification
   qkd.verification.ClassicalBerQotVerification
   qkd.verification.QKDNarrowbandHabibiVerification
+  qkd.verification.QKDStage2NliSafetyVerification
   qkd.verification.QKDJohannissonModeVerification
   qkd.verification.QKDJohannissonSciModeVerification
   qkd.verification.QKDJohannissonExactXciVerification

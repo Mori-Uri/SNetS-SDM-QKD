@@ -77,6 +77,7 @@ public final class QKDMeshFactory {
 					keyDemandPolicy,
 					trafficSeed,
 					simulationConfig.getQkdProtectionRandomSeed() + offset);
+			qkdMesh.setKeyInventoryConfig(simulationConfig.getQkdKeyInventory());
 			qkdMesh.setQkdWarmupArrivals(simulationConfig.getQkdWarmupFraction()
 					* simulationConfig.getRequests());
 

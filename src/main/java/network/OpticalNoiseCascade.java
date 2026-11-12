@@ -33,7 +33,8 @@ public final class OpticalNoiseCascade {
 	}
 
 	public void addNli(double psd) {
-		nliPsd += nonnegative(psd);
+		// Do not hide invalid NLI from any caller of the cascade model.
+		nliPsd += GnModelMath.nonnegative(psd,"optical-noise cascade");
 	}
 
 	public void addXt(double psd) {

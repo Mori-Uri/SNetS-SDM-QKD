@@ -11,7 +11,7 @@ import java.util.List;
  *
  * <p>Immutable. Use {@link #comb} to build the fully loaded C+L comb of the reference papers.</p>
  *
- * <p>Referências: comb de 184,4 a 196,8 THz, 112,5 GHz, 0 dBm/canal em [MEHDI24] e [DIBAJ25] (C+L de
+ * <p>ReferÃªncias: comb de 184,4 a 196,8 THz, 112,5 GHz, 0 dBm/canal em [MEHDI24] e [DIBAJ25] (C+L de
  * [FERRARI20]).</p>
  */
 public final class ClassicalChannel implements Serializable {

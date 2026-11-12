@@ -123,14 +123,15 @@ public class Mesh implements Serializable {
 			this.avaliableModulations = ModulationSelector.configureModulations(this);
 		}
 
-		// Computing of the distances of the modulation formats
-		if (physicalLayer.isActiveQoT()) {
-			if (modTrDistance == null) {
-				this.modTrDistance = physicalLayer.computesModulationsDistances(this, this.avaliableModulations);
-			} else {
-				this.modTrDistance = modTrDistance;
-			}
-		}
+		// Do not perform 4,000 costly OSNR/power evaluations per modulation/rate
+		// during network initialization. Precomputed ranges are still accepted
+		// from the simulation manager for backward compatibility.
+		this.modTrDistance = modTrDistance == null
+				? new HashMap<String, HashMap<Double, Double>>() : modTrDistance;
+		for (Modulation mod : avaliableModulations)
+			if (!this.modTrDistance.containsKey(mod.getName())
+					|| this.modTrDistance.get(mod.getName()) == null)
+				this.modTrDistance.put(mod.getName(), new HashMap<Double, Double>());
 	}
 
 	/**
@@ -144,13 +145,21 @@ public class Mesh implements Serializable {
 		Double distance = null;
 
 		if (physicalLayer.isActiveQoT()) {
-			distance = modTrDistance.get(modulation.getName()).get(bitRate);
-
-			if(distance == null) {
-				distance = physicalLayer.computeModulationDistanceByBitRate(modulation, bitRate, this);
-				modTrDistance.get(modulation.getName()).put(bitRate, distance);
+			HashMap<Double, Double> perRate = modTrDistance.get(modulation.getName());
+			if (perRate == null) {
+				perRate = new HashMap<Double, Double>();
+				modTrDistance.put(modulation.getName(), perRate);
 			}
-
+			distance = perRate.get(bitRate);
+			if (distance == null) {
+				// The configured reach is only a coarse routing filter; real QoT
+				// is evaluated on the actual circuit at admission. Zero/absent
+				// ranges cannot safely be used to reject a viable circuit.
+				double configured = modulation.getMaxRange();
+				distance = Double.isFinite(configured) && configured > 0.0
+						? configured : Double.POSITIVE_INFINITY;
+				perRate.put(bitRate, distance);
+			}
 		} else {
 			distance = modulation.getMaxRange();
 		}

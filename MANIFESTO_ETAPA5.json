@@ -1,0 +1,61 @@
+{
+  "edition": "SNetS-SDM-QKD Etapa 5 — Scientific Validation 2026-11-11",
+  "base": "SNetS-SDM-QKD Etapa 4 incremental",
+  "notes": "Files with a beforeSha256 require an exact stage-4 baseline; no force overwrite.",
+  "files": [
+    {
+      "path": "src/main/java/network/PhysicalLayer.java",
+      "beforeSha256": "2d43824049bc8ff80f2caf1e4d1e47318f7add4147943309ee305871f334c56a",
+      "afterSha256": "bb3847de67f94d61b00f7209c10ed8e3d89d361ac79327c9679db507625dbc20",
+      "binary": false
+    },
+    {
+      "path": "src/main/java/simulationControl/SimulationFileManager.java",
+      "beforeSha256": "1be6e00fd9817ec2a3b9b0b9329e8c07418d24a684f45b096fac010e5c0438da",
+      "afterSha256": "9d276048346a5f7f5056c680b57f57a20febedb48e48dc5c6994247b80c5f1bf",
+      "binary": false
+    },
+    {
+      "path": "src/main/java/qkd/verification/QKDStage5QuantitativeSweepVerification.java",
+      "beforeSha256": "",
+      "afterSha256": "cd8f21db08e4f8fe710427918c159295ab1948d1a92e76410396ca4ba37bc596",
+      "binary": false
+    },
+    {
+      "path": "src/main/java/qkd/verification/QKDStage5SimulationIntegrityVerification.java",
+      "beforeSha256": "",
+      "afterSha256": "cd840591b0376deacceae1fbd46abdb61aabd6f0a2b66b450369a34c4ce36ed7",
+      "binary": false
+    },
+    {
+      "path": "src/main/java/qkd/verification/QKDStage5MultibandQuantitativeVerification.java",
+      "beforeSha256": "",
+      "afterSha256": "e1d49f3cc2c9b2b94ab98cb14ef09355bfa155f6c3031bad23d4fd9192ae2a77",
+      "binary": false
+    },
+    {
+      "path": "scripts/validar_cientificamente_etapa5.py",
+      "beforeSha256": "",
+      "afterSha256": "fad956337957b3ca2860e4749f93363a2fe34715f75d200ea2a9053395d6a6c9",
+      "binary": false
+    },
+    {
+      "path": "scripts/validar_etapa5.bat",
+      "beforeSha256": "",
+      "afterSha256": "84c8020942518cad5b6f2f4dd57db087c7d8ba15217562291bdea61fb0f46d7a",
+      "binary": false
+    },
+    {
+      "path": "docs/ETAPA5_VALIDACAO_CIENTIFICA_REPRODUTIVEL.md",
+      "beforeSha256": "",
+      "afterSha256": "a20644270c7adf20463cffe1d48e67c3c469ff46854e64881c4c30591cce4554",
+      "binary": false
+    },
+    {
+      "path": "simulations/SNetS-SDM-QKD-exp.jar",
+      "beforeSha256": "b1733da0a231ca0adb2741ddf84eec382087b6b1b9af7876d7cb1e28c53a695a",
+      "afterSha256": "ce821078c0057ba07595ed3c69a25382854d090c55d6e2861864aeaa69281448",
+      "binary": true
+    }
+  ]
+}
