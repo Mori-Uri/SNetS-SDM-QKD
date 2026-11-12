@@ -176,6 +176,10 @@
     clear(panel).append(el('div.toolbar', { style: { marginBottom: '4px' } }, el('h2', 'Saída da execução'), el('span.spacer'), cancel), meta, bar, pre);
     clearInterval(R.logPoll);
     let finishedHandled = false;
+    // Parte 64: só recarrega o caso se esta saída viu a execução terminar. Antes, ao abrir a aba Executar de um caso
+    // que já tinha terminado, o recarregamento redesenhava a aba, que se ligava de novo à mesma execução e recarregava
+    // outra vez: a aba ficava piscando sem parar.
+    let sawRunning = false;
     const tick = async () => {
       if (R.consoleRunId !== id || !document.body.contains(pre)) { clearInterval(R.logPoll); return; }
       let d;
@@ -196,12 +200,13 @@
         d.exitCode !== null ? el('span', 'Código de saída ', el('b', String(d.exitCode))) : null);
       bar.firstChild.style.width = (d.progress * 100).toFixed(1) + '%';
       cancel.hidden = d.state !== 'running';
+      if (d.state === 'running' || d.state === 'queued') sawRunning = true;
       if (d.state !== 'running') {
         clearInterval(R.logPoll);
         if (!finishedHandled) {
           finishedHandled = true;
           if (d.state === 'finished' && d.case === App.state.casePath) {
-            App.refreshCaseFiles();
+            if (sawRunning) App.refreshCaseFiles();
             panel.appendChild(el('div.notice.ok', { style: { marginTop: '10px' } },
               el('span', 'Simulação concluída. '),
               el('button.btn.small', { type: 'button', on: { click: () => App.selectTab('results') } }, 'Ver resultados')));

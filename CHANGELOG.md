@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [64](#parte-64) | Parte 64 — launcher 1.22.2: aba Executar não fica mais piscando depois de uma execução |
 | [63](#parte-63) | Parte 63 — launcher 1.22.1: lista de JARs atualizada e seleção de casos por pasta |
 | [62](#parte-62) | Parte 62 — launcher 1.22.0: tema da interface (azul, cinza, preto e claro) e casos de conferência antes do merge |
 | [61](#parte-61) | Parte 61 — launcher 1.21.2: uma só barra de rolagem nas janelas, "Salvar como…" na mesma linha e ícone do aplicativo na bandeja e no atalho |
@@ -45,6 +46,20 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-64"></a>
+## Parte 64 — launcher 1.22.2: aba Executar não fica mais piscando depois de uma execução
+
+Feita na `main` (depois do merge da experimental). Só o launcher muda; o simulador e os resultados não mudam.
+
+- **Correção:** ao abrir a aba Executar de um caso cuja execução já tinha terminado nesta sessão, a aba ficava sendo
+  redesenhada sem parar (cerca de 10 vezes por segundo). A saída da execução, ao se ligar à execução terminada,
+  recarregava o caso; o recarregamento redesenhava a aba, que se ligava de novo à mesma execução e recarregava outra
+  vez. Agora o caso só é recarregado quando a saída acompanhou a execução terminar (`launcher/web/js/run.js`).
+- **Conferência:** com um simulador de teste rodando uma fila de 4 casos, a aba passou de 350 redesenhos em 40 s para
+  2 (a abertura da aba e o recarregamento ao fim da execução).
 
 ---
 
