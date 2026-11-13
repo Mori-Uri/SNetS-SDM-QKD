@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [65](#parte-65) | Parte 65 — PICh como canal clássico (modulação, potência, QoT e interferência) e launcher 1.22.3 |
 | [64](#parte-64) | Parte 64 — launcher 1.22.2: aba Executar não fica mais piscando depois de uma execução |
 | [63](#parte-63) | Parte 63 — launcher 1.22.1: lista de JARs atualizada e seleção de casos por pasta |
 | [62](#parte-62) | Parte 62 — launcher 1.22.0: tema da interface (azul, cinza, preto e claro) e casos de conferência antes do merge |
@@ -46,6 +47,95 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-65"></a>
+## Parte 65 — PICh como canal clássico (modulação, potência, QoT e interferência) e launcher 1.22.3
+
+Feita na `main`, a pedido do coorientador: "o PICh tem que funcionar como um canal clássico. Ele tem modulação
+e potência, a QoT dele tem que ser verificada, ele causa interferência nos outros canais e sofre interferência dos
+outros canais, e tem seções correspondentes às seções do QCh (os nós confiáveis)". Vale para o modo `segment` do PICh
+(o padrão); o modo `route` continua como antes (só ocupa espectro). Os algoritmos de RMCSA não mudaram.
+
+**Como era.** O PICh só reservava uma faixa de slots num núcleo clássico de cada enlace. Não tinha modulação nem
+potência, não entrava na lista de circuitos do núcleo e, por isso, não sofria nem causava NLI, crosstalk ou ruído nos
+QChs, e a QoT dele nunca era verificada.
+
+**Como ficou.** Cada PICh aberto num enlace é um circuito (`qkd.capacity.QKDPichCircuit`, subclasse de
+`network.SectionedCircuit`):
+
+- **Seções.** O PICh termina nos mesmos nós que o QCh: as seções dele são os trechos do plano QKD (QTND) dentro do
+  enlace, de um nó confiável ao seguinte. Ele ocupa a mesma faixa de slots no enlace inteiro (como interferente, está
+  no enlace todo), mas é recebido e regenerado em cada nó confiável, então a QoT e o crosstalk dele são calculados por
+  seção, com o comprimento da seção no lugar do comprimento do enlace (vãos, amplificadores de linha e ganho do
+  pré-amplificador da seção; os interferentes são os circuitos do enlace). A pior seção decide. Seções de mesmo
+  comprimento têm o mesmo resultado e são calculadas uma vez só.
+- **Modulação.** Escolhida como nos circuitos (`ModulationSelectionByQoTv2`): da mais eficiente para a menos
+  eficiente, a primeira com QoT aceitável. Para cada modulação, os núcleos são tentados na ordem do PICh
+  (`pichCorePolicy`) e, em cada um, a primeira faixa livre da ordem de slots (`pichSlotPolicy`). A faixa tem
+  `max(pichSlots, slots da modulação para a taxa do PICh)` slots. Campo novo `network.qkd.pichBitRateGbps`
+  (padrão 10 Gbit/s). Campo novo `network.qkd.pichModulation` (padrão vazio = como os circuitos) para fixar uma
+  modulação.
+- **Potência.** A mesma regra dos circuitos (`PhysicalLayer.getCircuitLaunchPower`: PSD fixa × banda do sinal, ou a
+  potência fixa do arquivo de camada física).
+- **Admissão de um PICh novo** (`qkd.control.QKDPichPhysicalCheck`), com o PICh já na lista de circuitos do núcleo e o
+  circuito clássico pendente da requisição como interferente hipotético, seguindo as mesmas chaves da camada física
+  (`activeQoT`, `activeQoTForOther`, `activeXT`, `activeXTForOther`, modelo de XT):
+  1. QoT do PICh (SNR de cada seção ≥ limiar da modulação) e XT de cada seção ≤ limiar de XT;
+  2. os circuitos do núcleo do PICh no enlace mantêm a QoT, os circuitos dos núcleos adjacentes que se sobrepõem a ele
+     mantêm o XT (outros PIChs incluídos), e o circuito pendente também;
+  3. com ruído clássico no núcleo QKD (`intercoreCrosstalkEnabled`), cada QCh do enlace que o PICh alcança (núcleo QKD
+     adjacente e sobreposição espectral, a mesma regra dos candidatos clássicos) mantém a taxa de chave reservada nele,
+     já contando a reserva da sessão pendente.
+  Se nenhuma combinação passar, a requisição QKD é bloqueada com a causa `[PICH]` (a mensagem diz se foi espectro,
+  QoT do PICh, interferência nos canais clássicos ou nos QChs).
+- **Depois de aberto**, o PICh está na lista de circuitos do núcleo, então entra sozinho no GN/NLI, no XT, no XTO, na
+  QoTO e no ruído dos QChs (crosstalk e Raman) de todos os outros canais, e é testado como vítima quando um circuito
+  novo chega (QoTO/XTO), como qualquer circuito. Quando a última sessão sai, ele sai da lista e libera os slots. As
+  sessões QKD com QCh no enlace de um PICh aberto ou fechado têm o estado físico atualizado.
+- **Métricas novas** em `QKDMetrics.csv` (só quando o PICh físico está ligado): PIChs abertos, slots por PICh aberto,
+  falhas de abertura por espectro / QoT do PICh / interferência nos canais clássicos / interferência nos QChs, e o
+  número médio de PIChs abertos por modulação.
+
+**Launcher 1.22.3:** campos "Taxa do PICh" e "Modulação do PICh" na seção do PICh do caso QKD, e o texto da seção
+atualizado.
+
+**Conferência** (casos `Regressao_Parte62`, 20 000 requisições, 3 cargas × 3 replicações):
+
+- Caso clássico (01) e caso QKD com `pichSlots = 0`: resultados iguais aos de antes (só a ordem de linhas e o
+  último dígito da energia, como sempre entre duas execuções).
+- Probabilidade de bloqueio média das 3 replicações, carga 0 / 1 / 2 (antes → depois):
+
+| Caso | Antes | Depois |
+|---|---|---|
+| 05_T10_Q50_R100 | 12,76% / 44,14% / 59,09% | 16,28% / 45,71% / 62,47% |
+| 07_D3_Losango_O1310 | 0,54% / 1,11% / 1,45% | 6,61% / 7,81% / 8,41% |
+| 07 com `pichModulation = 4QAM` | — | 0,96% / 1,53% / 2,51% |
+| 09_F_MBSDM_QTND50 | 0,00% / 2,16% / 16,13% | 0,00% / 2,26% / 16,15% |
+| 10_G_CL_E1381_QTND50 | 24,79% / 26,84% / 26,71% | 31,37% / 30,48% / 38,50% |
+| 11_H3_bidir_NLI | 0,54% / 1,11% / 1,45% | 6,61% / 7,81% / 8,37% |
+
+- O aumento vem quase todo de QoTO e XTO dos circuitos clássicos: o PICh agora é vítima. Como os circuitos, ele
+  escolhe a modulação mais eficiente que passa na QoT no momento em que é aberto; com a rede vazia isso costuma ser
+  64QAM (limiar alto de SNR e de XT). Como as sessões QKD se sobrepõem no tempo, o PICh quase nunca fecha, e a
+  modulação escolhida no início vale para a simulação toda: os circuitos que chegam depois não podem degradá-lo. Com
+  uma modulação robusta fixa (4QAM no caso 07) o efeito cai bastante.
+- Tempo de execução (2 casos em paralelo, 2 threads cada): 07 225 s → 230 s, 05 423 s → 394 s, 10 766 s → 704 s,
+  11 417 s → 424 s. Sem custo relevante.
+- Save states: estado salvo e retomado no meio da execução de um caso com PIChs abertos, sem erro.
+
+**Observação (não mudada, precisa de decisão):** a potência de um circuito é calculada uma vez, na primeira modulação
+testada (a mais eficiente), e guardada no circuito (`PhysicalLayer.getCircuitLaunchPower`). Quando a seleção desce
+para uma modulação menos eficiente, a potência continua a da primeira (banda menor), e a PSD fica abaixo da PSD fixa.
+Isso vale para os circuitos desde antes e, pela regra "mesma potência dos circuitos", também para o PICh.
+
+**Arquivos:** `network/{Link, Circuit, SectionedCircuit (novo), PhysicalLayer, Crosstalk}.java`,
+`qkd/capacity/{QKDPichCircuit (novo), QKDPichPool, QKDSharedResourceManager}.java`,
+`qkd/control/{QKDPichPhysicalCheck (novo), QKDProvisioningService, QKDControlPlane}.java`,
+`qkd/network/QKDNetworkParameters.java`, `qkd/metrics/QKDMetricsSnapshot.java`,
+`simulationControl/{SimulationManagement, parsers/NetworkConfig}.java`; launcher: `LauncherServer.java`,
+`web/js/qkdcase.js`, `web/js/schema.js` e `snets-launcher.jar`.
 
 ---
 

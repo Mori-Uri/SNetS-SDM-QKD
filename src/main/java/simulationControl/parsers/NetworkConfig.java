@@ -224,6 +224,10 @@ public class NetworkConfig {
         private String pichMode = "segment";
         /** Part 26: sessions that may share one PICh in "segment" mode (0 = unlimited). */
         private int pichSessionsPerChannel = 0;
+        /** Parte 65: bit rate of the PICh (Gbit/s); with its modulation it sets the bandwidth and the launch power. */
+        private double pichBitRateGbps = 10.0;
+        /** Parte 65: modulation of the PICh; "" (default) = chosen as for the circuits (most efficient with QoT). */
+        private String pichModulation = "";
         /**
          * Part 26 (link/span granularity): "shared" (default) = a session reuses the
          * spare key rate of an active QCh before activating a new one; "dedicated" =
@@ -283,6 +287,10 @@ public class NetworkConfig {
         public void setPichMode(String v) { this.pichMode = v; }
         public int getPichSessionsPerChannel() { return pichSessionsPerChannel; }
         public void setPichSessionsPerChannel(int v) { this.pichSessionsPerChannel = v; }
+        public double getPichBitRateGbps() { return pichBitRateGbps; }
+        public void setPichBitRateGbps(double v) { this.pichBitRateGbps = v; }
+        public String getPichModulation() { return pichModulation == null ? "" : pichModulation.trim(); }
+        public void setPichModulation(String v) { this.pichModulation = v; }
         public String getQchSharing() {
             return qchSharing == null || qchSharing.trim().isEmpty() ? "shared" : qchSharing.trim().toLowerCase();
         }

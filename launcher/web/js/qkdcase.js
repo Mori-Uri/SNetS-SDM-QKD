@@ -106,13 +106,20 @@
     const fixedOk = classical.some((c) => Number(c.id) === Number(q.pichCoreId));
     return el('section.panel',
       el('h2', 'Canal público (PICh)'),
-      el('p.lead', 'Canal clássico da discussão pública do BB84 (peneiramento, correção de erros, amplificação de privacidade). Ocupa slots num núcleo clássico, nunca no núcleo QKD nem num núcleo desativado; a potência dele não entra no crosstalk.'),
+      el('p.lead', 'Canal clássico da discussão pública do BB84 (peneiramento, correção de erros, amplificação de privacidade). Ocupa slots num núcleo clássico, nunca no núcleo QKD nem num núcleo desativado. No modelo segment ele é um canal clássico (Parte 65): tem modulação (a mais eficiente com QoT aceitável, como os circuitos) e potência (mesma regra dos circuitos), sua QoT é verificada em cada trecho entre nós confiáveis, e ele interfere nos outros canais (clássicos e QChs) e sofre interferência deles.'),
       el('div.fields',
         num('pichSlots', 'Slots de cada PICh', '0 = não modelar o PICh', { int: true, redraw: true }),
         on ? sel('pichMode', 'Modelo do PICh', [
           ['segment', 'segment — um PICh por enlace da rota QKD, compartilhado pelas sessões (padrão)'],
           ['route', 'route — um PICh dedicado por sessão, contínuo na rota inteira']], true) : null,
         on && String(q.pichMode || 'segment') === 'segment' ? num('pichSessionsPerChannel', 'Sessões por PICh', '0 = ilimitado', { int: true }) : null,
+        on && String(q.pichMode || 'segment') === 'segment' ? num('pichBitRateGbps', 'Taxa do PICh', 'Gbit/s (vazio = 10)') : null,
+        on && String(q.pichMode || 'segment') === 'segment' ? sel('pichModulation', 'Modulação do PICh',
+          [['', 'como os circuitos — a mais eficiente com QoT aceitável (padrão)']].concat(
+            (Array.isArray(net.modulations) ? net.modulations : []).filter((m) => m && m.name)
+              .map((m) => [String(m.name), String(m.name) + ' (fixa)'])
+              .concat(q.pichModulation && !(net.modulations || []).some((m) => m && String(m.name) === String(q.pichModulation))
+                ? [[String(q.pichModulation), String(q.pichModulation) + ' (não existe na lista de modulações)']] : []))) : null,
         on ? sel('pichCorePolicy', 'Núcleo do PICh', [
           ['lowest', 'lowest — núcleo clássico de menor número (padrão, como antes)'],
           ['fixed', 'fixed — sempre o núcleo escolhido abaixo (se estiver cheio, os outros)'],

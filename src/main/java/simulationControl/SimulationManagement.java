@@ -447,6 +447,23 @@ public class SimulationManagement {
         // Part 26: shared PIChs (pichMode = segment) and QTx/QRx totals
         metrics.put("Mean open PIChs", m -> m.meanOpenPichs);
         metrics.put("Peak open PIChs", m -> m.peakOpenPichs < 0 ? Double.NaN : m.peakOpenPichs);
+        if (snaps.get(0).get(0).pichPhysical) { // Parte 65: PICh as a classical channel
+            metrics.put("PIChs opened", m -> m.pichOpened);
+            metrics.put("Mean slots per PICh opened", m -> m.pichMeanSlots);
+            metrics.put("PICh failures by spectrum", m -> m.pichFailSpectrum);
+            metrics.put("PICh failures by QoT of the PICh", m -> m.pichFailQot);
+            metrics.put("PICh failures by interference on classical channels", m -> m.pichFailClassical);
+            metrics.put("PICh failures by interference on QChs", m -> m.pichFailQkd);
+            metrics.put("Mean slots per open PICh", m -> m.pichMeanOpenSlots);
+            java.util.TreeSet<String> pmods = new java.util.TreeSet<String>();
+            for (List<QKDMetricsSnapshot> row : snaps) for (QKDMetricsSnapshot m : row) pmods.addAll(m.pichOpenByModulation.keySet());
+            for (final String mod : pmods) {
+                metrics.put("Mean open PIChs with " + mod, m -> {
+                    Double v = m.pichOpenByModulation.get(mod);
+                    return v == null ? 0.0 : v.doubleValue();
+                });
+            }
+        }
         metrics.put("Mean QTx in use (network)", m -> sumEquip(m, 0));
         metrics.put("Mean QRx in use (network)", m -> sumEquip(m, 1));
 

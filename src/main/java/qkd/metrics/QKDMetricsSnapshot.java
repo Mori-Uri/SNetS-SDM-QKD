@@ -48,6 +48,12 @@ public final class QKDMetricsSnapshot implements Serializable {
     public long blockedQtrx, qEquipmentFailures;
     public double meanOpenPichs = Double.NaN;
     public long peakOpenPichs = -1, pichOpened;
+    /** Parte 65: physical PICh (classical channel) and its failures by reason. */
+    public boolean pichPhysical;
+    public long pichFailSpectrum, pichFailQot, pichFailClassical, pichFailQkd;
+    public double pichMeanSlots = Double.NaN;
+    public double pichMeanOpenSlots = Double.NaN;
+    public final java.util.Map<String, Double> pichOpenByModulation = new java.util.TreeMap<String, Double>();
     /** node -> {mean QTx, mean QRx, peak QTx, peak QRx, QTx limit, QRx limit, network node 1/0}. */
     public final java.util.Map<String, double[]> qEquipment = new java.util.TreeMap<String, double[]>();
     public final java.util.Map<String, long[]> perPair = new java.util.TreeMap<String, long[]>();

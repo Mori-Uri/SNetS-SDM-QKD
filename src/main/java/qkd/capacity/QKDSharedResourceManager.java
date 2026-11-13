@@ -429,6 +429,41 @@ public final class QKDSharedResourceManager implements Serializable {
                 projectedWorst == null ? 0.0 : projectedWorst.getMaximumQber());
     }
 
+    /**
+     * Parte 65: a new PICh (already in the circuit list of its core) must keep every active QCh of its link able to
+     * carry the key rate reserved on it (the reservations of the pending session included). Only the QChs that the
+     * PICh can reach are evaluated, with the same rule as the classical candidates
+     * (QKDExistingSessionImpactEvaluator.candidateCanAffect): QKD core adjacent to the core of the PICh and spectral
+     * overlap. The pending classical candidate, when given, is added as a hypothetical interferer.
+     *
+     * @return true when every reachable QCh stays viable
+     */
+    public synchronized boolean keepsChannelsWithPich(Circuit pich, Circuit candidate, double wavelengthNm) {
+        final Link link = pich.getRoute().getLink(0);
+        final int pichCore = pich.getIndexCore();
+        for (QKDSharedChannel c : allChannels) {
+            if (c.getLink() != link) continue;
+            final qkd.resource.QKDChannelAllocation a = c.getAllocation();
+            if (qkd.physical.QKDPhysicalLayer.numberOfOverlappingSlots(a.getSpectrumBand(), pich.getSpectrumAssigned()) <= 0) continue;
+            boolean adjacent = false;
+            final List<network.Core> adj = link.getAdjacentCores(a.getQuantumCoreId());
+            if (adj != null) for (network.Core core : adj) if (core != null && core.getId() == pichCore) { adjacent = true; break; }
+            if (!adjacent) continue;
+            final QKDLinkChannelPhysicalResult projected = candidate == null
+                    ? evaluator.evaluateLinkChannel(link, c.getEvaluationPlan(), mesh.getPhysicalLayer(), a,
+                            c.wavelengthOr(wavelengthNm))
+                    : evaluator.evaluateLinkChannelWithAdditionalClassicalCircuit(link, c.getEvaluationPlan(),
+                            mesh.getPhysicalLayer(), a, c.wavelengthOr(wavelengthNm), candidate);
+            final double allowedQber = c.getPhysicalResult() == null ? 1.0
+                    : c.getPhysicalResult().getSpans().get(0).getMaximumQber();
+            if (projected.getMinimumSecretKeyRateBps() - c.getUsedKeyRateBps() < -EPS
+                    || projected.getMaximumQber() > allowedQber) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     // ------------------------------------------------------------------ route granularity (Part 23)
 
     /**

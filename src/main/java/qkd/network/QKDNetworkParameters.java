@@ -48,6 +48,9 @@ public final class QKDNetworkParameters implements Serializable {
     /** Part 26: PICh ends at every node of the QKD route and is shared (true), or is route-continuous and dedicated (false). */
     private boolean pichSegmented = true;
     private int pichSessionsPerChannel = 0;
+    /** Parte 65: bit rate of the PICh, in Gbit/s. */
+    private double pichBitRateGbps = 10.0;
+    private String pichModulation = "";
     private boolean dedicatedQch = false;
     private int qTxPerNode = 0, qRxPerNode = 0, qTxPerTrustedNode = -1, qRxPerTrustedNode = -1;
     private java.util.Map<String, int[]> nodeQEquipment = java.util.Collections.emptyMap();
@@ -176,6 +179,11 @@ public final class QKDNetworkParameters implements Serializable {
             throw new IllegalArgumentException("network.qkd.pichSessionsPerChannel must be >= 0");
         }
         out.pichSessionsPerChannel = config.getPichSessionsPerChannel();
+        if (!(config.getPichBitRateGbps() > 0.0) || Double.isInfinite(config.getPichBitRateGbps())) {
+            throw new IllegalArgumentException("network.qkd.pichBitRateGbps must be > 0");
+        }
+        out.pichBitRateGbps = config.getPichBitRateGbps();
+        out.pichModulation = config.getPichModulation();
         final String sharing = config.getQchSharing();
         if (!"shared".equals(sharing) && !"dedicated".equals(sharing)) {
             throw new IllegalArgumentException("network.qkd.qchSharing must be \"shared\" or \"dedicated\"");
@@ -303,6 +311,9 @@ public final class QKDNetworkParameters implements Serializable {
     public boolean isPichSegmented() { return pichSegmented; }
     /** Part 26: sessions per PICh in segment mode (0 = unlimited). */
     public int getPichSessionsPerChannel() { return pichSessionsPerChannel; }
+    public double getPichBitRateGbps() { return pichBitRateGbps; }
+    /** Parte 65: fixed modulation of the PICh, or "" to choose it as for the circuits. */
+    public String getPichModulation() { return pichModulation; }
     /** Part 26: one QCh per session in link/span granularity (no rate sharing). */
     public boolean isDedicatedQch() { return dedicatedQch; }
 

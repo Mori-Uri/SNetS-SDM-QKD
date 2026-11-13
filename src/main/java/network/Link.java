@@ -61,7 +61,26 @@ public class Link implements Serializable {
     }
 
     public double getDistance() {
-        return distance;
+        return sectionKm > 0.0 ? sectionKm : distance; // Parte 65: 0 = whole link (also after reading a save state)
+    }
+
+    /*
+     * Parte 65 (PICh fisico): the QoT of a PICh is computed per section (between trusted nodes), shorter than the
+     * link. While a section is evaluated, getDistance() returns the section length; everything else of the link
+     * (cores, circuits, adjacency) stays the same. Each simulation thread has its own mesh, so the field needs no
+     * synchronization. Always restored by the caller (try/finally).
+     */
+    private transient double sectionKm;
+
+    /** Parte 65: getDistance() returns km until clearSectionLength(); used only by PICh section evaluations. */
+    public void setSectionLength(double km) {
+        if (!(km > 0.0)) throw new IllegalArgumentException("section length must be positive: " + km);
+        this.sectionKm = km;
+    }
+
+    /** Parte 65: getDistance() returns the link length again. */
+    public void clearSectionLength() {
+        this.sectionKm = 0.0;
     }
 
     public String getName() {

@@ -153,6 +153,9 @@ public class Crosstalk implements Serializable {
 	 * @return double (value in dB)
 	 */
 	public double calculateCrosstalk(Circuit circuit, Circuit testCircuit, boolean addTestCircuit) {
+		if (circuit instanceof SectionedCircuit) { // Parte 65: PICh, worst section
+			return PhysicalLayer.ratioForDB(sectionedCrosstalk((SectionedCircuit) circuit, testCircuit, addTestCircuit, false));
+		}
 		Route rota = circuit.getRoute();
 		double totalXT = 0.0;
 
@@ -200,6 +203,9 @@ public class Crosstalk implements Serializable {
 	 * @return double (value in linear)
 	 */
 	public double calculateCrosstalk2(Circuit circuit, Circuit testCircuit, boolean addTestCircuit) {
+		if (circuit instanceof SectionedCircuit) { // Parte 65
+			return sectionedCrosstalk((SectionedCircuit) circuit, testCircuit, addTestCircuit, true);
+		}
 		Route rota = circuit.getRoute();
 		double totalXT = 0.0;
 
@@ -211,6 +217,34 @@ public class Crosstalk implements Serializable {
 		}
 
 		return totalXT;
+	}
+
+	/**
+	 * Parte 65: crosstalk (linear) of a channel received at every trusted node of its link (PICh): the crosstalk of
+	 * each section is the crosstalk on the link with the length of the section; the worst section is returned.
+	 */
+	private double sectionedCrosstalk(SectionedCircuit circuit, Circuit testCircuit, boolean addTestCircuit, boolean second) {
+		final Link link = circuit.getLink();
+		double worst = 0.0;
+		try {
+			for (int i = 0; i < circuit.numberOfSections(); i++) {
+				if (circuit.sameLengthBefore(i)) continue; // same length, same crosstalk
+				link.setSectionLength(circuit.sectionKm(i));
+				double xt = 0.0;
+				if (second) {
+					if (this.tipoEstimativa == 1) xt = calculateCrosstalkInLink3(circuit, link, testCircuit, addTestCircuit);
+				} else if (this.tipoEstimativa == 1) {
+					xt = calculateCrosstalkInLink(circuit, link, testCircuit, addTestCircuit);
+				} else if (this.tipoEstimativa >= 2 && this.tipoEstimativa <= 4) {
+					xt = calculateCrosstalkInLink2(circuit, link);
+				}
+				worst = Math.max(worst, xt);
+			}
+		} finally {
+			link.clearSectionLength();
+		}
+		if (!second && worst == 0.0) worst = lowestXT;
+		return worst;
 	}
 
 	/**

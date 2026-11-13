@@ -62,7 +62,15 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 * Instantiates a circuit with the list of requests answered by it in empty
 	 */
 	public Circuit() {
-		this.id = quantity++;
+		this(Integer.valueOf(quantity++));
+	}
+
+	/**
+	 * Parte 65: circuit with a given id, without using the counter of the classical circuits (PICh: negative ids,
+	 * so that creating a PICh does not change the ids, and therefore the order, of the classical circuits).
+	 */
+	protected Circuit(Integer id) {
+		this.id = id;
 		this.requests = new TrackedRequestList(this); // Parte 54
 
 		this.QoT = true; // Assuming that a request always starts with admissible QoT

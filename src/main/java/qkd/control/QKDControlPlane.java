@@ -126,6 +126,9 @@ public class QKDControlPlane extends ControlPlane {
                 powerAssignment);
 
         this.provisioningService = new QKDProvisioningService(mesh);
+        // Parte 65: the PICh is a classical channel (modulation, power, QoT, interference); segment mode only
+        this.provisioningService.setPichPhysics(new QKDPichPhysicalCheck(mesh, provisioningService,
+                mesh.getQkdPhysicalParameters().isIntercoreCrosstalkEnabled()));
         this.sessionRegistry = new QKDSessionRegistry();
         this.existingSessionImpactEvaluator =
                 new QKDExistingSessionImpactEvaluator(mesh);
@@ -281,6 +284,7 @@ public class QKDControlPlane extends ControlPlane {
         }
 
         refreshActiveQkdPhysicalState(circuit);
+        refreshPichChanges(circuit);
     }
 
     /**
@@ -376,6 +380,7 @@ public class QKDControlPlane extends ControlPlane {
         final boolean classicalSuccess = super.handleRequisition(request);
         if (!classicalSuccess) {
             releasePendingForRequest(request);
+            refreshPichChanges(null);
             qkdRejected++;
             pairStats[1]++;
             countBlockingCause(lastQkdPrecommitFailureReason);
@@ -407,6 +412,7 @@ public class QKDControlPlane extends ControlPlane {
             }
             connection = fallback.getConnection();
             sessionRegistry.register(request, connection);
+            refreshPichChanges(null);
         }
 
         qkdAccepted++;
@@ -435,9 +441,38 @@ public class QKDControlPlane extends ControlPlane {
 
         /* Always try to release the classical resources as well. */
         super.finalizeConnection(request);
+        refreshPichChanges(null);
 
         if (qkdFailure != null) {
             throw qkdFailure;
+        }
+    }
+
+    /**
+     * Parte 65: PIChs opened or closed change the noise of the QChs of their links. The sessions with a QCh on a link
+     * of the classical circuit just allocated or released were refreshed already; the others (PICh on a link of an
+     * alternative QKD route, or a PICh closed with a QKD session) are refreshed here. Not counted as refreshes.
+     */
+    private void refreshPichChanges(Circuit classical) {
+        final qkd.capacity.QKDPichPool pool = provisioningService.getPichPool();
+        if (pool == null) return;
+        final java.util.List<qkd.capacity.QKDPichCircuit> changed = pool.drainChanged();
+        if (changed.isEmpty() || sessionRegistry.isEmpty() || !classicalNoiseCoupled) return;
+        // a PICh opened and closed again (a request that failed later) did not change the network
+        final java.util.Map<qkd.capacity.QKDPichCircuit, Integer> times =
+                new java.util.IdentityHashMap<qkd.capacity.QKDPichCircuit, Integer>();
+        for (qkd.capacity.QKDPichCircuit p : changed) {
+            Integer t = times.get(p);
+            times.put(p, Integer.valueOf(t == null ? 1 : t.intValue() + 1));
+        }
+        final java.util.Set<network.Link> done = java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<network.Link, Boolean>());
+        if (classical != null && classical.getRoute() != null) done.addAll(classical.getRoute().getLinkList());
+        for (qkd.capacity.QKDPichCircuit p : changed) {
+            if (times.get(p).intValue() % 2 == 0) continue;
+            if (done.add(p.getLink())) {
+                existingSessionImpactEvaluator.refreshActiveSessions(sessionRegistry, p);
+            }
         }
     }
 
@@ -609,6 +644,14 @@ public class QKDControlPlane extends ControlPlane {
         m.qEquipment.putAll(rm.equipmentStatistics());
         qkd.capacity.QKDPichPool pp = provisioningService.getPichPool();
         if (pp != null) { m.meanOpenPichs = pp.getMeanOpenChannels(); m.peakOpenPichs = pp.getPeakOpenChannels(); m.pichOpened = pp.getOpened(); }
+        if (pp != null && pp.isPhysical()) { // Parte 65
+            m.pichPhysical = true;
+            m.pichFailSpectrum = pp.getFailSpectrum(); m.pichFailQot = pp.getFailQot();
+            m.pichFailClassical = pp.getFailClassical(); m.pichFailQkd = pp.getFailQkd();
+            m.pichMeanSlots = pp.getMeanOpenedSlots();
+            m.pichMeanOpenSlots = pp.getMeanSlotsPerOpenChannel();
+            m.pichOpenByModulation.putAll(pp.getMeanOpenChannelsByModulation());
+        }
         m.alternativeRouteAccepted = qkdAlternativeRouteAccepted;
         if (qkdAccepted > 0) {
             m.meanQTrxPerSession = qkdAdmittedQTrxSum / qkdAccepted;

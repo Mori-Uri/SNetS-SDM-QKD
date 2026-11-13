@@ -555,6 +555,9 @@ public class PhysicalLayer implements Serializable {
 	 * @return double - SNR (linear)
 	 */
 	public double computeSNRSegment(Circuit circuit, Route route, int sourceNodeIndex, int destinationNodeIndex, Modulation modulation, int core, int spectrumAssigned[], Circuit testCircuit, boolean addTestCircuit){
+		if (circuit instanceof SectionedCircuit && sectionPass == 0) { // Parte 65: PICh, one SNR per section
+			return sectionedSNR((SectionedCircuit) circuit, modulation, core, spectrumAssigned, testCircuit, addTestCircuit, false);
+		}
 
 		//double numSlotsRequired = spectrumAssigned[1] - spectrumAssigned[0] + 1; // Number of slots required
 		double numSlotsRequired = modulation.requiredSlots(circuit.getRequiredBitRate()); // Number of slots required
@@ -594,6 +597,7 @@ public class PhysicalLayer implements Serializable {
 		// circuit and reused while the link and the circuit did not change (QotLinkCache). The terms are added in the
 		// same order as before, so the SNR is the same bit for bit.
 		final boolean useQotCache = simulator.PerfChecks.ENABLED && !(circuit instanceof TranslucentCircuit)
+				&& !(circuit instanceof SectionedCircuit) // Parte 65: the length of the link changes with the section
 				&& !PhysicalStateChanges.isUntracked();
 		final double[] terms = useQotCache ? new double[3] : null;
 
@@ -777,6 +781,40 @@ public class PhysicalLayer implements Serializable {
 	 * @param addTestCircuit boolean - To add the test circuit to the circuit list
 	 * @return double - SNR (linear)
 	 */
+	/** Parte 65: > 0 while the SNR of one section of a SectionedCircuit is being computed. */
+	private transient int sectionPass;
+
+	/**
+	 * Parte 65: SNR of a channel received at every trusted node of its link (PICh): the SNR of each section is
+	 * computed as the SNR of the channel on the link, with the length of the section in place of the length of the
+	 * link (spans, line amplifiers and pre-amplifier gain of the section; the interferers are the circuits of the
+	 * link). The worst section is returned: the channel needs every section above the threshold. Sections of the
+	 * same length have the same SNR (the length only enters through the spans and amplifiers of the section), so
+	 * each length is computed once.
+	 */
+	private double sectionedSNR(SectionedCircuit circuit, Modulation modulation, int core, int spectrumAssigned[],
+			Circuit testCircuit, boolean addTestCircuit, boolean second) {
+		final Link link = circuit.getLink();
+		final Route route = circuit.getRoute();
+		final int last = route.getNodeList().size() - 1;
+		double worst = Double.POSITIVE_INFINITY;
+		sectionPass++;
+		try {
+			for (int i = 0; i < circuit.numberOfSections(); i++) {
+				if (circuit.sameLengthBefore(i)) continue;
+				link.setSectionLength(circuit.sectionKm(i));
+				final double snr = second
+						? computeSNRSegment2(circuit, route, 0, last, modulation, core, spectrumAssigned, testCircuit, addTestCircuit)
+						: computeSNRSegment(circuit, route, 0, last, modulation, core, spectrumAssigned, testCircuit, addTestCircuit);
+				if (snr < worst || Double.isNaN(snr)) worst = snr;
+			}
+		} finally {
+			link.clearSectionLength();
+			sectionPass--;
+		}
+		return worst;
+	}
+
 	/**
 	 * Parte 54: the terms that one link adds to the noise of a circuit, computed exactly as in the loop of
 	 * computeSNRSegment: terms[0] is added to Inli, terms[1] to Iase and terms[2] to Ixt (each only when the
@@ -858,6 +896,9 @@ public class PhysicalLayer implements Serializable {
 	}
 
 	public double computeSNRSegment2(Circuit circuit, Route route, int sourceNodeIndex, int destinationNodeIndex, Modulation modulation, int core, int spectrumAssigned[], Circuit testCircuit, boolean addTestCircuit){
+		if (circuit instanceof SectionedCircuit && sectionPass == 0) { // Parte 65
+			return sectionedSNR((SectionedCircuit) circuit, modulation, core, spectrumAssigned, testCircuit, addTestCircuit, true);
+		}
 
 		//double numSlotsRequired = spectrumAssigned[1] - spectrumAssigned[0] + 1; // Number of slots required
 		double numSlotsRequired = modulation.requiredSlots(circuit.getRequiredBitRate()); // Number of slots required

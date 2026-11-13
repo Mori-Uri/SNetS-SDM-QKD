@@ -251,3 +251,5 @@ launcher/*.lnk
 
 # Gerado na raiz quando as verificações do "Gerar JAR" rodam a partir da pasta do projeto
 /routesByPar.txt
+# Tabelas locais de topologias (capitais), nao versionadas
+docs/topologias/

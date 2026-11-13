@@ -69,6 +69,13 @@ public final class QKDProvisioningService implements java.io.Serializable {
                 : null;
     }
 
+    /** Parte 65: turns the physical layer of the PIChs on (segment mode only). */
+    public void setPichPhysics(qkd.capacity.QKDPichPool.Physics physics) {
+        if (pichPool != null) {
+            pichPool.setPhysics(physics, mesh.getQkdNetworkParameters().getPichBitRateGbps() * 1e9);
+        }
+    }
+
     /**
      * Provisions QKD against the currently committed classical network state.
      * Kept for direct verification and for callers that do not have a pending
@@ -171,17 +178,19 @@ public final class QKDProvisioningService implements java.io.Serializable {
         }
 
         final QKDSession session = allocation.getSession();
-        final QKDRoutePhysicalResult physicalResult;
-        try {
-            physicalResult = additionalClassicalCircuit == null
-                    ? resourceManager.buildSessionPhysicalSnapshot(session)
-                    : resourceManager.buildSessionPhysicalSnapshotWithAdditionalClassicalCircuit(
-                            session, additionalClassicalCircuit,
-                            physicalParameters.getAttenuationCenterNm());
-        } catch (RuntimeException exception) {
-            releaseQuietly(session);
-            return QKDProvisioningResult.failure(
-                    "[OTHER] QKD physical snapshot failed: " + exception.getMessage());
+        QKDRoutePhysicalResult physicalResult = null;
+        if (pichPool == null || !pichPool.isPhysical()) {
+            try {
+                physicalResult = additionalClassicalCircuit == null
+                        ? resourceManager.buildSessionPhysicalSnapshot(session)
+                        : resourceManager.buildSessionPhysicalSnapshotWithAdditionalClassicalCircuit(
+                                session, additionalClassicalCircuit,
+                                physicalParameters.getAttenuationCenterNm());
+            } catch (RuntimeException exception) {
+                releaseQuietly(session);
+                return QKDProvisioningResult.failure(
+                        "[OTHER] QKD physical snapshot failed: " + exception.getMessage());
+            }
         }
 
         if (session.getProvisionedKeyRateBps() + 1e-6 < keyDemand.getRequiredKeyRateBps()) {
@@ -194,22 +203,42 @@ public final class QKDProvisioningService implements java.io.Serializable {
                     + " Mbit/s");
         }
 
+        java.util.List<qkd.capacity.QKDPichPool.Channel> pichShares = null;
+        if (pichPool != null) {
+            final boolean physical = pichPool.isPhysical();
+            pichShares = pichPool.acquire(route.getLinkList(), physical ? route.getNodeList() : null,
+                    physical ? sectionsOf(route, routePlan) : null,
+                    mesh.getQkdNetworkParameters().pichGuardBandOr(mesh.getGuardBand()), additionalClassicalCircuit);
+            if (pichShares == null) {
+                pichFailures++;
+                lastPichFailureLink = pichPool.getLastFailedLink();
+                releaseQuietly(session);
+                return QKDProvisioningResult.failure("[PICH] no " + pichSlots
+                        + "-slot PICh available on some link of the QKD route" + pichReason(pichPool.getLastFailureKind()));
+            }
+            if (physical) {
+                // Parte 65: the snapshot of the session is taken with its PIChs in the network
+                try {
+                    physicalResult = additionalClassicalCircuit == null
+                            ? resourceManager.buildSessionPhysicalSnapshot(session)
+                            : resourceManager.buildSessionPhysicalSnapshotWithAdditionalClassicalCircuit(
+                                    session, additionalClassicalCircuit,
+                                    physicalParameters.getAttenuationCenterNm());
+                } catch (RuntimeException exception) {
+                    pichPool.release(pichShares);
+                    releaseQuietly(session);
+                    return QKDProvisioningResult.failure(
+                            "[OTHER] QKD physical snapshot failed: " + exception.getMessage());
+                }
+            }
+        }
+
         QKDActiveConnection connection = new QKDActiveConnection(
                 request, classicalRoute, session, physicalResult);
         connection.setQkdRoute(route, alternative);
 
         if (pichPool != null) {
-            java.util.List<qkd.capacity.QKDPichPool.Channel> shares =
-                    pichPool.acquire(route.getLinkList(), mesh.getQkdNetworkParameters().pichGuardBandOr(mesh.getGuardBand()),
-                            additionalClassicalCircuit);
-            if (shares == null) {
-                pichFailures++;
-                lastPichFailureLink = pichPool.getLastFailedLink();
-                releaseQuietly(session);
-                return QKDProvisioningResult.failure("[PICH] no " + pichSlots
-                        + "-slot PICh available on some link of the QKD route");
-            }
-            connection.setPichShares(shares);
+            connection.setPichShares(pichShares);
         } else if (pichSlots > 0) {
             QKDActiveConnection.PichReservation pich = reservePich(route, additionalClassicalCircuit);
             if (pich == null) {
@@ -279,6 +308,46 @@ public final class QKDProvisioningService implements java.io.Serializable {
             }
         }
         return null;
+    }
+
+    /** Parte 65: reason of a PICh failure, appended to the [PICH] message. */
+    private static String pichReason(int kind) {
+        switch (kind) {
+            case qkd.capacity.QKDPichPool.QOT: return " (QoT of the PICh)";
+            case qkd.capacity.QKDPichPool.CLASSICAL: return " (interference on the classical channels)";
+            case qkd.capacity.QKDPichPool.QKD: return " (interference on the QChs)";
+            case qkd.capacity.QKDPichPool.SPECTRUM: return " (spectrum)";
+            default: return "";
+        }
+    }
+
+    /**
+     * Parte 65: sections of each link of the route, in km: the QKD spans of the link (from one trusted node to the
+     * next), the same sections as the QCh. A link without spans in the plan is one section.
+     */
+    private static double[][] sectionsOf(Route route, QKDRoutePlan plan) {
+        final java.util.List<Link> links = route.getLinkList();
+        final double[][] out = new double[links.size()][];
+        for (int i = 0; i < links.size(); i++) {
+            final String a = route.getNode(i).getName();
+            final String b = route.getNode(i + 1).getName();
+            final java.util.List<Double> km = new java.util.ArrayList<Double>();
+            if (plan != null && plan.getSpans() != null) {
+                for (qkd.network.QKDSpan sp : plan.getSpans()) {
+                    if (a.equals(sp.getPhysicalLinkSource()) && b.equals(sp.getPhysicalLinkDestination())
+                            && sp.getLengthKm() > 0.0) {
+                        km.add(Double.valueOf(sp.getLengthKm()));
+                    }
+                }
+            }
+            if (km.isEmpty()) {
+                out[i] = new double[] {links.get(i).getDistance()};
+            } else {
+                out[i] = new double[km.size()];
+                for (int k = 0; k < km.size(); k++) out[i][k] = km.get(k).doubleValue();
+            }
+        }
+        return out;
     }
 
     private static int causeRank(String reason) {
