@@ -52,7 +52,10 @@ public class ArriveRequestForConexionListener implements EventListener, java.io.
         }*/
 
         // Try to satisfy the request
+        final simulator.SimulationTracer tracer = simulation.getTracer(); // Parte 66 (observation only)
+        if (tracer != null) tracer.beforeArrival(requestForConnection, e.getTimeHours(), simulation.getControlPlane());
         Boolean success = simulation.getControlPlane().handleRequisition(requestForConnection);
+        if (tracer != null) tracer.afterArrival(requestForConnection, e.getTimeHours(), success.booleanValue(), simulation.getControlPlane());
         if (success) {// Schedule the end of the requisition and release of resources
             em.insert(new Event(requestForConnection, new HoldRequestListener(simulation), requestForConnection.getTimeOfFinalizeHours()));
         }

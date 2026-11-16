@@ -51,6 +51,9 @@ public class ObservedClassicalControlPlane extends ControlPlane {
         return ok;
     }
 
+    /** Parte 66: cause of the last block (simulation viewer). */
+    public String getLastBlockCause() { return blockingDetails.getLastObservedCause(); }
+
     public BlockingDetailRecorder.Snapshot snapshotBlockingDetails() {
         return blockingDetails.snapshot();
     }

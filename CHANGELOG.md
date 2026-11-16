@@ -6,6 +6,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | Parte | Resumo |
 |---|---|
 | [67](#parte-67) | Parte 67 — Algoritmos de RMSCA: vazamento de memória, bloqueio sem núcleo, grooming AGG e algoritmos registrados |
+| [66](#parte-66) | Parte 66 — visualizador da simulação (registro de eventos e aba Visualizador, launcher 1.23.0) |
 | [65](#parte-65) | Parte 65 — PICh como canal clássico (modulação, potência, QoT e interferência) e launcher 1.22.3 |
 | [64](#parte-64) | Parte 64 — launcher 1.22.2: aba Executar não fica mais piscando depois de uma execução |
 | [63](#parte-63) | Parte 63 — launcher 1.22.1: lista de JARs atualizada e seleção de casos por pasta |
@@ -151,6 +152,118 @@ da Rayline, e o AbneMlTrue precisa de um servidor externo. O `CLASSICAL_BASE_SHA
 - `measurement/ExternalFragmentation.java`
 - `gprmcsa/trafficGrooming/AuxiliaryGraphGrooming.java`
 - `gprmcsa/GPRMCSA.java`
+<a id="parte-66"></a>
+## Parte 66 — visualizador da simulação (registro de eventos e aba Visualizador, launcher 1.23.0)
+
+Feita na `experimental`. É a primeira versão da ideia 4 do `docs/IDEIAS_FUTURAS.md` (modo de depuração e visualização
+da simulação), no formato "replay": o simulador grava um registro e o launcher o reproduz passo a passo.
+
+**Registro (simulador).** Bloco novo no arquivo `simulation`:
+
+```json
+"trace": { "enabled": true, "loadPoint": 0, "replication": 0, "firstRequest": 0, "maxRequests": 2000 }
+```
+
+- Só a carga e a replicação escolhidas gravam; as outras simulações não são tocadas.
+- São gravadas as chegadas `firstRequest` a `firstRequest + maxRequests − 1` (contadas desde o início da simulação,
+  transitório incluído) e as saídas entre elas. Na primeira chegada gravada, as requisições que já estão na rede entram
+  como retrato inicial, então o visualizador começa do estado real da rede.
+- Cada chegada traz o resultado: rota, modulação, núcleo, faixa de slots, SNR e XT com os limiares da modulação e a
+  potência; se bloqueada, a tentativa e a causa (a mesma classificação do `BlockingDetails.csv`); nas protegidas, a rota
+  QKD, os trechos entre nós confiáveis, os QChs, os PIChs (modulação, seções e SNR), a SKR e o QBER, ou a mensagem da
+  recusa do lado QKD.
+- Arquivo: `<caso>/visualizador/<caso>_lp<L>_rep<R>.json` (cerca de 0,6 KB por requisição; até 50 000 requisições).
+- O registro só lê o estado depois de cada decisão: não recalcula nada e não muda nenhum resultado. Conferido com o
+  caso 07 da Parte 62: a simulação gravada deu os mesmos CSVs com e sem registro (só o último dígito da energia muda,
+  como sempre entre duas execuções).
+- O bloco `trace` não entra no hash dos save states (mudar o registro não invalida o progresso salvo). O registro não é
+  salvo nos save states: uma execução retomada antes do fim da janela não grava o arquivo.
+
+**Aba Visualizador (launcher 1.23.0).** Nova aba do caso, depois de Resultados:
+
+- painel para ligar o registro e escolher carga, replicação e janela (também no formulário de Simulação);
+- lista dos registros da pasta `visualizador/` do caso;
+- controles: início, passo anterior, reproduzir/pausar, próximo passo, fim, bloqueio anterior/próximo, velocidade
+  (1 a 100 passos/s), filtro dos passos (todos, só chegadas, só bloqueios, só QKD) e condição de parada (uma causa de
+  bloqueio ou um par origem-destino); teclado: setas e espaço;
+- linha do tempo com os bloqueios marcados (clique para ir ao ponto);
+- cabeçalho da requisição (número, clássica ou QKD, origem → destino, taxa, chave, carga, aceita ou bloqueada e a causa);
+- topologia com a ocupação dos enlaces, origem e destino destacados, a rota do circuito (tracejada em vermelho quando
+  bloqueada), a rota QKD e os nós confiáveis dentro dos enlaces; nas saídas, a rota do circuito que sai;
+- detalhes do circuito e da sessão QKD, diagrama dos núcleos do primeiro enlace da rota (núcleo escolhido, núcleo QKD,
+  núcleo do PICh);
+- log dos passos ao redor (clique para ir ao passo) e contadores (aceitas, bloqueadas por causa, saídas, circuitos,
+  QChs e PIChs ativos);
+- espectro enlace × núcleo × slot dos enlaces da requisição atual, de todos ou de um enlace: outros circuitos, a
+  requisição atual, a tentativa bloqueada, o circuito que sai, QChs e PIChs.
+
+**Aparência e análise dos bloqueios (ajustes depois do primeiro teste):**
+
+- **Cor dos circuitos** no espectro, à escolha: pelo número de slots (degradê de azul claro a azul escuro, com as
+  quantidades de slots do registro espalhadas por igual no degradê, e opção de escolher a cor de cada quantidade), pela
+  modulação, clássica ou QKD, uma cor por circuito ou uma cor só. Cores próprias também para a requisição atual, a
+  tentativa bloqueada, a vítima, os QChs e os PIChs.
+- **Texto nos circuitos:** nº de slots, nº da requisição ou modulação (quando cabe no retângulo).
+- **Grade dos slots:** uma linha por slot, a cada 10 slots ou nenhuma; altura de cada núcleo ajustável. Com muitos
+  slots o espectro fica mais largo e rola para o lado.
+- **Só a requisição atual:** esconde os outros circuitos e mostra a requisição do passo, a tentativa bloqueada, o que
+  sai, e (com a opção abaixo) quem contribuiu para o bloqueio.
+- **Destacar quem contribuiu para o bloqueio:** nos bloqueios, realça os circuitos ativos que podem ter causado a
+  recusa e apaga os outros: mesmo núcleo nos enlaces da rota (QoT: interferência não linear), núcleos vizinhos com
+  slots sobrepostos (crosstalk), ou todos os circuitos da rota (espectro e fragmentação).
+- **Vítima de QoTO e XTO:** o registro traz o circuito ativo que o simulador encontrou perdendo a QoT (ou passando do
+  limiar de XT) com o novo circuito, com a SNR (ou o XT) que ele teria e o limiar. Aparece no texto, marcada com "V"
+  no espectro e com a rota tracejada na topologia. Para isso, `ControlPlane.computeQoTForOther`/`checkOSNRForOther` e
+  `Crosstalk.isAdmissibleInOthers` passaram a guardar, só para leitura, o circuito que falhou (nenhuma decisão muda;
+  conferido com o caso 07: CSVs iguais com e sem registro).
+- **Linha do tempo:** bloqueios numa cor só ou uma cor por causa (cores ajustáveis), com legenda e contagem por causa.
+- **Ir para a requisição nº** e texto mais claro na configuração do registro (só um ponto de carga e uma replicação
+  são gravados; a janela começa na "primeira requisição" e grava a quantidade escolhida).
+- **Novas tentativas da mesma requisição** (versões do simulador que tentam de novo uma requisição bloqueada): cada
+  tentativa é um passo, com o mesmo número de requisição e "tentativa k" no cabeçalho.
+- As escolhas de aparência ficam gravadas no navegador (botão "Restaurar o padrão").
+
+**Tentativas internas dos algoritmos.** O registro passa a guardar, em cada chegada, o que aconteceu dentro do
+simulador até a decisão (`trace.internalAttempts`, ligado por padrão; até `trace.maxAttemptsPerRequest` = 300 por
+requisição, as demais só contadas):
+
+- as chamadas aos algoritmos escolhidos no arquivo `simulation` (roteamento, k rotas, seleção de modulação, núcleo e
+  espectro, espectro, RMCSA integrado, grooming), com o candidato que cada uma deixou (rota, modulação, núcleo e
+  faixa) e o resultado. Na simulação gravada, os algoritmos são embrulhados por um proxy que só repassa a chamada
+  (`simulator.TraceAlgorithms`; o PABS não é embrulhado, como no AlgorithmCost);
+- os testes do candidato feitos pelas funções comuns que os algoritmos usam: QoT (`PhysicalLayer.isAdmissibleModultion`,
+  `ControlPlane.computeQualityOfTransmission`), crosstalk (`Crosstalk.isAdmissible`), QoT dos outros
+  (`ControlPlane.computeQoTForOther`/`checkOSNRForOther`, com a vítima) e crosstalk nos outros
+  (`Crosstalk.isAdmissibleInOthers`, com a vítima), cada um com o valor em dB;
+- no QKD: a admissão de cada candidato (com a mensagem da recusa), a proteção das sessões ativas, as faixas de QCh
+  avaliadas e cada posição de PICh testada (com o motivo da recusa);
+- os testes refeitos depois de uma recusa, só para classificar a causa, aparecem marcados como "diagnóstico".
+
+Os testes que um algoritmo faz com código próprio, sem passar por essas funções, não aparecem. Os pontos de registro
+(`simulator.TraceProbe`) só copiam valores já calculados; com o registro desligado, cada um custa um teste de uma
+variável. Conferido: o caso 07 (spcsav2 + QABNE, QKD) e os casos 01 e 09 deram os mesmos CSVs na simulação gravada
+com e sem o registro. O arquivo fica com cerca de 2,4 KB por requisição (1 500 requisições do caso 07: 3,5 MB).
+
+No visualizador, a lista "Tentativas internas dos algoritmos" mostra cada passo com ✓/✗, o candidato e o valor;
+clicar numa linha mostra o candidato na topologia (rota tracejada verde ou vermelha) e no espectro (faixa
+contornada), com a rede como estava antes da chegada. A opção "passos internos" faz os botões, o teclado e a
+reprodução avançarem também por essas tentativas.
+
+**Exportar animação.** Painel "Exportar animação (GIF, WebM ou MP4)": intervalo de passos (ou "começar no passo
+atual"), tempo de cada quadro, largura, painéis (topologia, detalhes do passo, espectro), GIF em ciclo, destino (pasta
+das figuras do launcher ou download). Segue o filtro "Mostrar" e a opção "passos internos". O GIF é codificado quadro a
+quadro (memória pequena) e o painel avisa quando o intervalo é grande demais para GIF; o vídeo é gravado em tempo real
+pelo navegador (MP4 só se o navegador gravar MP4). Os codificadores são os da animação dos gráficos (Parte 59).
+
+**Ainda não feito:** acompanhar a execução ao vivo (decidido não fazer: o visualizador é só depois da execução).
+
+**Arquivos:** `simulator/SimulationTracer.java` (novo), `simulator/Simulation.java`,
+`simulator/eventListeners/{ArriveRequestForConexionListener, HoldRequestListener}.java`,
+`simulator/SaveStateStore.java`, `simulationControl/SimulationManagement.java`,
+`simulationControl/parsers/SimulationConfig.java`, `qkd/control/QKDControlPlane.java`,
+`qkd/metrics/{BlockingDetailRecorder, ObservedClassicalControlPlane}.java`, `network/{ControlPlane, Crosstalk, PhysicalLayer}.java` (vítima e pontos de registro, só leitura), `simulator/{TraceProbe, TraceAlgorithms}.java` (novos), `qkd/capacity/QKDPichPool.java`; launcher: `web/js/viz.js` (novo),
+`web/js/app.js`, `web/js/schema.js`, `web/js/animation.js`, `web/index.html`, `web/styles.css`, `src/launcher/LauncherServer.java` e
+`snets-launcher.jar`.
 
 ---
 

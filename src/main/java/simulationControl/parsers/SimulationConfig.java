@@ -47,6 +47,37 @@ public class SimulationConfig {
 
     /** Parte 45: save-state options, or null when absent (Parte 52: absent = on with the defaults). */
     public SaveState getSaveState() { return saveState; }
+
+    /**
+     * Parte 66: event trace for the simulation viewer of the launcher:
+     * "trace": { "enabled": false, "loadPoint": 0, "replication": 0, "firstRequest": 0, "maxRequests": 2000 }.
+     * Only the chosen simulation records; the results do not change.
+     */
+    public static class Trace implements Serializable {
+        private static final long serialVersionUID = 1L;
+        private boolean enabled = false;
+        private int loadPoint = 0;
+        private int replication = 0;
+        private int firstRequest = 0;
+        private int maxRequests = 2000;
+        /** Parte 66: also record the internal attempts of the algorithms (candidates tested and their checks). */
+        private boolean internalAttempts = true;
+        /** Parte 66: at most this many internal attempts per request (the rest is only counted). */
+        private int maxAttemptsPerRequest = 300;
+
+        public boolean isEnabled() { return enabled; }
+        public boolean isInternalAttempts() { return internalAttempts; }
+        public int getMaxAttemptsPerRequest() { return maxAttemptsPerRequest; }
+        public int getLoadPoint() { return loadPoint; }
+        public int getReplication() { return replication; }
+        public int getFirstRequest() { return Math.max(0, firstRequest); }
+        public int getMaxRequests() { return maxRequests; }
+    }
+
+    private Trace trace;
+
+    /** Parte 66: trace options, or null when absent (off). */
+    public Trace getTrace() { return trace; }
     private String regeneratorAssignment;
     private int networkType;
     private int threads;

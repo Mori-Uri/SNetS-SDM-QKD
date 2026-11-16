@@ -516,6 +516,7 @@ public final class SaveStateStore {
             final JsonObject o = sim.getAsJsonObject();
             o.remove("threads");
             o.remove("saveState");
+            o.remove("trace"); // Parte 66: the trace does not change the simulation
         }
         sb.append(gson.toJson(sim));
         sb.append('|').append(simulatorBuild()); // Parte 52: a state of another build of the simulator is not resumed

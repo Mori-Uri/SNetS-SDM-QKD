@@ -257,6 +257,7 @@ public class Crosstalk implements Serializable {
 		double xtDB = calculateCrosstalk(circuit, null, false);
 		double xtThreshold = circuit.getModulation().getXTthreshold();
 
+		if (simulator.TraceProbe.ON) simulator.TraceProbe.check("XT", circuit, xtDB <= xtThreshold, xtDB, null); // Parte 66
 		if(xtDB > xtThreshold) {
 			return false;
 		} else {
@@ -273,6 +274,7 @@ public class Crosstalk implements Serializable {
 	 */
 	public boolean isAdmissible(Circuit circuit, double xtDB) {
 		double xtThreshold = circuit.getModulation().getXTthreshold();
+		if (simulator.TraceProbe.ON) simulator.TraceProbe.check("XT", circuit, xtDB <= xtThreshold, xtDB, null); // Parte 66
 
 		if(xtDB > xtThreshold) {
 			return false;
@@ -347,7 +349,7 @@ public class Crosstalk implements Serializable {
 		}
 
 		//If the list of adjacent circuits is empty
-		if (circuitosAdj.isEmpty()) { return true; }
+		if (circuitosAdj.isEmpty()) { if (simulator.TraceProbe.ON) simulator.TraceProbe.check("XTO", circuit, true, Double.NaN, null); return true; } // Parte 66
 
 		double xtJThreshold = 0.0;
 		double newXt = 0.0;
@@ -357,12 +359,24 @@ public class Crosstalk implements Serializable {
 			newXt = calculateCrosstalk(circuitNeighbor, circuit, true);
 
 			if(newXt > xtJThreshold) {
+				traceVictim = circuitNeighbor; // Parte 66: observation only (simulation viewer)
+				traceVictimXt = newXt;
+				if (simulator.TraceProbe.ON) simulator.TraceProbe.check("XTO", circuit, false, newXt, circuitNeighbor);
 				return false;
 			}
 		}
 
+		if (simulator.TraceProbe.ON) simulator.TraceProbe.check("XTO", circuit, true, Double.NaN, null); // Parte 66
 		return true;
 	}
+
+	/** Parte 66: the neighbour whose XT failed in the last isAdmissibleInOthers (observation only), or null. */
+	private transient Circuit traceVictim;
+	private transient double traceVictimXt;
+
+	public Circuit getTraceVictim() { return traceVictim; }
+	public double getTraceVictimXt() { return traceVictimXt; }
+	public void clearTraceVictim() { traceVictim = null; }
 
 	/**
 	 * This method check the crosstalk (XT) on others circuits

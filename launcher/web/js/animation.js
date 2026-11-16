@@ -558,5 +558,5 @@
     rebuild();
   }
 
-  App.anim = { open, close, _test: { frameSpec, withTitle, encodeGif, lzw, buildPalette, canAccumulate } };
+  App.anim = { open, close, videoMime, buildPalette, lzw, _test: { frameSpec, withTitle, encodeGif, lzw, buildPalette, canAccumulate } }; // Parte 66: encoders shared with the simulation viewer
 })(window.App);

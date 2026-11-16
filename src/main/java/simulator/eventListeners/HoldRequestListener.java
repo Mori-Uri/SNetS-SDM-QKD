@@ -26,6 +26,7 @@ public class HoldRequestListener implements EventListener, java.io.Serializable 
     @Override
     public void execute(Event e) throws Exception {
         RequestForConnection request = (RequestForConnection) e.getObject();
+        if (simulation.getTracer() != null) simulation.getTracer().departure(request, e.getTimeHours()); // Parte 66
         simulation.getControlPlane().finalizeConnection(request);
 
         if(simulation.getMeasurements().getConsumedEnergyMetric() != null){
