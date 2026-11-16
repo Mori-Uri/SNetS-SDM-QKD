@@ -213,6 +213,8 @@ public class QKDControlPlane extends ControlPlane {
                 qkdClassicalRejectionsByExistingSessionImpact++;
                 lastQkdRejectCause = qkd.metrics.BlockingDetailRecorder.C_QKD_PROTECT;
                 QKDSessionImpact violation = result.getFirstViolation();
+                lastQkdFailureMessage = "[PROTECT] " + (violation == null ? result.toString() : violation.toString()); // Parte 66
+                if (simulator.TraceProbe.ON) simulator.TraceProbe.qkd("PROTECT", circuit, false, lastQkdFailureMessage);
                 trace("QKD_EXISTING_SESSION_PROTECT",
                         primaryRequest(circuit),
                         violation == null ? result.toString() : violation.toString());
@@ -243,6 +245,8 @@ public class QKDControlPlane extends ControlPlane {
             if (!qkd.isSuccess()) {
                 qkdPrecommitAdmissionRejections++;
                 lastQkdPrecommitFailureReason = qkd.getFailureReason();
+                lastQkdFailureMessage = qkd.getFailureReason(); // Parte 66
+                if (simulator.TraceProbe.ON) simulator.TraceProbe.qkd("QKD", circuit, false, qkd.getFailureReason());
                 lastQkdRejectCause = qkdCauseOf(qkd.getFailureReason());
                 trace("QKD_PRECOMMIT_REJECT", request, qkd.getFailureReason());
                 return false;
@@ -250,6 +254,7 @@ public class QKDControlPlane extends ControlPlane {
 
             lastQkdPrecommitFailureReason = null;
             pendingQkdAdmissions.put(circuit, qkd.getConnection());
+            if (simulator.TraceProbe.ON) simulator.TraceProbe.qkd("QKD", circuit, true, null); // Parte 66
             trace("QKD_PRECOMMIT_OK", request,
                     "reservedRateMbps="
                     + (qkd.getConnection().getRequiredKeyRateBps() / 1.0e6));
@@ -300,6 +305,7 @@ public class QKDControlPlane extends ControlPlane {
     @Override
     public boolean handleRequisition(RequestForConnection request) throws Exception {
         lastQkdRejectCause = null;
+        lastQkdFailureMessage = null; // Parte 66
         if (request != null) blockingDetails.arrival();
         final qkd.capacity.QKDSharedResourceManager rmLog = provisioningService.getResourceManager();
         final boolean protectedReq = request != null && request.isQkdProtected();
@@ -310,6 +316,7 @@ public class QKDControlPlane extends ControlPlane {
             ok = handleRequisitionQkd(request);
         } finally {
             if (protectedReq && rmLog != null) tried = rmLog.endQchAttemptLog();
+            if (simulator.TraceProbe.ON) simulator.TraceProbe.qchTried(tried); // Parte 66
         }
         if (request != null) {
             blockingDetails.observe(this, request, ok, ok ? null : lastQkdRejectCause);
@@ -351,6 +358,14 @@ public class QKDControlPlane extends ControlPlane {
         }
         return out;
     }
+
+    /** Parte 66: cause of the last block (simulation viewer). */
+    public String getLastBlockCause() { return blockingDetails.getLastObservedCause(); }
+
+    /** Parte 66: message of the last QKD rejection (simulation viewer), or null. */
+    public String getLastQkdFailureMessage() { return lastQkdFailureMessage; }
+
+    private transient String lastQkdFailureMessage;
 
     /** Part 25: blocking details (observation only, see BlockingDetailRecorder). */
     public qkd.metrics.BlockingDetailRecorder.Snapshot snapshotBlockingDetails() {
@@ -404,6 +419,7 @@ public class QKDControlPlane extends ControlPlane {
                 super.finalizeConnection(request);
                 markQkdAdmissionFailure(request);
                 lastQkdRejectCause = qkdCauseOf(fallback.getFailureReason());
+                lastQkdFailureMessage = fallback.getFailureReason(); // Parte 66
                 qkdRejected++;
                 pairStats[1]++;
                 countBlockingCause(fallback.getFailureReason());

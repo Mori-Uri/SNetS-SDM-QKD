@@ -292,6 +292,7 @@ public final class QKDPichPool implements Serializable {
                     try { core.liberateSpectrum(band, guardBand); } catch (Exception ignored) { }
                     throw e;
                 }
+                if (simulator.TraceProbe.ON) simulator.TraceProbe.pich(link, core.getId(), band, mod, verdict); // Parte 66
                 if (verdict == OK) {
                     Channel c = new Channel(link, core.getId(), band, guardBand, pich);
                     c.sessions = 1;

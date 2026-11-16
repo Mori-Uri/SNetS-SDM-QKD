@@ -133,6 +133,16 @@ public class SimulationManagement {
                         loadPoint,
                         replication,
                         util);
+                // Parte 66: event trace for the simulation viewer (only the chosen load point and replication)
+                final simulationControl.parsers.SimulationConfig.Trace trace = simulationConfig.getTrace();
+                if (trace != null && trace.isEnabled() && trace.getLoadPoint() == loadPoint
+                        && trace.getReplication() == replication) {
+                    simulation.setTracer(new simulator.SimulationTracer(
+                            new java.io.File(simulationRequest.getPath(), simulationRequest.getName()),
+                            simulationRequest.getName(), loadPoint, replication,
+                            trace.getFirstRequest(), trace.getMaxRequests(),
+                            trace.isInternalAttempts(), trace.getMaxAttemptsPerRequest()));
+                }
 
                 replications.add(simulation);
             }
@@ -216,6 +226,7 @@ public class SimulationManagement {
                             if (replication.getCostRecorder() != null) {
                                 replication.getCostRecorder().setWallNanos(System.nanoTime() - wall0);
                             }
+                            if (replication.getTracer() != null) replication.getTracer().simulationFinished(); // Parte 66
 
                             int finished;
                             synchronized (SimulationManagement.this) {

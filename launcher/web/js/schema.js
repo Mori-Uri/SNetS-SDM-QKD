@@ -27,6 +27,7 @@
       },
       { title: 'QKD', keys: ['qkdProtectedRequestProbability', 'qkdProtectionRandomSeed', 'qkdKeyDemand', 'qkdWarmupFraction', 'qkdExactRequestCount'] },
       // 1.20.0 (Parte 45)
+      { title: 'Registro do visualizador (Parte 66)', desc: 'Grava os eventos de uma carga e de uma replicação em visualizador/ dentro do caso, para a aba Visualizador. Não muda os resultados nem os save states.', keys: ['trace'] },
       { title: 'Save states (experimental)', desc: 'Ligados por padrão (Parte 52), mesmo sem este grupo no arquivo. O simulador grava o estado de cada simulação (carga × replicação) em savestate/ a cada intervalo, ao terminar e ao ser cancelado (botão Cancelar, Ctrl+C ou fechar a janela de console). Uma queda de energia não pode ser avisada: vale o último estado gravado. "Continuar execução" (no caso ou em Execuções) roda o caso de novo: as simulações concluídas não são refeitas e as interrompidas continuam do ponto salvo, com os mesmos resultados. O estado é ignorado se algum arquivo de entrada mudar (exceto threads) ou se o JAR for outro. A pasta savestate é apagada quando o caso termina.', keys: ['saveState'] },
     ],
     fields: {
@@ -54,6 +55,14 @@
       'qkdKeyDemand.updateIntervalsMicroseconds': { label: 'Intervalos de renovação da chave', unit: 'µs', help: 'Lista separada por vírgulas; cada requisição protegida sorteia um deles com igual probabilidade.' },
       'qkdKeyDemand.randomSeed': { label: 'Semente da demanda de chave', type: 'int' },
       qkdWarmupFraction: { label: 'Warm-up das métricas QKD', type: 'prob', default: 0.1, help: 'Fração das chegadas de cada replicação descartada nas estatísticas QKD (padrão 0,1, a mesma regra das métricas clássicas do SNetS). Use 0 em estudos semiestáticos.' },
+      trace: { label: 'Registro do visualizador', default: { enabled: false, loadPoint: 0, replication: 0, firstRequest: 0, maxRequests: 2000, internalAttempts: true, maxAttemptsPerRequest: 300 } },
+      'trace.enabled': { label: 'Gravar o registro do visualizador', default: false },
+      'trace.loadPoint': { label: 'Ponto de carga gravado (só este)', type: 'int', min: 0, default: 0, help: 'Índice do ponto de carga cuja simulação é gravada (0 = o primeiro). Os outros pontos rodam normalmente, sem registro.' },
+      'trace.replication': { label: 'Replicação gravada (só esta)', type: 'int', min: 0, default: 0, help: 'Índice da replicação gravada (0 = a primeira).' },
+      'trace.firstRequest': { label: 'Primeira requisição gravada', type: 'int', min: 0, default: 0, help: 'Contada desde o início da simulação (transitório incluído). As requisições já na rede entram como retrato inicial.' },
+      'trace.internalAttempts': { label: 'Gravar as tentativas internas dos algoritmos', default: true, help: 'Rotas, modulações, núcleos e faixas testados e o resultado de cada teste (QoT, XT, QoTO, XTO, QKD, PICh). Não muda os resultados.' },
+      'trace.maxAttemptsPerRequest': { label: 'Tentativas internas por requisição (máx.)', type: 'int', min: 1, default: 300 },
+      'trace.maxRequests': { label: 'Quantas requisições gravar', type: 'int', min: 1, default: 2000, help: 'A partir da primeira requisição gravada; até 50 000 (cerca de 0,6 KB por requisição).' },
       saveState: { label: 'Save states', default: { enabled: true, intervalMinutes: 10, keepAfterFinish: false }, absentEnabled: true },
       'saveState.enabled': { label: 'Gravar e retomar save states', default: true, help: 'Desligado: cancelar ou uma queda de energia perdem a execução inteira.' },
       'saveState.keepAfterFinish': { label: 'Manter a pasta savestate depois que o caso termina', default: false, help: 'Normalmente ela é apagada quando os resultados são gravados.' },

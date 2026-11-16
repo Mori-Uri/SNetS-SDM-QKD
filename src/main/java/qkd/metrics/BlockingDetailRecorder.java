@@ -106,6 +106,9 @@ public final class BlockingDetailRecorder implements java.io.Serializable {
     private final Map<String, Map<String, long[]>> modPerLink = new TreeMap<String, Map<String, long[]>>();
     /* cause decided by the last observe() (null = accepted), used by markQch */
     private String lastObservedCause;
+
+    /** Parte 66: cause of the last request observed (null when it was accepted). */
+    public String getLastObservedCause() { return lastObservedCause; }
     /* Part 29: the same, counted once per request on each link and core it used (not per slot). */
     private long[][] rowAttempts;
     private final Map<String, long[][]> rowBlocked = new LinkedHashMap<String, long[][]>();

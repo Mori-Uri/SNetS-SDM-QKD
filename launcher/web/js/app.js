@@ -29,6 +29,7 @@
     { id: 'run', label: 'Executar' },
     { id: 'sweep', label: 'Varredura' },
     { id: 'results', label: 'Resultados' },
+    { id: 'viz', label: 'Visualizador' }, // Parte 66
   ];
 
   // ================================================================== serialization
@@ -410,8 +411,9 @@
       st.caseData.otherFiles = data.otherFiles;
       st.caseData.hasRoutesFile = data.hasRoutesFile;
       App.results.invalidate(st.casePath);
+      if (App.viz) App.viz.invalidate(); // Parte 66: a run may have written a new trace
       App.loadTree();
-      if (st.tab === 'overview' || st.tab === 'results') App.renderTab();
+      if (st.tab === 'overview' || st.tab === 'results' || st.tab === 'viz') App.renderTab();
     } catch (e) { /* ignore */ }
   };
 
@@ -484,6 +486,7 @@
         case 'run': node = App.run.render(); break;
         case 'sweep': node = App.sweep.render(); break;
         case 'results': node = App.results.render(); break;
+        case 'viz': node = App.viz.render(); break; // Parte 66
         default: node = el('div');
       }
     } catch (e) {

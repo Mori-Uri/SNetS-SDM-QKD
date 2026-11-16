@@ -722,3 +722,115 @@ tr.bulk-tpl td { background: var(--accent-soft); }
 
 /* Parte 63: linha de pasta na lista de vários casos */
 tr.folder-row td { background: var(--surface-2); border-top: 1px solid var(--border); }
+
+/* Parte 66: visualizador da simulação */
+.viz .viz-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.viz .viz-row h3 { margin: 0; }
+.viz-files select.input { min-width: 0; max-width: 100%; flex: 1 1 320px; }
+.viz-controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.viz-controls select.input, .viz-controls .input.small { padding: 2px 6px; font-size: 12.5px; width: auto; }
+.viz-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+.viz-timeline { display: block; width: 100%; height: 14px; margin-top: 10px; cursor: pointer; }
+.viz-slider { width: 100%; margin: 2px 0 8px; }
+.viz-header { display: grid; gap: 2px; margin-bottom: 8px; }
+.viz-req { font-size: 15px; }
+.viz-chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--surface-3); color: var(--fg-2); }
+.viz-chip.ok { background: var(--ok-soft); color: var(--ok); }
+.viz-chip.err { background: var(--err-soft); color: var(--err); }
+.viz-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .viz-grid { grid-template-columns: minmax(0, 1fr); } }
+.viz-left, .viz-right { min-width: 0; }
+.viz-right h3 { margin: 10px 0 4px; }
+.viz-svg { width: 100%; height: auto; background: var(--chart-surface); border: 1px solid var(--border); border-radius: 6px; display: block; }
+.viz-km { font-size: 10px; fill: #c00000; font-weight: 600; paint-order: stroke; stroke: var(--chart-surface); stroke-width: 3px; }
+.viz-node { fill: var(--surface); stroke: var(--fg); stroke-width: 1.5; }
+.viz-node.src { fill: #2a78d6; stroke: #1b4f8e; }
+.viz-node.dst { fill: #eb6834; stroke: #9c4220; }
+.viz-nodelabel { font-size: 10px; font-weight: 700; fill: var(--fg); pointer-events: none; }
+.viz-node.src + .viz-nodelabel, .viz-node.dst + .viz-nodelabel { fill: #fff; }
+.viz-route { stroke: #2a78d6; stroke-width: 7; stroke-opacity: .75; stroke-linecap: round; stroke-linejoin: round; }
+.viz-route.blocked { stroke: var(--err); stroke-dasharray: 10 6; }
+.viz-route.qkd { stroke: #7030a0; stroke-width: 3; stroke-dasharray: 5 4; stroke-opacity: .95; }
+.viz-route.rel { stroke: #8a8a8a; stroke-dasharray: 3 5; }
+.viz-trusted { fill: #7030a0; stroke: #fff; stroke-width: 1; }
+.viz-detail h3, .viz-cores h3 { margin: 0 0 6px; }
+.viz-detail .kv { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; }
+.viz-detail .kv .v { font-size: 13.5px; overflow-wrap: anywhere; }
+.viz-detail .notice { margin-top: 8px; }
+.viz-pich { margin-top: 6px; background: var(--surface-2); border-radius: 6px; padding: 6px 10px; }
+.viz-pich .k { font-size: 11.5px; color: var(--fg-3); text-transform: uppercase; letter-spacing: .05em; }
+.viz-pich pre { margin: 2px 0 0; font-size: 12px; white-space: pre-wrap; font-family: var(--mono); }
+.viz-cores { margin-top: 10px; display: grid; gap: 2px; justify-items: start; }
+.viz-fiber { width: 150px; height: 150px; }
+.viz-clad { fill: var(--surface-3); stroke: var(--border-strong); }
+.viz-core { fill: var(--surface); stroke: var(--fg); stroke-width: 1.3; }
+.viz-core.qkd { fill: #e6d6f2; stroke: #7030a0; }
+.viz-core.off { fill: var(--surface-3); stroke-dasharray: 3 2; }
+.viz-core.cur { fill: #2a78d6; }
+.viz-core.blk { fill: var(--err); }
+.viz-core.pich { stroke: #e08a00; stroke-width: 3; }
+.viz-corelabel { font-size: 11px; font-weight: 700; fill: var(--fg); pointer-events: none; }
+.viz-log { font-family: var(--mono); font-size: 12px; border: 1px solid var(--border); border-radius: 6px; max-height: 230px; overflow: auto; background: var(--surface-2); }
+.viz-logline { padding: 2px 8px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.viz-logline:hover { background: var(--surface-3); }
+.viz-logline.blk { color: var(--err); }
+.viz-logline.cur { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.viz-logt { color: var(--fg-3); }
+.viz-counters { margin: 14px 0 6px; }
+.viz-counters .kv { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
+.viz-counters .kv .v { font-size: 15px; }
+.viz-spectrum { overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--chart-surface); padding: 4px; }
+.viz-spec { display: block; min-width: 760px; }
+.viz-row { fill: var(--surface-2); stroke: var(--border); stroke-width: .5; }
+.viz-row.qkd { fill: rgba(112, 48, 160, .16); }
+.viz-row.off { fill: var(--surface-3); }
+.viz-seg { stroke: rgba(0,0,0,.25); stroke-width: .4; }
+.viz-seg.cur { fill: #2a78d6; stroke: #0b3d7a; stroke-width: 1; }
+.viz-seg.rel { fill: none; stroke: #6b6b6b; stroke-width: 1.4; stroke-dasharray: 2 2; }
+.viz-seg.blk { fill: var(--err); fill-opacity: .55; stroke: var(--err); stroke-width: 1; }
+.viz-seg.qch { fill: #7030a0; }
+.viz-seg.pich { fill: #e08a00; }
+.viz-tick { font-size: 9px; fill: var(--fg-3); }
+.viz-linklabel { font-size: 10.5px; fill: var(--fg-2); font-weight: 600; }
+.viz-linklabel.on { fill: #2a78d6; }
+.viz-legend { display: inline-flex; flex-wrap: wrap; gap: 10px; margin-left: auto; font-size: 12px; color: var(--fg-2); }
+.viz-leg { display: inline-flex; align-items: center; gap: 4px; }
+.viz-sw { width: 14px; height: 9px; border-radius: 2px; display: inline-block; background: #9fb6c4; }
+.viz-sw.cur { background: #2a78d6; }
+.viz-sw.rel { background: transparent; border: 1.5px dashed #6b6b6b; }
+.viz-sw.blk { background: var(--err); opacity: .6; }
+.viz-sw.qch { background: #7030a0; }
+.viz-sw.pich { background: #e08a00; }
+.viz select.input.small, .viz .input.small { width: auto; padding: 2px 6px; font-size: 12.5px; }
+.viz-grid { stroke: var(--fg); stroke-opacity: .35; stroke-width: .5; fill: none; pointer-events: none; }
+.viz-grid.fine { stroke-opacity: .22; stroke-width: .35; }
+.viz-segtext { font-weight: 700; pointer-events: none; font-family: var(--mono); }
+.viz-route.victim { stroke-width: 4; stroke-dasharray: 2 4; stroke-opacity: .95; }
+.viz-tllegend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--fg-2); margin-top: 4px; }
+.viz-grad { width: 46px; height: 9px; border-radius: 2px; display: inline-block; }
+.viz-appearance { margin-top: 14px; }
+.viz-appearance h4 { margin: 12px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--fg-3); }
+.viz-app-body { padding-top: 8px; }
+.viz-colors { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.viz-colorfield { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; cursor: pointer; }
+.viz-color { width: 30px; height: 22px; padding: 0; border: 1px solid var(--border); border-radius: 4px; background: none; cursor: pointer; }
+.viz-spectrum { overflow-x: auto; }
+.viz-trialbar { margin-top: 4px; padding: 4px 10px; border-radius: 6px; font-size: 13px; background: var(--surface-2); border-left: 4px solid var(--fg-3); }
+.viz-trialbar.ok { border-left-color: var(--ok); }
+.viz-trialbar.fail { border-left-color: var(--err); }
+.viz-route.try { stroke: #1baf7a; stroke-width: 6; stroke-dasharray: 8 5; }
+.viz-route.try.fail { stroke: var(--err); }
+.viz-seg.try { fill: #1baf7a; fill-opacity: .35; stroke: #1baf7a; stroke-width: 2; stroke-dasharray: 3 2; }
+.viz-seg.try.fail { fill: var(--err); stroke: var(--err); }
+.viz-attbox { margin-top: 8px; }
+.viz-attbox summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+.viz-attempts { max-height: 260px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; margin: 6px 0; font-size: 12px; background: var(--surface-2); }
+.viz-att { padding: 2px 8px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.viz-att:hover { background: var(--surface-3); }
+.viz-att.cur { background: var(--accent-soft); color: var(--accent-ink); }
+.viz-att.diag { opacity: .7; }
+.viz-attn { display: inline-block; min-width: 2.2em; color: var(--fg-3); font-family: var(--mono); }
+.viz-attm { display: inline-block; width: 1.2em; font-weight: 700; }
+.viz-att.ok .viz-attm { color: var(--ok); }
+.viz-att.fail .viz-attm { color: var(--err); }
+.viz-attd { font-size: 11px; color: var(--fg-3); }

@@ -511,6 +511,7 @@ public class PhysicalLayer implements Serializable {
 		boolean QoT = isAdmissible(modulation, SNR);
 		//boolean QoT2 = isAdmissible2(circuit.getRequiredBandwidth(), modulation, SNR);
 
+		if (simulator.TraceProbe.ON && testCircuit == null) simulator.TraceProbe.check("QoT", circuit, route, modulation, core, spectrumAssigned, QoT, ratioForDB(SNR), null); // Parte 66
 		return QoT;
 	}
 
@@ -536,6 +537,7 @@ public class PhysicalLayer implements Serializable {
 		boolean QoT = isAdmissible(modulation, SNR);
 		//boolean QoT2 = isAdmissible2(circuit.getRequiredBandwidth(), modulation, SNR);
 
+		if (simulator.TraceProbe.ON && testCircuit == null) simulator.TraceProbe.check("QoT", circuit, route, modulation, core, spectrumAssigned, QoT, ratioForDB(SNR), null); // Parte 66
 		return QoT;
 	}
 

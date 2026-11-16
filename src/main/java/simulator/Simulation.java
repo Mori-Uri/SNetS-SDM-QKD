@@ -137,6 +137,22 @@ public class Simulation implements Serializable {
             power = costRecorder.wrap(power, PowerAssignmentAlgorithmInterface.class, "PowerAssignment");
         }
 
+        // Parte 66: the traced simulation reports the calls to its algorithms (internal attempts; nothing changes)
+        final SimulationConfig.Trace trace = sc.getTrace();
+        if (trace != null && trace.isEnabled() && trace.isInternalAttempts() && trace.getLoadPoint() == loadPoint
+                && trace.getReplication() == replication) {
+            grooming = TraceAlgorithms.wrap(grooming, TrafficGroomingAlgorithmInterface.class, "Grooming");
+            integrated = TraceAlgorithms.wrap(integrated, IntegratedRMLSAAlgorithmInterface.class, "IntegratedRMLSA");
+            routing = TraceAlgorithms.wrap(routing, RoutingAlgorithmInterface.class, "Routing");
+            kRouting = TraceAlgorithms.wrap(kRouting, KRoutingAlgorithmInterface.class, "KRouting");
+            spectrum = TraceAlgorithms.wrap(spectrum, SpectrumAssignmentAlgorithmInterface.class, "SpectrumAssignment");
+            modulation = TraceAlgorithms.wrap(modulation, ModulationSelectionAlgorithmInterface.class, "ModulationSelection");
+            coreAndSpectrum = TraceAlgorithms.wrap(coreAndSpectrum, CoreAndSpectrumAssignmentAlgorithmInterface.class,
+                    "CoreAndSpectrumAssignment");
+            reallocation = TraceAlgorithms.wrap(reallocation, ReallocationAlgorithmInterface.class, "Reallocation");
+            power = TraceAlgorithms.wrap(power, PowerAssignmentAlgorithmInterface.class, "PowerAssignment");
+        }
+
         if (sc.getNetworkType() == GPRMCSA.TRANSPARENT) {
             if (qkdEnabled) {
                 controlPlane = new QKDControlPlane(
@@ -173,6 +189,17 @@ public class Simulation implements Serializable {
                     spectrum, regenerator, modulation, coreAndSpectrum,
                     reallocation, power);
         }
+    }
+
+    /** Parte 66: event trace for the simulation viewer, or null (not saved in the save states). */
+    private transient SimulationTracer tracer;
+
+    public SimulationTracer getTracer() {
+        return tracer;
+    }
+
+    public void setTracer(SimulationTracer tracer) {
+        this.tracer = tracer;
     }
 
     /** Parte 45: cost recorder of this simulation, or null when activeMetrics.AlgorithmCost is off. */

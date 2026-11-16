@@ -389,6 +389,7 @@ public class ControlPlane implements Serializable {
 				circuit.setXtAdmissibleInOther(true);
 
 				// Identify the cause of the blocking
+				if (simulator.TraceProbe.ON) simulator.TraceProbe.diagnosis(true); // Parte 66: the checks below only explain the block
 				if (isBlockingByLackOfFreeSpectrum(circuit)) {
 					circuit.setBlockCause(Circuit.BY_OTHER);
 
@@ -410,6 +411,7 @@ public class ControlPlane implements Serializable {
             	} else{
             		circuit.setBlockCause(Circuit.BY_OTHER);
             	}
+				if (simulator.TraceProbe.ON) simulator.TraceProbe.diagnosis(false); // Parte 66
 			} else {
 				circuit.setBlockCause(Circuit.BY_LACK_RX);
 			}
@@ -794,6 +796,7 @@ public class ControlPlane implements Serializable {
 
 		circuit.setSNRlinear(SNR);
 		circuit.setQoT(QoT);
+		if (simulator.TraceProbe.ON && testCircuit == null) simulator.TraceProbe.check("QoT", circuit, QoT, circuit.getSNR(), null); // Parte 66
 
 		return QoT;
 	}
@@ -823,6 +826,14 @@ public class ControlPlane implements Serializable {
 	 * @param circuit Circuit
 	 * @return boolean - True, if it did not affect another circuit, or false otherwise
 	 */
+	/** Parte 66: the circuit whose QoT failed in the last QoTO test (observation only, simulation viewer), or null. */
+	private transient Circuit traceVictim;
+	private transient double traceVictimSnr;
+
+	public Circuit getTraceVictim() { return traceVictim; }
+	public double getTraceVictimSnr() { return traceVictimSnr; }
+	public void clearTraceVictim() { traceVictim = null; }
+
 	public boolean computeQoTForOther(Circuit circuit) {
 		HashSet<Circuit> circuits = new HashSet<Circuit>(); // Circuit list for test
 		HashMap<Circuit, Double> circuitsSNR = new HashMap<Circuit, Double>(); // To guard the SNR of the test list circuits
@@ -854,6 +865,8 @@ public class ControlPlane implements Serializable {
 			boolean QoT = computeQualityOfTransmission(circuitTemp, circuit, true);
 
 			if (!QoT) {
+				traceVictim = circuitTemp; // Parte 66: observation only (simulation viewer)
+				traceVictimSnr = circuitTemp.getSNR();
 
 				// Returns the SNR and QoT values of circuits before the establishment of the circuit in evaluation
 				for (Circuit circuitAux : circuitsSNR.keySet()) {
@@ -861,10 +874,12 @@ public class ControlPlane implements Serializable {
 					circuitAux.setQoT(circuitsQoT.get(circuitAux));
 				}
 
+				if (simulator.TraceProbe.ON) simulator.TraceProbe.check("QoTO", circuit, false, traceVictimSnr, circuitTemp); // Parte 66
 				return false;
 			}
 		}
 
+		if (simulator.TraceProbe.ON) simulator.TraceProbe.check("QoTO", circuit, true, Double.NaN, null); // Parte 66
 		return true;
 	}
 
@@ -903,10 +918,14 @@ public class ControlPlane implements Serializable {
 			boolean QoT = mesh.getPhysicalLayer().isAdmissible(circuitTemp.getModulation(), SNR);
 
 			if (!QoT) {
+				traceVictim = circuitTemp; // Parte 66: observation only (simulation viewer)
+				traceVictimSnr = PhysicalLayer.ratioForDB(SNR);
+				if (simulator.TraceProbe.ON) simulator.TraceProbe.check("QoTO", circuit, false, traceVictimSnr, circuitTemp); // Parte 66
 				return false;
 			}
 		}
 
+		if (simulator.TraceProbe.ON) simulator.TraceProbe.check("QoTO", circuit, true, Double.NaN, null); // Parte 66
 		return true;
 	}
 
