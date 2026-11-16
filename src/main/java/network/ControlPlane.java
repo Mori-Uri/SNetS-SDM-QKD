@@ -389,7 +389,10 @@ public class ControlPlane implements Serializable {
 				circuit.setXtAdmissibleInOther(true);
 
 				// Identify the cause of the blocking
-				if (isBlockingByLackOfFreeSpectrum(circuit)) {
+				if (!circuit.hasCoreSelected()) {
+					circuit.setBlockCause(blockCauseWithoutCore(circuit)); // Parte 67
+
+				} else if (isBlockingByLackOfFreeSpectrum(circuit)) {
 					circuit.setBlockCause(Circuit.BY_OTHER);
 
 				} else if(isBlockingByFragmentation(circuit)) {
@@ -1260,6 +1263,7 @@ public class ControlPlane implements Serializable {
 	 * @return boolean
 	 */
 	public boolean isBlockingByLackOfFreeSpectrum(Circuit circuit) {
+		if (!circuit.hasCoreSelected()) return false; // Parte 67: see blockCauseWithoutCore
 
 		if (circuit.getRoute() == null)
 			return false;
@@ -1278,6 +1282,49 @@ public class ControlPlane implements Serializable {
 		}
 
 		return lackOfFreeSpectrum;
+	}
+
+	/**
+	 * Parte 67: cause of a blocking in which the core and spectrum assignment algorithm did not select a core (core -1;
+	 * the XT-aware algorithms do this when no core passes their tests). The spectrum tests are made in every core:
+	 * lack of free spectrum (counted as other, as with a core) when no core has free slots in all links of the route;
+	 * fragmentation when no core has a contiguous band for the circuit and some core would have room with its free
+	 * slots together; other in the remaining cases (the physical-layer tests need a core and a band). The circuit is
+	 * left without a core.
+	 */
+	private int blockCauseWithoutCore(Circuit circuit) {
+		if (circuit.getRoute() == null || circuit.getRoute().getLinkList().isEmpty()) return Circuit.BY_OTHER;
+		final int cores = circuit.getRoute().getLinkList().get(0).getNumberOfCores();
+		boolean anyFree = false, contiguous = false, fragmentation = false;
+		try {
+			for (int c = 0; c < cores; c++) {
+				circuit.indexCore = c;
+				if (isBlockingByLackOfFreeSpectrum(circuit)) continue;
+				anyFree = true;
+				if (hasContiguousBand(circuit)) {
+					contiguous = true;
+				} else if (isBlockingByFragmentation(circuit)) {
+					fragmentation = true;
+				}
+			}
+		} finally {
+			circuit.indexCore = -1;
+		}
+		if (anyFree && !contiguous && fragmentation) return Circuit.BY_FRAGMENTATION;
+		return Circuit.BY_OTHER;
+	}
+
+	/** Parte 67: true when the core of the circuit has, in all links of the route, a free band for some modulation. */
+	private boolean hasContiguousBand(Circuit circuit) {
+		final List<int[]> merge = IntersectionFreeSpectrum.merge(circuit.getRoute(), circuit.getGuardBand(), circuit.getIndexCore());
+		final List<Modulation> mods = mesh.getAvaliableModulations();
+		for (int m = mods.size() - 1; m >= 0; m--) {
+			final int need = mods.get(m).requiredSlots(circuit.getRequiredBitRate());
+			for (int[] band : merge) {
+				if (band[1] - band[0] + 1 >= need) return true;
+			}
+		}
+		return false;
 	}
 
 	/**

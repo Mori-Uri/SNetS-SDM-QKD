@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [67](#parte-67) | Parte 67 — Algoritmos de RMSCA: vazamento de memória, bloqueio sem núcleo, grooming AGG e algoritmos registrados |
 | [65](#parte-65) | Parte 65 — PICh como canal clássico (modulação, potência, QoT e interferência) e launcher 1.22.3 |
 | [64](#parte-64) | Parte 64 — launcher 1.22.2: aba Executar não fica mais piscando depois de uma execução |
 | [63](#parte-63) | Parte 63 — launcher 1.22.1: lista de JARs atualizada e seleção de casos por pasta |
@@ -47,6 +48,109 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-67"></a>
+## Parte 67 — Algoritmos de RMSCA: vazamento de memória, bloqueio sem núcleo, grooming AGG e algoritmos registrados
+
+Feita na `main` depois de uma auditoria de todos os algoritmos do simulador (não só o ABNE/spcsav2). Cada algoritmo
+rodou num caso clássico de 7 núcleos (3000 requisições) com o JAR de antes das otimizações (Parte 53), com o JAR
+atual e com o rastro do visualizador ligado. Os algoritmos determinísticos deram resultados idênticos nas três
+execuções. Os algoritmos que usam `new Random()` sem semente (randomcore\*, rccas, coreprioritizationrandomfit,
+NewAcine\*, randomcore) já variavam de uma execução para outra antes das otimizações.
+
+**1. Vazamento de memória (regressão da Parte 54).** Vários algoritmos montam circuitos candidatos com a lista de
+requisições do circuito real (`setRequests(circuit.getRequests())` ou `clone()`). Entre eles estão DiRMCSA, Acine,
+NewAcine\*, icxtaa, xtawaregreedyalgorithm e pushpullcsbasdm. Desde a Parte 54, a lista
+(`network.TrackedRequestList`) guardava uma referência forte a cada um desses candidatos, para avisá-los quando as
+requisições mudassem. Por isso nenhum candidato era liberado, e cada candidato novo fazia uma busca linear na
+lista. O DiRMCSA estourava 1,5 GB de memória em 75 s. Agora os candidatos ficam em referências fracas: um candidato
+descartado é coletado (não precisa mais de aviso), e a lista é compactada quando a maior parte dos candidatos já foi
+coletada. O DiRMCSA rodou com ~13 MB de memória estável e caiu de 119 s (Parte 53) para 67 s, com resultados
+idênticos. Os outros algoritmos também deram resultados idênticos. Os save states não mudam: o campo novo não é
+salvo.
+
+**2. Bloqueio sem núcleo escolhido (falha antiga, já existia na Parte 53 e na versão da Rayline).** Quando o
+algoritmo de núcleo e espectro bloqueia sem escolher um núcleo (núcleo −1), o simulador dava NullPointerException.
+Isso acontecia na classificação da causa do bloqueio (`ControlPlane.isBlockingByLackOfFreeSpectrum`) e na métrica
+ExternalFragmentation. Os algoritmos XT-aware fazem isso quando nenhum núcleo passa nos testes, então
+icxtaa, xtawaregreedyalgorithm, NewAcine_v2 e NewAcine_v3 caíam no primeiro bloqueio. Agora, nesse caso:
+
+- **Causa do bloqueio:** os testes de espectro são feitos em todos os núcleos da rota.
+  - **Falta de espectro livre** (contada como "outro", como já era com núcleo): nenhum núcleo tem slots livres em
+    todos os enlaces.
+  - **Fragmentação:** nenhum núcleo tem uma faixa contínua para o circuito, mas algum teria espaço com os slots
+    livres juntos.
+  - **Outro:** os demais casos. Os testes de camada física precisam de um núcleo e de uma faixa.
+- **Fragmentação externa horizontal:** a média entre os núcleos da rota.
+
+Isso não muda nada nos algoritmos que sempre escolhem um núcleo. Método novo `Circuit.hasCoreSelected()`.
+
+**3. Grooming AGG (falha antiga).** `agg`, `agg_srnp`, `agg_sstg1` e `agg_sstg2` caíam com NullPointerException na
+primeira vez que um circuito existente podia ser expandido. O motivo era que as arestas dos circuitos ativos no grafo
+auxiliar (`AuxiliaryGraphGrooming.MyEdge`) não recebiam o plano de controle. Agora recebem. O `agg_srnp`, o
+`agg_sstg1` e o `agg_sstg2` também precisam das variáveis próprias no arquivo `others`: `alfa`, `beta`, `gama` e
+`sigmaExpansiveness`.
+
+**4. Algoritmos de núcleo e espectro registrados** no `GPRMCSA` (as classes já existiam, mas não podiam ser
+escolhidas). Os nomes são os da versão da Rayline:
+
+| Nome | Classe |
+|---|---|
+| `acine` | `Acine` |
+| `newacine` | `NewAcine` |
+| `newacinev2` | `NewAcine_v2` |
+| `newacinev3` | `NewAcine_v3` |
+| `adein` | `Adein` |
+| `pgnie` | `Pgnie` |
+| `dirmcsa` | `DiRMCSA` |
+| `intraareaff` | `IntraAreaFF` |
+| `bestdeltaxtv2` | `BestDeltaXT_v2` |
+| `randomcore` | `RandomCoreAssignment` |
+
+O `newacinev3` e o `randomcore` usam o algoritmo de espectro do campo `spectrumAssignment` (firstfit, bestfit…).
+Antes, nenhum algoritmo registrado usava esse campo. Os algoritmos de aprendizado de máquina (Mlearning, AcineMl,
+ABNEwML, NewCbaSba e AbneMlTrue) ficaram de fora: precisam de ganchos do plano de controle que só existem na versão
+da Rayline, e o AbneMlTrue precisa de um servidor externo. O `CLASSICAL_BASE_SHA256.txt` registra o hash do
+`GPRMCSA.java` da base clássica entregue, que agora é outro.
+
+**Conferência:**
+
+- **Resultados iguais aos do JAR anterior:** csbasdm, spcsav2, kspcsav3, cpcas, prmscav2+pabs, djkfgba,
+  simpletrafficgrooming e pushpullcsbasdm (CSVs idênticos).
+- **Algoritmos novos:** rodaram com o rastro do visualizador ligado e desligado, com resultados idênticos (exceto os
+  aleatórios).
+- **Save states:** o DiRMCSA parou e foi retomado de um save state, com resultado igual ao da execução sem
+  interrupção.
+
+**Tempos de antes das otimizações (Parte 53) para agora** (mesmo caso):
+
+| Algoritmo | Antes | Agora |
+|---|---|---|
+| icxtaa | 487 s | 109 s |
+| xtawaregreedyalgorithm | mais de 1200 s | 345 s |
+| kspgbsa | mais de 600 s | 230 s |
+| mdjkv2 | 291 s | 65 s |
+| kspxt | 152 s | 37 s |
+| impa | 137 s | 23 s |
+| Acine | 54 s | 9 s |
+
+**Falhas antigas encontradas e não mudadas:**
+
+- `mgfccf` estoura a memória em `MultihopGrooming.removeCircuitVirtualRouting`.
+- `scsp` precisa da modulação antes da rota e cai com `rmlsaType` 0.
+- `BestDeltaXT` (v1) e `MuriTest` não terminam ou falham.
+- `modulationbyqotsigma` precisa da variável `sigma` no arquivo `others`.
+- Os algoritmos que calculam a SNR por conta própria (EnPA, PABS, IMPA, NewAcine) não mostram esses testes como
+  passos de QoT no visualizador. Aparecem só as verificações padrão de QoT e XT.
+
+**Arquivos:**
+
+- `network/{TrackedRequestList, Circuit, ControlPlane}.java`
+- `measurement/ExternalFragmentation.java`
+- `gprmcsa/trafficGrooming/AuxiliaryGraphGrooming.java`
+- `gprmcsa/GPRMCSA.java`
 
 ---
 

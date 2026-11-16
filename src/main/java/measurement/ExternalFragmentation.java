@@ -185,16 +185,31 @@ public class ExternalFragmentation extends Measurement {
     private void observationExternalFragHorizontal(Circuit circuit) {
         if (circuit.getRoute() == null) return;
         List<Link> links = circuit.getRoute().getLinkList();
+        if (links.isEmpty()) return;
 
+        if (!circuit.hasCoreSelected()) {
+            // Parte 67: blocked without a core (core -1): the mean over the cores of the route
+            final int cores = links.get(0).getNumberOfCores();
+            double sum = 0.0;
+            for (int c = 0; c < cores; c++) {
+                sum += horizontalFragmentation(circuit, links, c);
+            }
+            ExternalFragHorizontal += cores > 0 ? sum / cores : 0.0;
+            return;
+        }
+        ExternalFragHorizontal += horizontalFragmentation(circuit, links, circuit.getIndexCore());
+    }
+
+    private double horizontalFragmentation(Circuit circuit, List<Link> links, int core) {
         List<int[]> composition;
-        composition = links.get(0).getCore(circuit.getIndexCore()).getFreeSpectrumBands(circuit.getGuardBand());
+        composition = links.get(0).getCore(core).getFreeSpectrumBands(circuit.getGuardBand());
 
         for (int i = 1; i < links.size(); i++) {
-            composition = IntersectionFreeSpectrum.merge(composition, links.get(i).getCore(circuit.getIndexCore()).getFreeSpectrumBands(circuit.getGuardBand()));
+            composition = IntersectionFreeSpectrum.merge(composition, links.get(i).getCore(core).getFreeSpectrumBands(circuit.getGuardBand()));
         }
 
         ComputesFragmentation cf = new ComputesFragmentation();
-        ExternalFragHorizontal += cf.externalFragmentation(composition);
+        return cf.externalFragmentation(composition);
     }
 
     /**

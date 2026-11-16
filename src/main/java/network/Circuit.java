@@ -567,6 +567,11 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 	 * Returns the index core.
 	 * @return the index core.
 	 */
+	/** Parte 67: true when a core was selected (getIndexCore prints an error when it was not). */
+	public boolean hasCoreSelected() {
+		return indexCore >= 0;
+	}
+
 	public int getIndexCore() {
 		if (indexCore == -1) {
 			System.err.println("Core not selected.");
@@ -593,6 +598,8 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 
 	/** Parte 54: QoT terms per link (see QotLinkCache); not saved in save states. */
 	transient QotLinkCache.Entry[] qotCache;
+	/** Parte 67: the shared request list this circuit is registered in (see TrackedRequestList.addOwner). */
+	transient TrackedRequestList sharedListOf;
 
 	/** Parte 54: called by Core when this circuit enters a core circuit list. */
 	void enteredCoreList() {
@@ -814,6 +821,7 @@ public class Circuit implements Comparable<Object>, Serializable, Cloneable {
 		final Circuit c = (Circuit) super.clone();
 		c.coreLists = 0; // Parte 54: the copy is not in any core list
 		c.qotCache = null;
+		c.sharedListOf = null; // Parte 67: the copy registers itself below
 		if (c.requests instanceof TrackedRequestList) {
 			((TrackedRequestList) c.requests).addOwner(c); // Parte 54: the copy shares the list
 		}

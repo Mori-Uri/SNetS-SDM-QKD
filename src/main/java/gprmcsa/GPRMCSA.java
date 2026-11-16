@@ -99,6 +99,16 @@ public class GPRMCSA implements Serializable {
 	private static final String CORE_SPECTRUM_ASSIGNMENT_RANDOMCORERANDOMFIT = "randomcorerandomfit";
 	private static final String CORE_SPECTRUM_ASSIGNMENT_CSBASDM = "csbasdm"; //ABNE
 	private static final String CORE_SPECTRUM_ASSIGNMENT_CSBASDM2 = "csbasdm2";
+	private static final String CORE_SPECTRUM_ASSIGNMENT_ACINE = "acine"; // Parte 67
+	private static final String CORE_SPECTRUM_ASSIGNMENT_NEWACINE = "newacine"; // Parte 67
+	private static final String CORE_SPECTRUM_ASSIGNMENT_NEWACINE_V2 = "newacinev2"; // Parte 67
+	private static final String CORE_SPECTRUM_ASSIGNMENT_NEWACINE_V3 = "newacinev3"; // Parte 67
+	private static final String CORE_SPECTRUM_ASSIGNMENT_ADEIN = "adein"; // Parte 67
+	private static final String CORE_SPECTRUM_ASSIGNMENT_PGNIE = "pgnie"; // Parte 67
+	private static final String CORE_SPECTRUM_ASSIGNMENT_DIRMCSA = "dirmcsa"; // Parte 67
+	private static final String CORE_SPECTRUM_ASSIGNMENT_INTRAAREAFF = "intraareaff"; // Parte 67
+	private static final String CORE_SPECTRUM_ASSIGNMENT_BESTDELTAXT_V2 = "bestdeltaxtv2"; // Parte 67
+	private static final String CORE_SPECTRUM_ASSIGNMENT_RANDOMCORE = "randomcore"; // Parte 67
 	private static final String CORE_SPECTRUM_ASSIGNMENT_COREPRIORITIZATIONFIRSTFIT = "coreprioritizationfirstfit";
 	private static final String CORE_SPECTRUM_ASSIGNMENT_COREPRIORITIZATIONRANDOMFIT = "coreprioritizationrandomfit";
 	private static final String CORE_SPECTRUM_ASSIGNMENT_XTAWAREGREEDYALGORITHM = "xtawaregreedyalgorithm";
@@ -423,6 +433,26 @@ public class GPRMCSA implements Serializable {
                 return new CSBASDM();
             case CORE_SPECTRUM_ASSIGNMENT_CSBASDM2:
                 return new CSBASDM2();
+            case CORE_SPECTRUM_ASSIGNMENT_ACINE:
+                return new Acine(); // Parte 67
+            case CORE_SPECTRUM_ASSIGNMENT_NEWACINE:
+                return new NewAcine(); // Parte 67
+            case CORE_SPECTRUM_ASSIGNMENT_NEWACINE_V2:
+                return new NewAcine_v2(); // Parte 67
+            case CORE_SPECTRUM_ASSIGNMENT_NEWACINE_V3:
+                return new NewAcine_v3(); // Parte 67
+            case CORE_SPECTRUM_ASSIGNMENT_ADEIN:
+                return new Adein(); // Parte 67
+            case CORE_SPECTRUM_ASSIGNMENT_PGNIE:
+                return new Pgnie(); // Parte 67
+            case CORE_SPECTRUM_ASSIGNMENT_DIRMCSA:
+                return new DiRMCSA(); // Parte 67
+            case CORE_SPECTRUM_ASSIGNMENT_INTRAAREAFF:
+                return new IntraAreaFF(); // Parte 67
+            case CORE_SPECTRUM_ASSIGNMENT_BESTDELTAXT_V2:
+                return new BestDeltaXT_v2(); // Parte 67
+            case CORE_SPECTRUM_ASSIGNMENT_RANDOMCORE:
+                return new RandomCoreAssignment(); // Parte 67
             default:
                 return null;
         }
