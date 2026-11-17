@@ -80,6 +80,17 @@
     T('metro2', 'Metropolitana 2 (8 nós, 11 enlaces)', 'Rede metropolitana deitada (Fig. 6b); mesmo grafo da Metropolitana, com outra numeração', {
       1: [456, 870], 2: [579, 699], 3: [756, 699], 4: [948, 771], 5: [756, 891], 6: [948, 954], 7: [750, 1035], 8: [579, 1035],
     }, '1-2:25 2-3:20 3-4:35 3-5:40 5-4:30 4-6:20 5-6:45 6-7:40 7-8:50 2-8:40 1-8:30', 'metro'),
+    // Parte 70: rede metropolitana POTI (Teresina), mapa novo, sem as derivações do cabo (J): os pontos que se encontravam numa
+    // derivação ficam ligados direto, com os km dos trechos somados (topologias_rascunho/poti_v3_sem_derivacoes.csv)
+    T('poti', 'POTI Teresina (24 nós, 37 enlaces)', 'Rede metropolitana POTI (RNP, Teresina), sem as derivações do cabo. Nós: 1 PoP-PI, 2 FACIME, 3 CCS, 4 HGV, 5 CPTN, 6 HU, 7 EL-DIR, 8 EL-MAC, 9 SESAPI, 10 IFPI-S, 11 EL-CEN, 12 UAPI, 13 MDER, 14 IFPI-C, 15 CTU, 16 EMBRAPA, 17 NTI, 18 CCA, 19 EL-SAT, 20 IFPI-R, 21 UESPI-D, 22 IFPI-D, 23 EL-PPI, 24 SEDET', {
+      1: [418, 575], 2: [350, 535], 3: [315, 492], 4: [291, 461], 5: [91, 375], 6: [494, 240], 7: [790, 691], 8:
+      [424, 724], 9: [266, 733], 10: [236, 641], 11: [223, 610], 12: [247, 579], 13: [536, 562], 14: [242, 492], 15:
+      [21, 362], 16: [367, 64], 17: [490, 169], 18: [620, 108], 19: [909, 340], 20: [902, 428], 21: [878, 608], 22:
+      [979, 632], 23: [378, 858], 24: [216, 531]
+    }, `6-18:2.34 17-18:2.21 2-3:0.68 3-4:0.47 5-15:0.93 5-16:6.38 4-5:3.63 5-6:5.75 10-11:0.4 11-12:0.51 7-8:6.38
+        7-19:6.09 6-7:10.83 7-22:2.92 7-20:5.26 7-21:1.68 8-23:2.46 8-9:2.59 9-23:2.69 6-19:8.64 19-22:7.43 19-20:3.07
+        19-21:6.19 6-16:7.07 1-2:1.05 4-14:0.69 6-22:12.17 6-20:7.81 6-17:1.57 6-21:10.93 20-22:6.6 21-22:3.02
+        20-21:5.36 9-10:1.27 1-13:1.47 1-12:2.46 12-24:0.69`, 'metro'),
     T('dt', 'DT (12 nós, 20 enlaces, 20 relays)', 'Rede Deutsche Telekom (Fig. 6c); os nós relay (13–32 na figura) viram nós confiáveis por enlace', {
       1: [1075, 195], 2: [532, 318], 3: [670, 338], 4: [825, 568], 5: [880, 125], 6: [862, 280], 7: [600, 420], 8: [1118, 370],
       9: [1162, 755], 10: [1080, 600], 11: [932, 742], 12: [1030, 805],

@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [70](#parte-70) | Parte 70 — launcher 1.24.1: topologia POTI (Teresina) nas topologias prontas |
 | [69](#parte-69) | Parte 69 — launcher 1.24.0: visualizador (cliques, navegação por tipo, legenda dos núcleos, SKR e página própria) |
 | [68](#parte-68) | Parte 68 — launcher 1.23.1: visualizador abre registros grandes |
 | [67](#parte-67) | Parte 67 — Algoritmos de RMSCA: vazamento de memória, bloqueio sem núcleo, grooming AGG e algoritmos registrados |
@@ -51,6 +52,26 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-70"></a>
+## Parte 70 — launcher 1.24.1: topologia POTI (Teresina) nas topologias prontas
+
+Topologia nova no grupo "Metropolitanas e de pequena escala": **POTI Teresina (24 nós, 37 enlaces)**, a rede
+metropolitana POTI (RNP) no mapa novo, sem as derivações do cabo (J). Os pontos que se encontravam numa derivação ficam
+ligados direto, com os km dos trechos somados (rascunho `poti_v3_sem_derivacoes.csv`). Enlaces de 0,4 a 12,17 km.
+Os nós são numerados de 1 a 24 (o roteamento `djk` exige nós chamados 1…N), ao longo do anel a partir do PoP-PI e
+depois os ramais; a correspondência está na descrição da topologia:
+
+1 PoP-PI, 2 FACIME, 3 CCS, 4 HGV, 5 CPTN, 6 HU, 7 EL-DIR, 8 EL-MAC, 9 SESAPI, 10 IFPI-S, 11 EL-CEN, 12 UAPI,
+13 MDER, 14 IFPI-C, 15 CTU, 16 EMBRAPA, 17 NTI, 18 CCA, 19 EL-SAT, 20 IFPI-R, 21 UESPI-D, 22 IFPI-D, 23 EL-PPI,
+24 SEDET.
+
+Atenção: os enlaces que passam por uma derivação usam o mesmo cabo, mas no simulador são fibras independentes (cada
+um com todos os núcleos e slots); a capacidade e as rotas alternativas ficam acima das do cabo real.
+
+**Arquivos:** `launcher/web/js/presets.js`, `launcher/src/launcher/LauncherServer.java` e `launcher/snets-launcher.jar`.
 
 ---
 
