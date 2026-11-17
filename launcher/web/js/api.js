@@ -58,6 +58,21 @@
     runTool: (id, jar, queued, jvmArgs) => call('POST', 'tool/run', { id, jar, queued: queued ? 'true' : null, jvmArgs }),
     text: (path, optional) => call('GET', 'text', { path, optional: optional ? 'true' : null }),
     files: (path) => call('GET', 'files', { path }),
+    // Parte 68: record of the visualizer, parsed by the browser straight from the file (no size limit)
+    trace: async (path) => {
+      let res;
+      try {
+        res = await fetch('/api/trace?' + new URLSearchParams({ path }).toString());
+      } catch (e) {
+        throw new Error('Sem conexão com o launcher. A janela do servidor foi fechada?');
+      }
+      if (!res.ok) {
+        let msg = 'Erro HTTP ' + res.status;
+        try { const d = await res.json(); if (d && d.error) msg = d.error; } catch (e) { /* ignore */ }
+        throw new Error(msg);
+      }
+      return res.json();
+    },
     figures: () => call('GET', 'figures'),
     figure: (name) => call('GET', 'figure', { name }),
     saveFigure: (name, json) => call('POST', 'figure', { name }, json),

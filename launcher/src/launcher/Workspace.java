@@ -377,6 +377,21 @@ final class Workspace {
         return readText(f);
     }
 
+    /**
+     * Parte 68: a record of the visualizer (a .json file in a "visualizador" folder of a case). It is sent as it is,
+     * without the 16 MB limit of readTextFile: a record with internal attempts easily passes it.
+     */
+    File traceFile(String rel) throws IOException {
+        if (rel == null || !rel.toLowerCase().endsWith(".json")) {
+            throw new IllegalArgumentException("Registro do visualizador inválido: " + rel);
+        }
+        File f = resolve(rel);
+        if (!f.isFile() || f.getParentFile() == null || !"visualizador".equals(f.getParentFile().getName())) {
+            throw new IllegalArgumentException("Registro do visualizador não encontrado: " + rel);
+        }
+        return f;
+    }
+
     /** Lists the files of a folder under simulations (non-recursive). */
     List<Object> listFiles(String rel) throws IOException {
         File dir = resolve(rel);

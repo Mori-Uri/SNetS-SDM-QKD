@@ -229,8 +229,7 @@
     V.loading = true; V.error = null; V.file = name;
     if (!quiet) App.renderTab();
     try {
-      const r = await App.api.text(App.state.casePath + '/visualizador/' + name);
-      prepare(JSON.parse(r.text));
+      prepare(await App.api.trace(App.state.casePath + '/visualizador/' + name)); // Parte 68: any size
     } catch (e) {
       V.error = 'Não foi possível abrir ' + name + ': ' + e.message;
       V.data = null;

@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [68](#parte-68) | Parte 68 — launcher 1.23.1: visualizador abre registros grandes |
 | [67](#parte-67) | Parte 67 — Algoritmos de RMSCA: vazamento de memória, bloqueio sem núcleo, grooming AGG e algoritmos registrados |
 | [66](#parte-66) | Parte 66 — visualizador da simulação (registro de eventos e aba Visualizador, launcher 1.23.0) |
 | [65](#parte-65) | Parte 65 — PICh como canal clássico (modulação, potência, QoT e interferência) e launcher 1.22.3 |
@@ -49,6 +50,26 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-68"></a>
+## Parte 68 — launcher 1.23.1: visualizador abre registros grandes
+
+**Problema.** O visualizador lia o registro pelo mesmo caminho dos CSVs e de outros textos (`/api/text`), que recusa
+arquivos acima de 16 MB ("Arquivo grande demais para a interface"). Um registro com as tentativas internas passa
+disso com facilidade: 10 000 requisições deram 16,3 MB (caso clássico) e 21,1 MB (caso QKD). Quando a aba abria o
+registro mais recente sozinha, o erro não aparecia e a aba ficava vazia.
+
+**Como ficou.** Rota nova `/api/trace`, que envia o arquivo como ele está (sem lê-lo inteiro na memória do launcher)
+e só para arquivos `.json` dentro de uma pasta `visualizador`. O navegador lê o JSON direto da resposta, sem o
+limite de 16 MB. O limite das outras leituras continua o mesmo.
+
+**Conferência.** Os dois registros que falhavam (`Teste_EX_Visu` e `Teste_EX_QKD_Visu`, 16 749 e 16 590 passos)
+abriram em menos de 1 s, e ir do primeiro ao último passo levou ~0,5 s.
+
+**Arquivos:** `launcher/src/launcher/{LauncherServer, Workspace}.java`, `launcher/web/js/{api, viz}.js` e
+`launcher/snets-launcher.jar`.
 
 ---
 

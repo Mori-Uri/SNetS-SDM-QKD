@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
  */
 public final class LauncherServer {
 
-    static final String VERSION = "1.23.0";
+    static final String VERSION = "1.23.1";
 
     private final Settings settings;
     private final Workspace workspace;
@@ -206,6 +206,10 @@ public final class LauncherServer {
                 Map<String, String> q = query(ex.getRequestURI().getRawQuery());
                 if ("/api/run/console".equals(path)) {
                     sendText(ex, consoleText(q));
+                    return;
+                }
+                if ("/api/trace".equals(path)) { // Parte 68: visualizer records are sent as they are (any size)
+                    sendFile(ex, workspace.traceFile(q.get("path")));
                     return;
                 }
                 Object result = route(method, path, q, ex);
@@ -678,6 +682,16 @@ public final class LauncherServer {
         ex.sendResponseHeaders(200, bytes.length);
         try (OutputStream os = ex.getResponseBody()) {
             os.write(bytes);
+        }
+    }
+
+    /** Parte 68: sends a file as it is (application/json), streamed, without reading it into memory. */
+    private static void sendFile(HttpExchange ex, File f) throws IOException {
+        ex.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+        ex.getResponseHeaders().set("Cache-Control", "no-store");
+        ex.sendResponseHeaders(200, f.length());
+        try (OutputStream os = ex.getResponseBody()) {
+            java.nio.file.Files.copy(f.toPath(), os);
         }
     }
 
