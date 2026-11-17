@@ -737,8 +737,18 @@ tr.folder-row td { background: var(--surface-2); border-top: 1px solid var(--bor
 .viz-chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--surface-3); color: var(--fg-2); }
 .viz-chip.ok { background: var(--ok-soft); color: var(--ok); }
 .viz-chip.err { background: var(--err-soft); color: var(--err); }
-.viz-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-@media (max-width: 1000px) { .viz-grid { grid-template-columns: minmax(0, 1fr); } }
+.viz-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .viz-layout { grid-template-columns: minmax(0, 1fr); } }
+/* Parte 69: controls, timeline and header fixed at the top of the page "Visualizador" */
+.viz-sticky.on { position: sticky; top: 0; z-index: 5; background: var(--surface); padding: 8px 0 4px; margin-top: -8px; border-bottom: 1px solid var(--border); }
+.viz-heat { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.viz-heatbar { display: inline-block; width: 90px; height: 8px; border-radius: 4px; }
+.viz-corewrap { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.viz-corelegend { display: grid; gap: 3px; font-size: 12px; color: var(--fg-2); }
+.viz-coreleg { display: flex; align-items: center; gap: 6px; }
+.viz-coreleg.off { opacity: .4; }
+.viz-coresw { width: 16px; height: 16px; flex: none; }
+.viz-coresw .viz-core.pich { stroke-width: 2.6; }
 .viz-left, .viz-right { min-width: 0; }
 .viz-right h3 { margin: 10px 0 4px; }
 .viz-svg { width: 100%; height: auto; background: var(--chart-surface); border: 1px solid var(--border); border-radius: 6px; display: block; }
@@ -781,9 +791,9 @@ tr.folder-row td { background: var(--surface-2); border-top: 1px solid var(--bor
 .viz-counters .kv .v { font-size: 15px; }
 .viz-spectrum { overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--chart-surface); padding: 4px; }
 .viz-spec { display: block; min-width: 760px; }
-.viz-row { fill: var(--surface-2); stroke: var(--border); stroke-width: .5; }
-.viz-row.qkd { fill: rgba(112, 48, 160, .16); }
-.viz-row.off { fill: var(--surface-3); }
+.viz-srow { fill: var(--surface-2); stroke: var(--border); stroke-width: .5; }
+.viz-srow.qkd { fill: rgba(112, 48, 160, .16); }
+.viz-srow.off { fill: var(--surface-3); }
 .viz-seg { stroke: rgba(0,0,0,.25); stroke-width: .4; }
 .viz-seg.cur { fill: #2a78d6; stroke: #0b3d7a; stroke-width: 1; }
 .viz-seg.rel { fill: none; stroke: #6b6b6b; stroke-width: 1.4; stroke-dasharray: 2 2; }
@@ -802,8 +812,8 @@ tr.folder-row td { background: var(--surface-2); border-top: 1px solid var(--bor
 .viz-sw.qch { background: #7030a0; }
 .viz-sw.pich { background: #e08a00; }
 .viz select.input.small, .viz .input.small { width: auto; padding: 2px 6px; font-size: 12.5px; }
-.viz-grid { stroke: var(--fg); stroke-opacity: .35; stroke-width: .5; fill: none; pointer-events: none; }
-.viz-grid.fine { stroke-opacity: .22; stroke-width: .35; }
+.viz-sgrid { stroke: var(--fg); stroke-opacity: .35; stroke-width: .5; fill: none; pointer-events: none; }
+.viz-sgrid.fine { stroke-opacity: .22; stroke-width: .35; }
 .viz-segtext { font-weight: 700; pointer-events: none; font-family: var(--mono); }
 .viz-route.victim { stroke-width: 4; stroke-dasharray: 2 4; stroke-opacity: .95; }
 .viz-tllegend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--fg-2); margin-top: 4px; }

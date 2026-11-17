@@ -396,6 +396,27 @@ public final class SimulationTracer {
         } catch (RuntimeException ignored) {
             // physical result not available
         }
+        // Parte 69: key demand, key rate generated at the bottleneck span, admission thresholds and the result of
+        // every span (SKR in Mb/s and QBER), as recorded when the session was admitted
+        try {
+            m.put("demandMbps", round(conn.getRequiredKeyRateMbps(), 4));
+            final qkd.physical.QKDRoutePhysicalResult pr = conn.getPhysicalResult();
+            if (pr != null) {
+                m.put("rawSkrMbps", round(pr.getMinimumSecretKeyRateBps() / 1e6, 4));
+                final List<Object> sp = new ArrayList<Object>();
+                double skrTh = Double.NaN, qberTh = Double.NaN;
+                for (qkd.physical.QKDSpanPhysicalResult r : pr.getSpanResults()) {
+                    sp.add(new Object[] {round(r.getSecretKeyRateMbps(), 4), round(r.getQber(), 6)});
+                    skrTh = r.getMinimumSecretKeyRateBps();
+                    qberTh = r.getMaximumQber();
+                }
+                m.put("spanPhys", sp);
+                if (Double.isFinite(skrTh)) m.put("skrThMbps", round(skrTh / 1e6, 4));
+                if (Double.isFinite(qberTh)) m.put("qberTh", round(qberTh, 6));
+            }
+        } catch (RuntimeException ignored) {
+            // physical result not available
+        }
         final qkd.resource.QKDSession s = conn.getQkdSession();
         if (s != null && s.getRoutePlan() != null && s.getRoutePlan().getSpans() != null) {
             final List<Object> spans = new ArrayList<Object>();

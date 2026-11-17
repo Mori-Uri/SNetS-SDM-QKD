@@ -356,6 +356,7 @@
     document.getElementById('welcome').hidden = true;
     document.getElementById('qkdView').hidden = true;
     document.getElementById('figView').hidden = true;
+    document.getElementById('vizView').hidden = true;
     document.getElementById('caseView').hidden = false;
     const parts = path.split('/');
     document.getElementById('caseName').textContent = st.bulk ? 'Edição em lote · ' + st.bulk.paths.length + ' casos' : parts[parts.length - 1];
@@ -1086,16 +1087,32 @@
     document.getElementById('welcome').hidden = true;
     document.getElementById('caseView').hidden = true;
     document.getElementById('qkdView').hidden = true;
+    document.getElementById('vizView').hidden = true;
     document.getElementById('figView').hidden = false;
     document.getElementById('main').scrollTop = 0;
     App.figures.render();
   };
   document.getElementById('btnFigures').addEventListener('click', () => App.showFigures());
+  // Parte 69: page "Visualizador" (choose a case with records and replay it)
+  App.showViz = async function () {
+    if (!leaveCase()) return;
+    document.getElementById('welcome').hidden = true;
+    document.getElementById('caseView').hidden = true;
+    document.getElementById('qkdView').hidden = true;
+    document.getElementById('figView').hidden = true;
+    document.getElementById('vizView').hidden = false;
+    document.getElementById('main').scrollTop = 0;
+    App.viz.renderPage();
+    await App.loadTree();
+    if (!document.getElementById('vizView').hidden) App.viz.renderPage();
+  };
+  document.getElementById('btnViz').addEventListener('click', () => App.showViz());
   document.getElementById('btnQkd').addEventListener('click', () => {
     if (!leaveCase()) return;
     document.getElementById('welcome').hidden = true;
     document.getElementById('caseView').hidden = true;
     document.getElementById('figView').hidden = true;
+    document.getElementById('vizView').hidden = true;
     document.getElementById('qkdView').hidden = false;
     document.getElementById('main').scrollTop = 0;
     App.qkd.render();

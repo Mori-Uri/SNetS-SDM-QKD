@@ -95,12 +95,20 @@
     }
   }
 
+  // ------------------------------------------------------------------ context (Parte 69)
+
+  /**
+   * Where the viewer is drawn: the "Visualizador" tab of an open case (App.state) or the "Visualizador" page of the
+   * top bar (a case chosen there, read without opening it). casePath, model (network, simulation) and rerender().
+   */
+  let C = { casePath: null, model: {}, rerender: () => App.renderTab(), page: false };
+
   // ------------------------------------------------------------------ module state
 
   const V = {
     casePath: null, files: null, file: null, data: null, error: null, loading: false,
     idx: 0, sub: -1, playing: false, speed: 5, timer: null,
-    show: 'all', stopCause: '', stopPair: '', linkSel: 'route', occupancy: true,
+    show: 'all', nav: 'block', stopOnNav: false, stopPair: '', linkSel: 'route', occupancy: true,
     keyframes: null, state: null, stateIdx: -1, steps: null, blockIdx: null,
   };
 
@@ -204,38 +212,37 @@
     V.slotValues = [...counts].sort((a, b) => a - b);
     V.slotRange = [V.slotValues[0] || 1, V.slotValues[V.slotValues.length - 1] || 1];
     V.causes = [...new Set(V.steps.filter((e) => e.k === 'req' && !e.ok).map((e) => e.cause || '?'))].sort();
-    V.state = null; V.stateIdx = -1;
+    V.state = null; V.stateIdx = -1; V.reqById = null;
     V.idx = 0;
   }
 
   // ------------------------------------------------------------------ files
 
   async function loadFiles() {
-    const st = App.state;
-    V.casePath = st.casePath;
+    V.casePath = C.casePath;
     V.files = null; V.error = null;
     try {
-      const list = await App.api.files(st.casePath + '/visualizador');
+      const list = await App.api.files(C.casePath + '/visualizador');
       V.files = (list || []).filter((f) => !f.dir && /\.json$/i.test(f.name)).sort((a, b) => b.mtime - a.mtime);
     } catch (e) {
       V.files = [];
     }
     if (V.files.length && (!V.file || !V.files.some((f) => f.name === V.file))) await openFile(V.files[0].name, true);
-    App.renderTab();
+    C.rerender();
   }
 
   async function openFile(name, quiet) {
     stop();
     V.loading = true; V.error = null; V.file = name;
-    if (!quiet) App.renderTab();
+    if (!quiet) C.rerender();
     try {
-      prepare(await App.api.trace(App.state.casePath + '/visualizador/' + name)); // Parte 68: any size
+      prepare(await App.api.trace(C.casePath + '/visualizador/' + name)); // Parte 68: any size
     } catch (e) {
       V.error = 'Não foi possível abrir ' + name + ': ' + e.message;
       V.data = null;
     }
     V.loading = false;
-    if (!quiet) App.renderTab();
+    if (!quiet) C.rerender();
   }
 
   // ------------------------------------------------------------------ navigation
@@ -247,15 +254,38 @@
     return true;
   }
 
-  function matchesStop(e) {
-    if (e.k !== 'req') return false;
-    if (V.stopCause && !(!e.ok && (V.stopCause === '*' || e.cause === V.stopCause))) return false;
-    if (V.stopPair) {
-      const [a, b] = V.stopPair.split(/[\s>-]+/).filter(Boolean);
-      if (!(String(e.s) === a && (!b || String(e.d) === b))) return false;
-    }
-    return !!(V.stopCause || V.stopPair);
+  /**
+   * Parte 69: the kind of step the buttons "anterior/próximo" go to (and where the playback stops, when asked):
+   * any block, a block of one cause, accepted requests, departures (resources released) or QKD requests; the
+   * optional pair (source-destination) narrows it.
+   */
+  const NAV_KINDS = [['block', 'qualquer bloqueio'], ['ok', 'requisições aceitas'], ['rel', 'saídas (liberação de recursos)'], ['qkd', 'requisições QKD'], ['qkdblock', 'requisições QKD bloqueadas']];
+  function navLabel(v) {
+    if (v.startsWith('cause:')) return 'bloqueio: ' + causePt(v.slice(6));
+    const k = NAV_KINDS.find((x) => x[0] === v);
+    return k ? k[1] : v;
   }
+  function pairMatch(e) {
+    if (!V.stopPair) return true;
+    const r = e.k === 'rel' ? findReqAny(e.r) : e;
+    if (!r) return false;
+    const [a, b] = V.stopPair.split(/[\s>-]+/).filter(Boolean);
+    return String(r.s) === a && (!b || String(r.d) === b);
+  }
+  function navMatch(e) {
+    if (!e) return false;
+    const v = V.nav;
+    let ok;
+    if (v === 'block') ok = e.k === 'req' && !e.ok;
+    else if (v.startsWith('cause:')) ok = e.k === 'req' && !e.ok && (e.cause || '?') === v.slice(6);
+    else if (v === 'ok') ok = e.k === 'req' && e.ok;
+    else if (v === 'rel') ok = e.k === 'rel';
+    else if (v === 'qkd') ok = e.k === 'req' && !!e.q;
+    else if (v === 'qkdblock') ok = e.k === 'req' && !!e.q && !e.ok;
+    else ok = false;
+    return ok && pairMatch(e);
+  }
+  function matchesStop(e) { return V.stopOnNav && navMatch(e); }
 
   function go(i, sub) {
     const n = V.steps.length;
@@ -286,9 +316,10 @@
   }
 
   function nextBlock(dir) {
-    const list = V.blockIdx;
-    const i = dir > 0 ? list.find((x) => x > V.idx) : [...list].reverse().find((x) => x < V.idx);
-    if (i !== undefined) go(i); else App.toast(dir > 0 ? 'Não há mais bloqueios no registro.' : 'Não há bloqueio antes deste passo.', 'warn');
+    let i = V.idx + dir;
+    while (i >= 0 && i < V.steps.length && !navMatch(V.steps[i])) i += dir;
+    if (i >= 0 && i < V.steps.length) go(i);
+    else App.toast((dir > 0 ? 'Não há mais passos do tipo "' : 'Não há passo do tipo "') + navLabel(V.nav) + (V.stopPair ? '" do par ' + V.stopPair : '"') + (dir > 0 ? ' depois deste.' : ' antes deste.'), 'warn');
   }
 
   function play() {
@@ -323,26 +354,89 @@
   let ui = null; // nodes redrawn at every step
   let ui_timeline = null;
 
+  function body(root) {
+    if (V.files === null) { loadFiles(); root.append(el('section.panel', el('p.lead', 'Procurando registros na pasta visualizador do caso…'))); return root; }
+    root.append(filesPanel());
+    if (V.loading) root.append(el('section.panel', el('p.lead', 'Abrindo o registro…')));
+    else if (V.error) root.append(el('div.notice.err', V.error));
+    else if (V.data) root.append(viewer());
+    return root;
+  }
+
+  function useCase(path) {
+    if (V.casePath !== path) { stop(); V.file = null; V.data = null; V.files = null; V.casePath = path; }
+  }
+
+  // Parte 69: page of the top bar
+  const PG = { path: null, model: null, error: null, loading: false };
+
+  /** Cases of the tree with records of the visualizer (visualizador/*.json). */
+  function casesWithTraces() {
+    const out = [];
+    const walk = (n) => {
+      if (!n) return;
+      if (n.isCase && n.traceCount) out.push(n);
+      for (const c of n.children || []) walk(c);
+    };
+    walk(App.state.tree && App.state.tree.root);
+    return out.sort((a, b) => (b.traceLast || 0) - (a.traceLast || 0));
+  }
+
+  async function pageOpen(path) {
+    PG.path = path; PG.model = null; PG.error = null; PG.loading = true;
+    renderPage();
+    try {
+      const d = await App.api.readCase(path);
+      const parse = (t) => { try { return t ? JSON.parse(t) : undefined; } catch (e) { return undefined; } };
+      PG.model = { network: parse(d.files.network), simulation: parse(d.files.simulation) };
+    } catch (e) { PG.error = e.message; }
+    PG.loading = false;
+    renderPage();
+  }
+
+  function renderPage() {
+    const host = document.getElementById('vizView');
+    if (!host) return;
+    C = { casePath: PG.path, model: PG.model || {}, rerender: renderPage, page: true };
+    const cases = casesWithTraces();
+    const sel = el('select.input', [el('option', { value: '', selected: !PG.path }, cases.length ? 'Escolha um caso…' : 'Nenhum caso com registro')]
+      .concat(cases.map((n) => el('option', { value: n.path, selected: n.path === PG.path }, n.path + ' · ' + n.traceCount + (n.traceCount === 1 ? ' registro' : ' registros')
+        + (n.traceLast ? ' · ' + App.fmtDate(n.traceLast) : '')))));
+    sel.addEventListener('change', () => { if (sel.value) pageOpen(sel.value); });
+    const head = el('section.panel.viz-pagehead',
+      el('div.viz-row', el('h1', 'Visualizador'), el('span.small.muted', 'Reprodução dos registros gravados pelas simulações (pasta visualizador de cada caso).')),
+      el('div.viz-row', el('strong', 'Caso'), sel,
+        el('button.btn.small', { type: 'button', on: { click: async () => { await App.loadTree(); renderPage(); } } }, 'Atualizar lista'),
+        PG.path ? el('button.btn.small', { type: 'button', title: 'Abre o caso na aba Visualizador, onde se liga e se configura a gravação',
+          on: { click: () => App.openCase(PG.path, 'viz') } }, 'Abrir o caso (configurar a gravação)') : null),
+      cases.length ? null : el('div.notice.info', 'Nenhum caso tem registro ainda. Abra um caso, ligue "Gravar registro para o visualizador" na aba Visualizador, salve e execute.'));
+    const root = el('div.stack.viz.viz-page', head);
+    if (PG.loading) root.append(el('section.panel', el('p.lead', 'Lendo o caso…')));
+    else if (PG.error) root.append(el('div.notice.err', PG.error));
+    else if (PG.path && PG.model) { useCase(PG.path); body(root); }
+    clear(host).append(root);
+  }
+
   App.viz = {
     /** The list of traces is read again on the next render (after a run). */
     invalidate() { if (!V.playing) V.files = null; },
     render() {
       const st = App.state;
-      if (V.casePath !== st.casePath) { stop(); V.file = null; V.data = null; V.files = null; V.casePath = st.casePath; }
+      C = { casePath: st.casePath, model: st.model, rerender: () => App.renderTab(), page: false };
+      useCase(st.casePath);
       const root = el('div.stack.viz');
       root.append(configPanel());
-      if (V.files === null) { loadFiles(); root.append(el('section.panel', el('p.lead', 'Procurando registros na pasta visualizador do caso…'))); return root; }
-      root.append(filesPanel());
-      if (V.loading) root.append(el('section.panel', el('p.lead', 'Abrindo o registro…')));
-      else if (V.error) root.append(el('div.notice.err', V.error));
-      else if (V.data) root.append(viewer());
-      return root;
+      return body(root);
+    },
+    /** Parte 69: page "Visualizador" of the top bar. */
+    renderPage() {
+      if (PG.path && V.casePath !== PG.path) V.files = null;
+      renderPage();
     },
   };
 
   function configPanel() {
-    const st = App.state;
-    const sim = st.model.simulation || {};
+    const sim = C.model.simulation || {};
     const t = Object.assign({ enabled: false, loadPoint: 0, replication: 0, firstRequest: 0, maxRequests: 2000, internalAttempts: true, maxAttemptsPerRequest: 300 }, sim.trace || {});
     const set = (k, v) => { App.setValue('simulation', ['trace', k], v); };
     const ensure = () => { if (!App.isPlainObject(sim.trace)) App.setValue('simulation', ['trace'], Object.assign({}, t)); };
@@ -357,7 +451,7 @@
       return el('label.field', el('div.flabel', el('span', label)), i, help ? el('div.help', help) : null);
     };
     const cb = el('input', { type: 'checkbox', checked: !!t.enabled });
-    cb.addEventListener('change', () => { ensure(); set('enabled', cb.checked); App.renderTab(); });
+    cb.addEventListener('change', () => { ensure(); set('enabled', cb.checked); C.rerender(); });
     const loads = Number(sim.loadPoints) || 1, reps = Number(sim.replications) || 1;
     return el('details.group.panel', { open: !V.data },
       el('summary', el('strong', 'Gravar registro para o visualizador')),
@@ -385,13 +479,13 @@
   function filesPanel() {
     if (!V.files.length) {
       return el('section.panel', el('h2', 'Registros'), el('p.lead', 'Nenhum registro em visualizador/. Ligue a gravação acima, salve e execute o caso.'),
-        el('button.btn.small', { type: 'button', on: { click: () => { V.files = null; App.renderTab(); } } }, 'Procurar de novo'));
+        el('button.btn.small', { type: 'button', on: { click: () => { V.files = null; C.rerender(); } } }, 'Procurar de novo'));
     }
     const sel = el('select.input', V.files.map((f) => el('option', { value: f.name, selected: f.name === V.file }, f.name + ' · ' + App.fmtBytes(f.size) + ' · ' + App.fmtDate(f.mtime))));
     sel.addEventListener('change', () => openFile(sel.value));
     return el('section.panel.viz-files',
       el('div.viz-row', el('strong', 'Registro'), sel,
-        el('button.btn.small', { type: 'button', on: { click: () => { V.files = null; App.renderTab(); } } }, 'Atualizar lista')),
+        el('button.btn.small', { type: 'button', on: { click: () => { V.files = null; C.rerender(); } } }, 'Atualizar lista')),
       V.data ? el('div.small.muted', describe(V.data)) : null);
   }
 
@@ -411,11 +505,15 @@
     showSel.addEventListener('change', () => { V.show = showSel.value; });
     const speedSel = el('select.input.small', SPEEDS.map((v) => el('option', { value: v, selected: V.speed === v }, v + ' passos/s')));
     speedSel.addEventListener('change', () => { V.speed = Number(speedSel.value); });
-    const causeSel = el('select.input.small', [['', 'sem parada por causa'], ['*', 'qualquer bloqueio']].concat(V.causes.map((c) => [c, causePt(c)]))
-      .map(([v, l]) => el('option', { value: v, selected: V.stopCause === v }, l)));
-    causeSel.addEventListener('change', () => { V.stopCause = causeSel.value; });
-    const pairIn = el('input.input.small', { type: 'text', value: V.stopPair, placeholder: 'par, ex.: 5-12', style: { width: '9em' } });
-    pairIn.addEventListener('change', () => { V.stopPair = pairIn.value.trim(); });
+    const navOpts = [NAV_KINDS[0]].concat(V.causes.map((c) => ['cause:' + c, 'bloqueio: ' + causePt(c)]), NAV_KINDS.slice(1));
+    if (!navOpts.some(([v]) => v === V.nav)) V.nav = 'block';
+    const navSel = el('select.input.small', { title: 'Tipo de passo para os botões "anterior" e "próximo" (e para a parada da reprodução)' },
+      navOpts.map(([v, l]) => el('option', { value: v, selected: V.nav === v }, l)));
+    navSel.addEventListener('change', () => { V.nav = navSel.value; drawTimeline(); });
+    const pairIn = el('input.input.small', { type: 'text', value: V.stopPair, placeholder: 'par, ex.: 5-12', title: 'Opcional: só passos deste par origem-destino', style: { width: '8em' } });
+    pairIn.addEventListener('change', () => { V.stopPair = pairIn.value.trim(); drawTimeline(); });
+    const stopCb = el('input', { type: 'checkbox', checked: !!V.stopOnNav });
+    stopCb.addEventListener('change', () => { V.stopOnNav = stopCb.checked; });
     const subCb = el('input', { type: 'checkbox', checked: !!P.subSteps });
     subCb.addEventListener('change', () => { P.subSteps = subCb.checked; savePrefs(); if (!P.subSteps) V.sub = -1; draw(); });
     const subToggle = el('label.check.small', { title: 'Avança também pelas tentativas internas dos algoritmos em cada chegada' }, subCb, ' passos internos');
@@ -432,10 +530,11 @@
       btn(V.playing ? '❚❚ Pausar' : '▶ Reproduzir', 'Reproduzir ou pausar (espaço)', play, 'vizPlay'),
       btn('▶', 'Próximo passo (seta direita)', () => { stop(); stepBy(1); }),
       btn('⏭', 'Fim do registro', () => { stop(); go(V.steps.length - 1); }),
-      btn('⟸ bloqueio', 'Bloqueio anterior', () => { stop(); nextBlock(-1); }),
-      btn('bloqueio ⟹', 'Próximo bloqueio', () => { stop(); nextBlock(1); }),
+      el('span.viz-sep'), el('span.small.muted', 'Ir para'), navSel, pairIn,
+      btn('⟸ anterior', 'Passo anterior do tipo escolhido', () => { stop(); nextBlock(-1); }),
+      btn('próximo ⟹', 'Próximo passo do tipo escolhido', () => { stop(); nextBlock(1); }),
+      el('label.check.small', { title: 'A reprodução para quando chega num passo do tipo escolhido' }, stopCb, ' parar a reprodução nele'),
       el('span.viz-sep'), el('span.small.muted', 'Mostrar'), showSel, speedSel,
-      el('span.viz-sep'), el('span.small.muted', 'Parar em'), causeSel, pairIn,
       el('span.viz-sep'), el('span.small.muted', 'Ir para a requisição nº'), goIn,
       el('span.viz-sep'), subToggle);
     const timeline = el('div.viz-tlbox');
@@ -453,9 +552,10 @@
       return el('label.check.small', { title }, c, ' ' + label);
     };
     ui.legend = el('span.viz-legend');
-    box.append(controls, timeline, slider, ui.header,
-      el('div.viz-grid',
-        el('div.viz-left', ui.topo, el('label.check.small', occ, ' cor dos enlaces = ocupação dos núcleos clássicos')),
+    ui.heat = el('span.viz-heat');
+    box.append(el('div.viz-sticky' + (C.page ? '.on' : ''), controls, timeline, slider, ui.header),
+      el('div.viz-layout',
+        el('div.viz-left', ui.topo, el('div.viz-row', el('label.check.small', occ, ' cor dos enlaces = ocupação dos núcleos clássicos'), ui.heat)),
         el('div.viz-right', ui.detail, ui.cores, el('h3', 'Log'), ui.log)),
       ui.counters,
       el('div.viz-row', el('h3', 'Espectro'), el('span.small.muted', 'Enlaces:'), linkSel,
@@ -475,9 +575,16 @@
     const W = 1000;
     const s = svg('svg', { class: 'viz-timeline', viewBox: '0 0 ' + W + ' 14', preserveAspectRatio: 'none' });
     s.append(svg('rect', { x: 0, y: 5, width: W, height: 4, fill: 'var(--surface-3)' }));
+    // Parte 69: the blocks of the kind chosen in "Ir para" are highlighted; other kinds get their own marks below
+    const blockNav = V.nav === 'block' || V.nav.startsWith('cause:') || V.nav === 'qkdblock';
     for (const i of V.blockIdx) {
       const c = P.tlMode === 'cause' ? causeColor(V.steps[i].cause) : P.blk;
-      s.append(svg('rect', { x: (i / n) * W, y: 1, width: Math.max(1, W / n), height: 12, fill: c, opacity: 0.9 }));
+      const on = !blockNav || navMatch(V.steps[i]);
+      s.append(svg('rect', { x: (i / n) * W, y: 1, width: Math.max(1, W / n), height: blockNav ? 12 : 8, fill: c, opacity: on ? 0.9 : 0.18 }));
+    }
+    if (!blockNav) {
+      const col = V.nav === 'ok' ? '#2ca02c' : V.nav === 'rel' ? '#8a8a8a' : P.qch;
+      V.steps.forEach((e, i) => { if (navMatch(e)) s.append(svg('rect', { x: (i / n) * W, y: 10, width: Math.max(1, W / n), height: 4, fill: col })); });
     }
     s.addEventListener('click', (ev) => {
       const r = s.getBoundingClientRect();
@@ -682,6 +789,11 @@
     return (e.q ? 'QKD' : 'Clássica') + ' · ' + e.s + ' → ' + e.d + ' · ' + App.fmtNum(e.gbps) + ' Gb/s' + (e.q ? ' · chave ' + App.fmtNum(e.keyMbps) + ' Mb/s' : '');
   }
 
+  function findReqAny(rid) {
+    if (!V.reqById) { V.reqById = new Map(); for (const x of (V.data.snapshot || []).concat(V.steps)) if (x.k === 'req' || x.r !== undefined && x.s !== undefined) if (!V.reqById.has(x.r)) V.reqById.set(x.r, x); }
+    return V.reqById.get(rid) || null;
+  }
+
   function findReq(rid) {
     for (let i = V.idx; i >= 0; i--) { const x = V.steps[i]; if (x.k === 'req' && x.r === rid) return x; }
     return (V.data.snapshot || []).find((x) => x.r === rid) || null;
@@ -707,7 +819,7 @@
 
   function nodePositions() {
     if (V.pos) return V.pos;
-    const net = App.state.model.network;
+    const net = C.model.network;
     const names = new Set(); for (const l of V.data.links) { names.add(l.a); names.add(l.b); }
     let pos = null;
     try {
@@ -752,7 +864,7 @@
     for (const p of pairs.values()) {
       const A = XY(p.a), B = XY(p.b);
       const col = V.occupancy ? App.presets.heatColor(p.use) : 'var(--border-strong)';
-      root.append(svg('line', { x1: A.x, y1: A.y, x2: B.x, y2: B.y, stroke: col, 'stroke-width': 4, 'stroke-linecap': 'round' }, svg('title', { text: p.a + '–' + p.b + ' · ' + App.fmtNum(p.km) + ' km · ocupação ' + Math.round(p.use * 100) + '%' })));
+      root.append(svg('line', { x1: A.x, y1: A.y, x2: B.x, y2: B.y, style: 'stroke:' + col, 'stroke-width': 4, 'stroke-linecap': 'round' }, svg('title', { text: p.a + '–' + p.b + ' · ' + App.fmtNum(p.km) + ' km · ocupação ' + Math.round(p.use * 100) + '%' })));
       root.append(svg('text', { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 - 5, 'text-anchor': 'middle', class: 'viz-km', text: App.fmtNum(p.km) }));
     }
     const req = e.k === 'req' ? e : findReq(e.r);
@@ -791,6 +903,13 @@
       root.append(svg('text', { x: p.x, y: p.y + 4, 'text-anchor': 'middle', class: 'viz-nodelabel', text: n }));
     }
     clear(ui.topo).append(root);
+    if (ui.heat) {
+      clear(ui.heat);
+      if (V.occupancy) {
+        const stops = [0, 0.25, 0.5, 0.75, 1].map((u) => App.presets.heatColor(u)).join(',');
+        ui.heat.append(el('span.small.muted', 'ocupação 0%'), el('span.viz-heatbar', { style: { background: 'linear-gradient(90deg,' + stops + ')' } }), el('span.small.muted', '100%'));
+      }
+    }
   }
 
   function linkNodes(links) {
@@ -857,14 +976,30 @@
       const q = e.qkd;
       const pichTxt = (q.pich || []).map((p) => p.link + ' núcleo ' + p.core + ' slots ' + p.band[0] + '–' + p.band[1] + (p.mod ? ' ' + p.mod : '')
         + (p.sections ? ' · seções ' + p.sections.map((x) => App.fmtNum(x)).join('+') + ' km' : '') + (p.snr !== undefined ? ' · SNR ' + App.fmtNum(p.snr, 1) + ' dB' : '')).join('\n');
+      // Parte 69: SKR and QBER with their thresholds (key demand of the request, admission limits), like SNR and XT
+      const mb = (v) => App.fmtNum(v, v < 1 ? 3 : 2) + ' Mb/s';
+      const demand = q.demandMbps !== undefined ? q.demandMbps : e.keyMbps;
+      const raw = q.rawSkrMbps !== undefined ? q.rawSkrMbps : q.skrMbps;
+      const skrTxt = raw !== undefined ? mb(raw) + ' (limiar: demanda de ' + (demand !== undefined ? mb(demand) : '?')
+        + (q.skrThMbps ? ' · limiar de admissão ' + mb(q.skrThMbps) : '') + ')' : '—';
+      const qberTxt = q.qber !== undefined ? App.fmtNum(q.qber * 100, 2) + ' %' + (q.qberTh !== undefined && q.qberTh < 1 ? ' (limiar ' + App.fmtNum(q.qberTh * 100, 2) + ' %)' : '') : '—';
+      const spanTxt = (q.spans || []).map((x, i) => {
+        const ph = (q.spanPhys || [])[i];
+        return x[0] + ' ' + App.fmtNum(x[1]) + '–' + App.fmtNum(x[2]) + ' km' + (ph ? ' · SKR ' + mb(ph[0]) + ' · QBER ' + App.fmtNum(ph[1] * 100, 2) + ' %' : '');
+      }).join('\n');
       box.append(el('h3', 'Sessão QKD'),
         el('div.kv',
           kv('Rota QKD', (q.route || []).join(' → ') + (q.alt ? ' (alternativa)' : '')),
-          kv('SKR mínima', q.skrMbps !== undefined ? App.fmtNum(q.skrMbps, 3) + ' Mb/s' : '—'),
-          kv('QBER máx.', q.qber !== undefined ? App.fmtNum(q.qber * 100, 2) + ' %' : '—'),
+          kv('SKR no gargalo', skrTxt),
+          q.rawSkrMbps !== undefined && q.skrMbps !== undefined && Math.abs(q.rawSkrMbps - q.skrMbps) > 1e-9 ? kv('Chave reservada para a sessão', mb(q.skrMbps)) : null,
+          kv('QBER máx.', qberTxt),
           kv('Trechos (nós confiáveis)', String((q.spans || []).length)),
           kv('QChs', (q.qch || []).map((x) => x[0] + ' núcleo ' + x[1] + ' slot ' + (x[2] === x[3] ? x[2] : x[2] + '–' + x[3])).join('; ') || '—')),
+        spanTxt ? el('div.viz-pich', el('div.k', 'Trechos (SKR e QBER de cada um)'), el('pre', spanTxt)) : null,
         pichTxt ? el('div.viz-pich', el('div.k', 'PIChs'), el('pre', pichTxt)) : null);
+    } else if (e.q && e.k === 'req') {
+      box.append(el('h3', 'Sessão QKD'), el('div.kv', kv('Demanda de chave', e.keyMbps !== undefined ? App.fmtNum(e.keyMbps, 2) + ' Mb/s' : '—')),
+        el('div.small.muted', 'Sessão não admitida: sem SKR/QBER registrados.'));
     }
   }
 
@@ -893,7 +1028,19 @@
       s.append(svg('circle', { cx: W / 2 + p.x * R, cy: W / 2 + p.y * R, r: cr, class: cls }));
       s.append(svg('text', { x: W / 2 + p.x * R, y: W / 2 + p.y * R + 4, 'text-anchor': 'middle', class: 'viz-corelabel', text: String(core.id) }));
     }
-    box.append(el('div.small.muted', 'Núcleos do enlace ' + l.a + '→' + l.b + (core0(l) ? ' · roxo: núcleo QKD' : '')), s);
+    // Parte 69: legend of the core drawing; the kinds not in this drawing are faded
+    const curCls = c && l.cores.some((x) => x.id === c.core) ? (trial ? (trial.step.ok === false ? 'blk' : 'cur') : e.ok ? 'cur' : 'blk') : null;
+    const has = { qkd: core0(l), off: l.cores.some((x) => x.off), cur: curCls === 'cur', blk: curCls === 'blk', pich: pichCores.size > 0, plain: true };
+    const sw = (cls) => { const t = svg('svg', { viewBox: '0 0 20 20', class: 'viz-coresw' }); t.append(svg('circle', { cx: 10, cy: 10, r: 7, class: 'viz-core' + (cls ? ' ' + cls : '') })); return t; };
+    const item = (cls, key, label) => el('div.viz-coreleg' + (has[key] ? '' : '.off'), sw(cls), el('span', label));
+    const legend = el('div.viz-corelegend',
+      item('', 'plain', 'núcleo clássico'),
+      item('qkd', 'qkd', 'núcleo QKD (QChs)'),
+      item('cur', 'cur', trial ? 'núcleo do candidato (teste aprovado ou em andamento)' : 'núcleo do circuito aceito'),
+      item('blk', 'blk', trial ? 'núcleo do candidato recusado neste teste' : 'núcleo da tentativa bloqueada'),
+      item('pich', 'pich', 'contorno: núcleo do PICh da sessão QKD'),
+      item('off', 'off', 'núcleo desativado'));
+    box.append(el('div.small.muted', 'Núcleos do enlace ' + l.a + '→' + l.b + (c && c.route && c.route.length > 1 ? ' (primeiro enlace da rota)' : '')), el('div.viz-corewrap', s, legend));
   }
   const core0 = (l) => l.cores.some((c) => c.qkd);
 
@@ -970,7 +1117,7 @@
       const y0 = y;
       for (const core of l.cores) {
         const h = rowH - 2;
-        root.append(svg('rect', { x: LW + CW, y, width: maxSlots * sx, height: h, class: 'viz-row' + (core.qkd ? ' qkd' : '') + (core.off ? ' off' : '') }));
+        root.append(svg('rect', { x: LW + CW, y, width: maxSlots * sx, height: h, class: 'viz-srow' + (core.qkd ? ' qkd' : '') + (core.off ? ' off' : '') }));
         root.append(svg('text', { x: LW + CW - 4, y: y + h / 2 + 3.5, 'text-anchor': 'end', class: 'viz-tick', text: String(core.id) }));
         const seg = (band, o) => {
           const w = Math.max(1.5, (band[1] - band[0] + 1) * sx);
@@ -1032,7 +1179,7 @@
         const every = P.grid === '10' ? 10 : 1;
         let d = '';
         for (let k = 0; k <= maxSlots; k += every) d += 'M' + (LW + CW + k * sx).toFixed(2) + ' ' + y0 + 'V' + (y - 2);
-        root.append(svg('path', { d, class: 'viz-grid' + (every === 1 ? ' fine' : '') }));
+        root.append(svg('path', { d, class: 'viz-sgrid' + (every === 1 ? ' fine' : '') }));
       }
       root.append(svg('text', { x: 2, y: (y0 + y) / 2 + 4, class: 'viz-linklabel' + (routeIds.has(id) ? ' on' : ''), text: l.a + '→' + l.b }));
       y += gap;

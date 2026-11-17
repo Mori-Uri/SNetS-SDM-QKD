@@ -150,6 +150,20 @@ final class Workspace {
             }
             n.put("csvCount", csv);
             n.put("lastResult", last);
+            // Parte 69: records of the visualizer (visualizador/*.json), for the page "Visualizador"
+            int traces = 0;
+            long traceLast = 0;
+            File[] tr = new File(dir, "visualizador").listFiles();
+            if (tr != null) {
+                for (File f : tr) {
+                    if (f.isFile() && f.getName().toLowerCase().endsWith(".json")) {
+                        traces++;
+                        traceLast = Math.max(traceLast, f.lastModified());
+                    }
+                }
+            }
+            n.put("traceCount", traces);
+            n.put("traceLast", traceLast);
             // Parte 52: progress saved by the simulator (savestate/progresso.json), parsed in the browser
             File progress = new File(new File(dir, "savestate"), "progresso.json");
             if (progress.isFile()) {

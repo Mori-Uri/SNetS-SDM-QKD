@@ -5,6 +5,7 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 
 | Parte | Resumo |
 |---|---|
+| [69](#parte-69) | Parte 69 — launcher 1.24.0: visualizador (cliques, navegação por tipo, legenda dos núcleos, SKR e página própria) |
 | [68](#parte-68) | Parte 68 — launcher 1.23.1: visualizador abre registros grandes |
 | [67](#parte-67) | Parte 67 — Algoritmos de RMSCA: vazamento de memória, bloqueio sem núcleo, grooming AGG e algoritmos registrados |
 | [66](#parte-66) | Parte 66 — visualizador da simulação (registro de eventos e aba Visualizador, launcher 1.23.0) |
@@ -50,6 +51,41 @@ corresponde a uma etapa de desenvolvimento da dissertação. Mudanças novas ent
 | [23](#parte-23) | Addon QKD — Parte 23: cenário de estudo da qualificação |
 | [21–22](#parte-21-22) | Entrega QKD - Partes 21 e 22 (+ interface) |
 | [18–20](#parte-18-20) | Entrega QKD - Partes 18, 19 e 20 |
+
+---
+
+<a id="parte-69"></a>
+## Parte 69 — launcher 1.24.0: visualizador (cliques, navegação por tipo, legenda dos núcleos, SKR e página própria)
+
+**Cliques que não funcionavam.** A grade dos slots no desenho do espectro e o bloco com a topologia e os detalhes
+usavam o mesmo nome de classe CSS (`viz-grid`), e a regra da grade desliga o mouse (`pointer-events: none`). Por isso
+o bloco inteiro ignorava cliques e a roda do mouse: a caixa "Tentativas internas dos algoritmos", a barra de rolagem
+dela, a caixa "cor dos enlaces", o log. As classes do desenho do espectro foram renomeadas (`viz-sgrid`, `viz-srow`).
+
+**Navegação por tipo de passo.** "Parar em" e os botões "⟸ bloqueio / bloqueio ⟹" foram trocados por "Ir para":
+qualquer bloqueio, bloqueio de uma causa, requisições aceitas, saídas (liberação de recursos), requisições QKD ou
+requisições QKD bloqueadas, com o par origem-destino opcional. Os botões "⟸ anterior" e "próximo ⟹" vão só para
+passos desse tipo, e "parar a reprodução nele" faz a reprodução parar no próximo deles. Na linha do tempo, os
+bloqueios do tipo escolhido ficam realçados (os outros, apagados); aceitas, saídas e requisições QKD ganham marcas
+próprias na faixa de baixo.
+
+**Legenda dos núcleos**, ao lado do desenho da fibra: núcleo clássico, núcleo QKD, núcleo do circuito (ou do
+candidato), núcleo da tentativa bloqueada (ou do teste recusado), contorno do núcleo do PICh da sessão e núcleo
+desativado. O que não aparece no passo fica apagado. Legenda da cor de ocupação dos enlaces (0% a 100%).
+
+**SKR e QBER com o limiar.** O registro do simulador (`SimulationTracer`) passa a gravar, para cada sessão QKD
+admitida, a demanda de chave, a SKR gerada no trecho gargalo e a SKR e a QBER de cada trecho. O painel mostra "SKR no
+gargalo" com o limiar (a demanda de chave da requisição), a chave reservada para a sessão quando ela é outra (QChs
+compartilhados) e a lista dos trechos com SKR e QBER. Os resultados da simulação não mudam.
+
+**Página "Visualizador"** na barra do topo, ao lado de "Gráficos": lista os casos que têm registro (pasta
+`visualizador`), abre o escolhido sem abrir o caso e deixa os botões, a linha do tempo, o controle deslizante e o
+cabeçalho do passo fixos no topo da tela ao rolar. A gravação continua sendo ligada na aba Visualizador do caso
+(botão "Abrir o caso").
+
+**Arquivos:** `src/main/java/simulator/SimulationTracer.java`, `simulations/SNetS-SDM-QKD.jar`,
+`launcher/src/launcher/{LauncherServer, Workspace}.java`, `launcher/web/{index.html, styles.css}`,
+`launcher/web/js/{app, viz}.js` e `launcher/snets-launcher.jar`.
 
 ---
 
